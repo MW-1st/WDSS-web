@@ -1,13 +1,47 @@
-알겠어! 네가 올려준 발표 내용을 바탕으로 **web 부분의 README 초안**을 정리해봤어. 발표에서 나온 웹 관련 기술적 과제와 목표를 중심으로 작성했어.
-
----
-
 # Web README
 
 ## 개요
 
 본 프로젝트의 웹(Web) 부분은 사용자가 업로드한 이미지나 직접 그린 그림을 기반으로 **드론 경로 자동 생성 및 시뮬레이션**을 지원하는 핵심 인터페이스 역할을 한다.
 웹은 단순히 데이터 입력 창구를 넘어, 이미지 처리·경로 변환·시뮬레이션 서버와의 실시간 연동을 담당하며, 사용자가 직관적으로 드론 이동 경로를 설계할 수 있도록 한다.
+
+---
+
+## 세팅
+
+1. 백엔드 (Python / 가상환경)
+```bash
+cd backend
+# 가상환경 생성 (윈도우라면)
+python -m venv venv
+
+# 가상환경 실행
+venv\Scripts\activate   # 윈도우
+# source venv/bin/activate   # 리눅스/맥
+
+# 패키지 설치
+pip install -r requirements.txt
+```
+
+2. 프론트엔드 (Node.js / npm)
+```bash
+cd frontend
+npm install
+```
+
+## 실행
+1. 백엔드 실행
+```bash
+cd backend
+venv\Scripts\activate   # (가상환경 실행, 이미 되어 있으면 생략)
+uvicorn app.main:app --reload 
+```
+
+2. 프론트엔드 실행
+```bash
+cd frontend
+npm run dev
+```
 
 ---
 
