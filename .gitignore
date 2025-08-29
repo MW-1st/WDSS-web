@@ -159,3 +159,4 @@ sketch
 .env.development
 venv
 .vscode
+__pycache__/
