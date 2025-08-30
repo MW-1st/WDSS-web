@@ -4,6 +4,7 @@ import MainPage from "./pages/MainPage.jsx";
 import EditorPage from "./pages/EditorPage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import DashboardPage from "./pages/DashboardPage.jsx";
+import SimulatorPage from "./pages/SimulatorPage.jsx";
 import PrivateRoute from "./components/PrivateRoute.jsx";
 
 export default function App() {
@@ -34,16 +35,19 @@ export default function App() {
         <Link to="/editor">Editor</Link>
         {!isAuth && <Link to="/login">Login</Link>}
         {isAuth && <Link to="/dashboard">Dashboard</Link>}
+        {isAuth && <Link to="/simulator">Simulator</Link>}
         {isAuth && (
           <button onClick={logout} style={{ marginLeft: "auto" }}>
             Logout
           </button>
         )}
+
       </nav>
 
       <Routes>
         <Route path="/" element={<MainPage />} />
         <Route path="/editor" element={<EditorPage />} />
+        <Route path="/simulator" element={<SimulatorPage />} />
         <Route
           path="/login"
           element={isAuth ? <Navigate to="/dashboard" replace /> : <LoginPage />}
@@ -56,7 +60,9 @@ export default function App() {
             </PrivateRoute>
           }
         />
+
       </Routes>
     </div>
   );
 }
+
