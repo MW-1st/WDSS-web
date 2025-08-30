@@ -7,51 +7,37 @@ const ImageUpload = ({ projectId = 1, sceneId = 1 }) => {
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
 
-  const handleFileSelect = (event) => {
+  // 🚀 1. 파일 선택과 업로드를 한 번에 처리하는 함수로 변경
+  const handleFileChangeAndUpload = async (event) => {
     const file = event.target.files[0];
-    if (file) {
-      if (file.type.startsWith('image/')) {
-        setSelectedFile(file);
-        setUploadStatus('');
-      } else {
-        setUploadStatus('이미지 파일만 업로드 가능합니다.');
-      }
-    }
-  };
+    if (!file) return;
 
-  const handleUpload = async () => {
-    if (!selectedFile) {
-      setUploadStatus('파일을 선택해주세요.');
+    if (!file.type.startsWith('image/')) {
+      setUploadStatus('이미지 파일만 업로드 가능합니다.');
       return;
     }
 
+    // 업로드를 위해 상태 업데이트
+    setSelectedFile(file);
     setUploading(true);
     setUploadStatus('업로드 중...');
 
     try {
       const formData = new FormData();
-      formData.append('image', selectedFile);
+      formData.append('image', file); // state 대신 방금 선택한 file 변수 사용
 
-      // 🚀 1. API 호출 (이 부분은 원래 코드와 동일)
       const response = await client.post(`/projects/${projectId}/scenes/${sceneId}/upload-image`, formData);
 
-      // 🚀 2. 성공 처리 (axios는 2xx 상태 코드만 try 블록으로 전달)
-      // response.status가 200인지 확인할 필요 없이, 이 코드가 실행되면 성공한 것입니다.
-      // response.data에 자동으로 파싱된 JSON 객체가 들어 있습니다.
       setUploadStatus('업로드 완료!');
       console.log('Upload success:', response.data);
 
-      setSelectedFile(null);
-      document.getElementById('fileInput').value = '';
+      setSelectedFile(null); // 성공 후 선택된 파일 정보 초기화
+      event.target.value = ''; // 파일 입력(input) 자체를 초기화
 
     } catch (error) {
-      // 🚀 3. 에러 처리 (4xx, 5xx 상태 코드나 네트워크 오류는 모두 catch 블록으로 전달)
       console.error('Upload error:', error);
-
-      // 서버가 응답을 한 경우 (4xx, 5xx 에러)
       if (error.response) {
         const status = error.response.status;
-        // 서버가 보낸 에러 메시지가 있다면 사용하고, 없다면 기본 메시지 사용
         const message = error.response.data?.message || `서버 오류 (${status})`;
 
         if (status === 404) {
@@ -59,13 +45,9 @@ const ImageUpload = ({ projectId = 1, sceneId = 1 }) => {
         } else {
           setUploadStatus(`업로드 실패: ${message}`);
         }
-      }
-      // 서버가 응답하지 않은 경우 (네트워크 문제 등)
-      else if (error.request) {
+      } else if (error.request) {
         setUploadStatus('업로드 실패: 서버에서 응답이 없습니다.');
-      }
-      // 요청을 보내기 전에 발생한 오류
-      else {
+      } else {
         setUploadStatus('업로드 중 오류가 발생했습니다.');
       }
     } finally {
@@ -78,13 +60,13 @@ const ImageUpload = ({ projectId = 1, sceneId = 1 }) => {
       <h3 className="text-lg font-semibold mb-4">이미지 업로드</h3>
 
       <div className="space-y-4">
-        {/* 파일 선택 */}
         <div>
           <input
             id="fileInput"
             type="file"
             accept="image/*"
-            onChange={handleFileSelect}
+            // 🚀 2. onChange 이벤트에 새로운 통합 함수를 연결
+            onChange={handleFileChangeAndUpload}
             className="block w-full text-sm text-gray-500
                      file:mr-4 file:py-2 file:px-4
                      file:rounded-full file:border-0
@@ -95,7 +77,6 @@ const ImageUpload = ({ projectId = 1, sceneId = 1 }) => {
           />
         </div>
 
-        {/* 선택된 파일 정보 */}
         {selectedFile && (
           <div className="text-sm text-gray-600">
             <p>선택된 파일: {selectedFile.name}</p>
@@ -104,18 +85,9 @@ const ImageUpload = ({ projectId = 1, sceneId = 1 }) => {
           </div>
         )}
 
-        {/* 업로드 버튼 */}
-        <button
-          onClick={handleUpload}
-          disabled={!selectedFile || uploading}
-          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600
-                   disabled:bg-gray-300 disabled:cursor-not-allowed
-                   transition-colors duration-200"
-        >
-          {uploading ? '업로드 중...' : '이미지 업로드'}
-        </button>
+        {/* 🚀 3. 업로드 버튼 제거 */}
+        {/* <button onClick={handleUpload} ... /> */}
 
-        {/* 상태 메시지 */}
         {uploadStatus && (
           <div className={`text-sm p-2 rounded ${
             uploadStatus.includes('완료') 
@@ -138,10 +110,7 @@ export default function EditorPage() {
       <h1 className="text-2xl font-bold mb-4">Editor</h1>
       <p className="text-gray-600 mb-6">간단한 Konva 캔버스 예시입니다.</p>
 
-      {/* 이미지 업로드 컴포넌트 */}
       <ImageUpload projectId={1} sceneId={1} />
-
-      {/* 캔버스 컴포넌트 */}
       <Canvas width={800} height={500} />
     </section>
   );
