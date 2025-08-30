@@ -3,6 +3,7 @@ import MainPage from "./pages/MainPage.jsx";
 import EditorPage from "./pages/EditorPage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import DashboardPage from "./pages/DashboardPage.jsx";
+import SimulatorPage from "./pages/SimulatorPage.jsx";
 
 export default function App() {
   return (
@@ -12,6 +13,7 @@ export default function App() {
         <Link to="/editor">Editor</Link>
         <Link to="/login">Login</Link>
         <Link to="/dashboard">Dashboard</Link>
+        <Link to="/simulator">Simulator</Link>
       </nav>
 
       <Routes>
@@ -19,7 +21,9 @@ export default function App() {
         <Route path="/editor" element={<EditorPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/simulator" element={<SimulatorPage />} />
       </Routes>
     </div>
   );
 }
+
