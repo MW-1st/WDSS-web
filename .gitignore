@@ -160,3 +160,4 @@ sketch
 venv
 .vscode
 __pycache__/
+.env
