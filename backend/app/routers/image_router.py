@@ -4,7 +4,9 @@ from app.services.svg_service import svg_to_coords, coords_to_json
 import shutil
 import os
 import uuid
+import json
 from app.db.database import get_conn
+from app.routers.websocket import manager
 
 router = APIRouter(prefix="/image", tags=["image"])
 
@@ -136,11 +138,13 @@ async def svg_to_json_endpoint(
         out_name = f"{safe_base}_{ts}_{uuid.uuid4().hex[:6]}.json"
         out_path = os.path.join(out_dir, out_name)
 
-        import json
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
 
-        return {"json_url": f"/svg-json/{out_name}"}
+        # Unity로 JSON 데이터 전송
+        await manager.broadcast(json.dumps(data))
+
+        return {"json_url": f"/svg-json/{out_name}", "unity_sent": True}
     finally:
         try:
             os.remove(temp_path)
