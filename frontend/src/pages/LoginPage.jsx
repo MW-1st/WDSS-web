@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 import client from "../api/client";
 
 export default function LoginPage() {
@@ -10,6 +11,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [mode, setMode] = useState("login"); // "login" | "register"
+  const { login } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -30,8 +32,8 @@ export default function LoginPage() {
         // [수정] localStorage에 토큰을 저장할 필요가 없습니다. 쿠키가 알아서 처리합니다.
         // localStorage.setItem("token", data.access_token);
         // localStorage.setItem("token_type", data.token_type || "bearer");
-
-        window.dispatchEvent(new Event("auth-change")); // 다른 컴포넌트에 로그인 상태 변경 알림
+        login(data.user);
+        // window.dispatchEvent(new Event("auth-change")); // 다른 컴포넌트에 로그인 상태 변경 알림
         navigate("/dashboard");
       } else {
         setError("Unexpected response from server.");

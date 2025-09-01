@@ -1,15 +1,16 @@
+import { useAuth } from '../contexts/AuthContext'; // 👈 AuthContext 훅 import
+
 export default function DashboardPage() {
-  const token = localStorage.getItem("token");
+  const { isAuthenticated, user } = useAuth();
 
   return (
     <div style={{ padding: 16 }}>
       <h2>Dashboard</h2>
-      {token ? (
-        <p>Logged in. Token stored in localStorage.</p>
+      {isAuthenticated ? (
+        <p>Welcome, {user.username}! You are logged in.</p>
       ) : (
-        <p>No token found. Please login.</p>
+        <p>You are not logged in. Please login.</p>
       )}
     </div>
   );
 }
-
