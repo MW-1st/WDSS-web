@@ -18,9 +18,8 @@ class TokenPayload(BaseModel):
 #     username: str
 #     disabled: bool = False
 class UserResponse(BaseModel):
-    id: str
-    email: EmailStr
     username: str
+    disabled: bool = False
 
 
 class UserInDB(UserResponse):
