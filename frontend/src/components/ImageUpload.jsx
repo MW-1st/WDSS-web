@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import client from "../api/client"; // axios 인스턴스
+import client from "../api/client";
 
-// ImageUpload 컴포넌트를 export default로 내보냅니다.
-export default function ImageUpload({ projectId = 1, sceneId = 1 }) {
+export default function ImageUpload({ projectId = 1, sceneId = 1, onUploaded }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
@@ -18,7 +17,7 @@ export default function ImageUpload({ projectId = 1, sceneId = 1 }) {
 
     setSelectedFile(file);
     setUploading(true);
-    setUploadStatus('업로드 중...');
+    setUploadStatus('업로드 중..');
 
     try {
       const formData = new FormData();
@@ -29,6 +28,14 @@ export default function ImageUpload({ projectId = 1, sceneId = 1 }) {
       setUploadStatus('업로드 완료!');
       console.log('Upload success:', response.data);
 
+      // 공개 URL 생성 (/uploads/*)
+      const filePath = String(response.data?.image_url || '');
+      const normalized = filePath.replace(/\\/g, '/');
+      const parts = normalized.split('/');
+      const filename = parts[parts.length - 1] || '';
+      const webUrl = `${client.defaults.baseURL.replace(/\/$/, '')}/uploads/${filename}`;
+      if (typeof onUploaded === 'function') onUploaded(webUrl);
+
       setSelectedFile(null);
       event.target.value = '';
 
@@ -37,7 +44,6 @@ export default function ImageUpload({ projectId = 1, sceneId = 1 }) {
       if (error.response) {
         const status = error.response.status;
         const message = error.response.data?.message || `서버 오류 (${status})`;
-
         if (status === 404) {
           setUploadStatus('업로드 실패: API 엔드포인트를 찾을 수 없습니다.');
         } else {
@@ -46,7 +52,7 @@ export default function ImageUpload({ projectId = 1, sceneId = 1 }) {
       } else if (error.request) {
         setUploadStatus('업로드 실패: 서버에서 응답이 없습니다.');
       } else {
-        setUploadStatus('업로드 중 오류가 발생했습니다.');
+        setUploadStatus('업로드 중 예기치 않은 오류가 발생했습니다.');
       }
     } finally {
       setUploading(false);
@@ -76,7 +82,7 @@ export default function ImageUpload({ projectId = 1, sceneId = 1 }) {
 
         {selectedFile && (
           <div className="text-sm text-gray-600">
-            <p>선택된 파일: {selectedFile.name}</p>
+            <p>선택 파일: {selectedFile.name}</p>
             <p>크기: {(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
             <p>타입: {selectedFile.type}</p>
           </div>
@@ -97,3 +103,4 @@ export default function ImageUpload({ projectId = 1, sceneId = 1 }) {
     </div>
   );
 };
+
