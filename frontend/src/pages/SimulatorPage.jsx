@@ -27,7 +27,7 @@ const buttonStyle = {
 const SimulatorPage = () => {
   const sendTestData = async () => {
     try {
-      const response = await fetch('/ws/test/broadcast', {
+      const response = await fetch('http://localhost:8000/ws/test/broadcast', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
