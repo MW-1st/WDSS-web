@@ -21,7 +21,7 @@ os.makedirs(UPLOAD_DIRECTORY, exist_ok=True)
 async def upload_image(
     project_id: int,
     scene_id: int,  # DB의 scene_num 컬럼과 매칭
-    image: UploadFile = File(...)
+    image: UploadFile = File(...),
 ):
     """
     이미지를 서버에 업로드하고, asyncpg를 사용해 DB에 경로를 업데이트합니다.
@@ -58,7 +58,10 @@ async def upload_image(
             updated_rows = int(status.split()[-1])
             if updated_rows == 0:
                 # 업데이트된 행이 없으면 해당 scene_id가 존재하지 않는 것이므로 404 에러 발생
-                raise HTTPException(status_code=404, detail=f"Scene ID(num) {scene_id}를 찾을 수 없습니다.")
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Scene ID(num) {scene_id}를 찾을 수 없습니다.",
+                )
 
     except HTTPException as http_exc:
         # 404 에러가 발생한 경우, 저장했던 파일을 삭제(롤백)하고 에러를 다시 발생시킵니다.
@@ -67,16 +70,16 @@ async def upload_image(
     except Exception as e:
         # 그 외 DB 관련 에러 발생 시에도 파일을 삭제(롤백)합니다.
         os.remove(file_path)
-        raise HTTPException(status_code=500, detail=f"데이터베이스 업데이트 중 오류 발생: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"데이터베이스 업데이트 중 오류 발생: {e}"
+        )
 
     # 6. 성공 응답 반환
     return JSONResponse(
         status_code=200,
         content={
-            "success": true,
+            "success": True,
             "message": "이미지가 업로드되었습니다.",
-            "image_url": file_path
+            "image_url": file_path,
         },
-
     )
-
