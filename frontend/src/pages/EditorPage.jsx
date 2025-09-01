@@ -57,7 +57,7 @@ export default function EditorPage({ projectId = 1 }) {
       {/* 업로드 바 */}
       <section style={{ display: "flex", justifyContent: "center", padding: "24px 0", borderBottom: "1px solid #eee" }}>
         <div style={{ width: "70%", maxWidth: 980 }}>
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, marginBottom: 12 }}>이미지 업로드</h2>
+          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, marginBottom: 12 }}></h2>
           <ImageUpload projectId={projectId} sceneId={selectedId ?? 0} />
         </div>
       </section>
@@ -101,7 +101,7 @@ export default function EditorPage({ projectId = 1 }) {
       disabled={start === 0}
       style={{
         position: "absolute",
-        left: "calc(50% - 540px)", // 썸네일 영역보다 살짝 바깥
+        left: "calc(50% - 540px)", 
         top: "50%",
         transform: "translateY(-50%)",
         width: 48,
@@ -178,7 +178,7 @@ export default function EditorPage({ projectId = 1 }) {
             bottom: 6,
             fontSize: 12,
             color: "#333",
-            opacity: 0.6,            // ← 옅게
+            opacity: 0.6,          
             background: "rgba(255,255,255,0.7)",
             padding: "2px 6px",
             borderRadius: 4,
