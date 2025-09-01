@@ -28,6 +28,13 @@ app.mount(
     name="uploads",
 )
 
+# Static files for generated JSON
+app.mount(
+    "/svg-json",
+    StaticFiles(directory="svg_json"),
+    name="svg_json",
+)
+
 
 @app.get("/health")
 def health_check():

@@ -162,3 +162,4 @@ venv
 __pycache__/
 .env
 backend/uploaded_images/
+backend/svg_json/

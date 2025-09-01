@@ -75,16 +75,6 @@ export default function Canvas({ width = 800, height = 500, imageUrl = "", stage
             listening={false}
           />
         )}
-        <Rect
-          x={50}
-          y={50}
-          width={120}
-          height={80}
-          fill="#ddd"
-          stroke="#333"
-          draggable
-          cornerRadius={8}
-        />
         {lines.map((l, i) => (
           <Line
             key={i}

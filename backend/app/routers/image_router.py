@@ -1,5 +1,6 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from app.services.image_service import process_image
+from app.services.svg_service import svg_to_coords, coords_to_json
 import shutil
 import os
 import uuid
@@ -60,3 +61,88 @@ async def process_uploaded_image(
                 pass
 
     return {"output_url": f"/uploads/{os.path.basename(output_path)}"}
+
+
+@router.post("/svg-to-json")
+async def svg_to_json_endpoint(
+    file: UploadFile = File(...),
+    show_name: str = "svg-import",
+    scene_number: int = 1,
+    scene_holder: int = 0,
+    max_scene: int = 1,
+    max_drone: int | None = None,
+    # mapping
+    z_value: float = 0.0,
+    scale_x: float = 1.0,
+    scale_y: float = 1.0,
+    scale_z: float = 1.0,
+    offset_x: float = 0.0,
+    offset_y: float = 0.0,
+    offset_z: float = 0.0,
+    # visuals
+    led_intensity: float = 1.0,
+    led_r: int = 255,
+    led_g: int = 255,
+    led_b: int = 255,
+    # constraints
+    max_speed: float = 6.0,
+    max_accel: float = 3.0,
+    min_separation: float = 2.0,
+):
+    """
+    Accepts an SVG file, converts coordinates to DSJ JSON, saves to backend/svg_json,
+    and returns the downloadable URL under /svg-json/*.
+    """
+    backend_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    tmp_dir = os.path.join(backend_root, "tmp")
+    out_dir = os.path.join(backend_root, "svg_json")
+    os.makedirs(tmp_dir, exist_ok=True)
+    os.makedirs(out_dir, exist_ok=True)
+
+    ext = os.path.splitext(file.filename or "")[1].lower() or ".svg"
+    temp_path = os.path.join(tmp_dir, f"tmp_{uuid.uuid4().hex}{ext}")
+
+    with open(temp_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    try:
+        coords = svg_to_coords(temp_path)
+        data = coords_to_json(
+            coords,
+            show_name=show_name,
+            max_scene=max_scene,
+            max_drone=max_drone,
+            scene_number=scene_number,
+            scene_holder=scene_holder,
+            z_value=z_value,
+            scale_x=scale_x,
+            scale_y=scale_y,
+            scale_z=scale_z,
+            offset_x=offset_x,
+            offset_y=offset_y,
+            offset_z=offset_z,
+            led_intensity=led_intensity,
+            led_rgb=(led_r, led_g, led_b),
+            max_speed=max_speed,
+            max_accel=max_accel,
+            min_separation=min_separation,
+        )
+
+        # Save JSON with timestamped filename
+        from datetime import datetime
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        base = os.path.splitext(os.path.basename(file.filename or "import.svg"))[0]
+        safe_base = base or "svg"
+        out_name = f"{safe_base}_{ts}_{uuid.uuid4().hex[:6]}.json"
+        out_path = os.path.join(out_dir, out_name)
+
+        import json
+        with open(out_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+
+        return {"json_url": f"/svg-json/{out_name}"}
+    finally:
+        try:
+            os.remove(temp_path)
+        except OSError:
+            pass
