@@ -1,3 +1,5 @@
+import datetime
+
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 
@@ -12,12 +14,15 @@ class TokenPayload(BaseModel):
     exp: Optional[int] = None
 
 
-class User(BaseModel):
+# class User(BaseModel):
+#     username: str
+#     disabled: bool = False
+class UserResponse(BaseModel):
     username: str
     disabled: bool = False
 
 
-class UserInDB(User):
+class UserInDB(UserResponse):
     hashed_password: str
 
 
@@ -31,3 +36,26 @@ class RegisterResponse(BaseModel):
     id: str
     email: EmailStr
     username: str
+
+
+# logout?
+class MessageResponse(BaseModel):
+    success: bool = True
+    message: str
+
+
+class Project(BaseModel):
+    id: str
+    project_name: str
+    format: str
+    max_scene: int
+    max_speed: float
+    max_accel: float
+    min_separation: float
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
+
+
+class ProjectListResponse(BaseModel):
+    success: bool = True
+    projects: list[Project]

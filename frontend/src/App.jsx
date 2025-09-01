@@ -6,21 +6,12 @@ import LoginPage from "./pages/LoginPage.jsx";
 import DashboardPage from "./pages/DashboardPage.jsx";
 import PrivateRoute from "./components/PrivateRoute.jsx";
 import { UnityProvider, useUnity } from "./contexts/UnityContext.jsx";
+import { AuthProvider, useAuth } from "./contexts/AuthContext.jsx";
 
 function AppContent() {
   const navigate = useNavigate();
-  const [isAuth, setIsAuth] = useState(!!localStorage.getItem("token"));
   const { isUnityVisible, showUnity, hideUnity } = useUnity();
-
-  useEffect(() => {
-    const handler = () => setIsAuth(!!localStorage.getItem("token"));
-    window.addEventListener("auth-change", handler);
-    window.addEventListener("storage", handler);
-    return () => {
-      window.removeEventListener("auth-change", handler);
-      window.removeEventListener("storage", handler);
-    };
-  }, []);
+  const { isAuthenticated, logout, loading } = useAuth();
 
   useEffect(() => {
     const handleEscape = (event) => {
@@ -28,15 +19,13 @@ function AppContent() {
         hideUnity();
       }
     };
-    
+
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
   }, [isUnityVisible, hideUnity]);
 
-  const logout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("token_type");
-    window.dispatchEvent(new Event("auth-change"));
+  const handleLogout = async () => {
+    await logout(); // 👈 Context에 있는 진짜 로그아웃 로직을 호출
     navigate("/");
   };
 
@@ -82,20 +71,24 @@ function AppContent() {
     borderRadius: '8px'
   };
 
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+
   return (
     <div style={{ padding: 16 }}>
-      <nav style={{ display: "flex", gap: 12, marginBottom: 16, alignItems: "center" }}>
-        <Link to="/">Main</Link>
-        <Link to="/editor">Editor</Link>
-        {!isAuth && <Link to="/login">Login</Link>}
-        {isAuth && <Link to="/dashboard">Dashboard</Link>}
-        
-        {isAuth && (
-          <button onClick={logout} style={{ marginLeft: "auto" }}>
-            Logout
-          </button>
-        )}
+        <nav style={{ display: "flex", gap: 12, marginBottom: 16, alignItems: "center" }}>
+          <Link to="/">Main</Link>
+          <Link to="/editor">Editor</Link>
+          {!isAuthenticated && <Link to="/login">Login</Link>}
+          {isAuthenticated && <Link to="/dashboard">Dashboard</Link>}
 
+          {isAuthenticated && (
+            <button onClick={logout} style={{ marginLeft: "auto" }}>
+              Logout
+            </button>
+          )}
       </nav>
 
       <Routes>
@@ -103,7 +96,7 @@ function AppContent() {
         <Route path="/editor" element={<EditorPage />} />
         <Route
           path="/login"
-          element={isAuth ? <Navigate to="/dashboard" replace /> : <LoginPage />}
+          element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />}
         />
         <Route
           path="/dashboard"
@@ -135,10 +128,11 @@ function AppContent() {
 
 export default function App() {
   return (
-    <UnityProvider>
-      <AppContent />
-    </UnityProvider>
-
+      <AuthProvider>
+        <UnityProvider>
+          <AppContent />
+        </UnityProvider>
+      </AuthProvider>
 );
 }
 
