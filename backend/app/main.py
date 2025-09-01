@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import auth
+from app.routers import auth, image
 
 app = FastAPI()
 
@@ -15,6 +15,7 @@ app.add_middleware(
 
 # Routers
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
+app.include_router(image.router, prefix="/projects/{project_id}/scenes/{scene_id}", tags=["image"])
 
 
 @app.get("/health")
