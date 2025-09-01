@@ -52,34 +52,47 @@ def process_image(
             est = int(max(1, round((edge_pixels / max(target_dots, 1)) ** 0.5)))
             step = max(1, min(est, 64))
 
-    # 점 이미지 초기화
-    dots = np.zeros_like(edges)
-
-    # 간격에 따라 점 찍기
-    dot_count = 0
-    for y in range(0, h, step):
-        for x in range(0, w, step):
-            if edges[y, x] != 0:
-                cv2.circle(dots, (x, y), 1, 255, -1)
-                dot_count += 1
+    # 좌표만 수집하여 SVG로 저장할 예정
+    points: list[tuple[int, int]] = []  # (x, y)
+    if target_dots and target_dots > 0:
+        coords = np.column_stack(np.where(edges != 0))  # (y, x)
+        total = int(coords.shape[0])
+        if total > 0:
+            replace = target_dots > total
+            idx = np.random.choice(total, size=target_dots, replace=replace)
+            sel = coords[idx]
+            points = [(int(x), int(y)) for (y, x) in sel]
+        else:
+            points = []
+    else:
+        for y in range(0, h, step):
+            for x in range(0, w, step):
+                if edges[y, x] != 0:
+                    points.append((x, y))
+    dot_count = len(points)
 
     # 출력 경로 준비 (backend/uploaded_images)
     backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
     out_dir = os.path.join(backend_dir, "uploaded_images")
     os.makedirs(out_dir, exist_ok=True)
 
-    out_name = f"processed_{uuid.uuid4().hex}_{dot_count}.png"
+    out_name = f"processed_{uuid.uuid4().hex}_{dot_count}.svg"
     output_path = os.path.join(out_dir, out_name)
 
-    # 저장: imencode + 파일 쓰기 (비ASCII 경로 호환)
-    ok, buf = cv2.imencode(".png", dots)
-    if not ok:
-        raise RuntimeError("Failed to encode processed image as PNG")
-    with open(output_path, "wb") as f:
-        f.write(buf.tobytes())
-    print(f"Saved processed image to: {output_path}")
+    # SVG 저장 (비ASCII 경로 호환)
+    svg_header = (
+        f"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        f"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{w}\" height=\"{h}\" viewBox=\"0 0 {w} {h}\">\n"
+    )
+    # 원한다면 배경을 추가할 수 있음: <rect width="100%" height="100%" fill="white"/>
+    circles = [f"<circle cx=\"{x}\" cy=\"{y}\" r=\"1\" fill=\"#000\" />" for (x, y) in points]
+    svg_footer = "\n</svg>\n"
+    svg_content = svg_header + ("\n".join(circles)) + svg_footer
+
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(svg_content)
+    print(f"Saved processed SVG to: {output_path}")
 
     # 백엔드 루트 기준 상대 경로 반환
     rel_path = os.path.relpath(output_path, start=backend_dir)
     return rel_path
-

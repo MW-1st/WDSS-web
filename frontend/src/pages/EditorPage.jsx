@@ -8,6 +8,7 @@ export default function EditorPage() {
   const [processing, setProcessing] = useState(false);
   const [targetDots, setTargetDots] = useState(2000);
   const stageRef = useRef(null);
+  const sceneId = 1; // 현재 에디터의 씬 ID (임시 하드코딩)
 
   const handleUploaded = (webUrl) => {
     setImageUrl(webUrl || "");
@@ -17,14 +18,8 @@ export default function EditorPage() {
     if (!stageRef.current) return;
     try {
       setProcessing(true);
-      const dataUrl = stageRef.current.toDataURL({ pixelRatio: 1 });
-      const res = await fetch(dataUrl);
-      const blob = await res.blob();
-
-      const formData = new FormData();
-      formData.append("file", new File([blob], "canvas.png", { type: "image/png" }));
-
-      const resp = await client.post(`/image/process?target_dots=${encodeURIComponent(targetDots)}`, formData);
+      // 원본 이미지(서버 저장본)를 기준으로 변환 요청
+      const resp = await client.post(`/image/process?target_dots=${encodeURIComponent(targetDots)}&scene_id=${encodeURIComponent(sceneId)}`);
       let outputUrl = resp.data?.output_url || "";
       if (outputUrl.startsWith("http")) {
         setImageUrl(outputUrl);
