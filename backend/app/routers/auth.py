@@ -1,7 +1,6 @@
 from datetime import timedelta
 import uuid
 from typing import Optional
-
 import asyncpg
 from asyncpg import exceptions as pgexc
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -11,40 +10,15 @@ from app.schemas import Token, User, UserInDB, RegisterRequest, RegisterResponse
 from app.utils import security
 from app.core import config
 from app.db.database import get_conn
-
+from app.db.user import get_user_by_username
+from app.dependencies import get_current_user
 
 router = APIRouter()
 
 
-# OAuth2 scheme expects a tokenUrl where clients can get the token
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
-
-
-async def _get_user_by_username(
-    conn: asyncpg.Connection, username: str
-) -> Optional[UserInDB]:
-    row = await conn.fetchrow(
-        """
-        SELECT u.username, u.status, ac.password_hash
-        FROM users u
-        LEFT JOIN auth_credentials ac ON ac.user_id = u.id
-        WHERE u.username = $1
-        """,
-        username,
-    )
-    if not row:
-        return None
-    disabled = False if (row["status"] or "").upper() == "ACTIVE" else True
-    return UserInDB(
-        username=row["username"],
-        hashed_password=row["password_hash"],
-        disabled=disabled,
-    )
-
-
 async def authenticate_user(username: str, password: str) -> Optional[UserInDB]:
     async with get_conn() as conn:
-        user = await _get_user_by_username(conn, username)
+        user = await get_user_by_username(conn, username)
         if not user or not user.hashed_password:
             return None
         if not security.verify_password(password, user.hashed_password):
@@ -67,33 +41,6 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
         subject=user.username, expires_delta=access_token_expires
     )
     return Token(access_token=access_token)
-
-
-async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
-    try:
-        payload = security.decode_token(token)
-        username: str | None = payload.get("sub")
-        if username is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload"
-            )
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-        )
-
-    async with get_conn() as conn:
-        user_in_db = await _get_user_by_username(conn, username)
-    if user_in_db is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
-        )
-    if user_in_db.disabled:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user"
-        )
-    return User(username=user_in_db.username, disabled=user_in_db.disabled)
 
 
 @router.get("/me", response_model=User)
