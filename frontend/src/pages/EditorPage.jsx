@@ -112,13 +112,18 @@ export default function EditorPage() {
                 );
                 const jsonResp = await client.post("/image/svg-to-json", fd);
                 const jsonUrl = jsonResp.data?.json_url;
+                const unitySent = jsonResp.data?.unity_sent;
                 if (jsonUrl) {
-                  const base =
-                    client.defaults.baseURL?.replace(/\/$/, "") || "";
-                  const full = jsonUrl.startsWith("http")
+                  const base = 
+                        client.defaults.baseURL?.replace(/\/$/, '') || '';
+                  const full = jsonUrl.startsWith('http')
                     ? jsonUrl
-                    : `${base}/${jsonUrl.replace(/^\//, "")}`;
-                  window.open(full, "_blank", "noopener");
+                    : `${base}/${jsonUrl.replace(/^\//,'')}`;
+                  window.open(full, '_blank', 'noopener');
+                  if (unitySent) {
+                    alert('JSON 파일이 생성되었고 Unity로 데이터가 전송되었습니다!');
+                  }
+
                 } else {
                   alert("JSON 생성에 실패했습니다.");
                 }
@@ -162,13 +167,9 @@ export default function EditorPage() {
               🎮 Unity 시뮬레이터 닫기
             </button>
           )}
-          <button style={sendButtonStyle} onClick={sendTestData}>
-            Unity로 데이터 전송
-          </button>
         </div>
-        <p style={{ fontSize: "14px", color: "#666", margin: "0" }}>
-          Unity 시뮬레이터를 열고 데이터를 전송해보세요. Unity 인스턴스는 페이지
-          이동 시에도 메모리가 유지됩니다.
+        <p style={{ fontSize: '14px', color: '#666', margin: '0' }}>
+          Unity 시뮬레이터를 열고 'JSON 파일로만들기' 버튼을 클릭하면 Unity로 데이터가 자동 전송됩니다.
         </p>
       </div>
 

@@ -25,23 +25,6 @@ router = APIRouter(
     tags=["websocket"],
 )
 
-# --- 신규 추가: 테스트 데이터 전송을 위한 HTTP 엔드포인트 ---
-@router.post("/test/broadcast")
-async def broadcast_test_data():
-    """
-    연결된 모든 웹소켓 클라이언트에게 테스트용 JSON 데이터를 브로드캐스트합니다.
-    """
-    test_data = {
-        "objectName": "PlayerCube",
-        "action": "setColor",
-        "value": "#FF0000" # 빨간색
-    }
-    
-    # dict를 json 문자열로 변환하여 전송
-    await manager.broadcast(json.dumps(test_data))
-    
-    return {"status": "ok", "message": "Test data broadcasted to all clients."}
-# ---------------------------------------------------------
 
 
 @router.websocket("/unity")
