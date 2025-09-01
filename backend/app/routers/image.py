@@ -1,5 +1,3 @@
-# 기존 라우터 파일
-
 import os
 import uuid
 from fastapi import APIRouter, File, UploadFile, HTTPException

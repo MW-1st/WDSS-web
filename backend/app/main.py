@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
 from fastapi.staticfiles import StaticFiles
-from app.routers import auth, image
+from app.routers import auth, image, websocket
 from app.routers import image_router
 
 app = FastAPI()

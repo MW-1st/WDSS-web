@@ -2,24 +2,32 @@ import React, { useRef, useState } from 'react';
 import Canvas from "../components/Canvas.jsx";
 import ImageUpload from "../components/ImageUpload.jsx";
 import client from "../api/client";
+import { useUnity } from "../contexts/UnityContext.jsx";
 
 export default function EditorPage() {
+  // image change 관련 상태
   const [imageUrl, setImageUrl] = useState("");
   const [processing, setProcessing] = useState(false);
   const [targetDots, setTargetDots] = useState(2000);
   const stageRef = useRef(null);
   const sceneId = 1; // 현재 에디터의 씬 ID (임시 하드코딩)
 
+  // unity 관련 상태
+  const { isUnityVisible, showUnity, hideUnity, sendTestData } = useUnity();
+
+  // 업로드 완료 핸들러
   const handleUploaded = (webUrl) => {
     setImageUrl(webUrl || "");
   };
 
+  // 이미지 변환 핸들러
   const handleTransform = async () => {
     if (!stageRef.current) return;
     try {
       setProcessing(true);
-      // 원본 이미지(서버 저장본)를 기준으로 변환 요청
-      const resp = await client.post(`/image/process?target_dots=${encodeURIComponent(targetDots)}&scene_id=${encodeURIComponent(sceneId)}`);
+      const resp = await client.post(
+        `/image/process?target_dots=${encodeURIComponent(targetDots)}&scene_id=${encodeURIComponent(sceneId)}`
+      );
       let outputUrl = resp.data?.output_url || "";
       if (outputUrl.startsWith("http")) {
         setImageUrl(outputUrl);
@@ -36,15 +44,30 @@ export default function EditorPage() {
     }
   };
 
+  // 버튼 스타일
+  const buttonStyle = {
+    padding: '10px 20px',
+    backgroundColor: '#007bff',
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    marginRight: '10px'
+  };
+  const sendButtonStyle = { ...buttonStyle, backgroundColor: '#28a745' };
+  const closeButtonStyle = { ...buttonStyle, backgroundColor: '#dc3545' };
+
   return (
     <section className="p-6">
       <h1 className="text-2xl font-bold mb-4">Editor</h1>
-      <p className="text-gray-600 mb-6">이미지 업로드 후 캔버스에서 확인하고 변환할 수 있습니다.</p>
+      <p className="text-gray-600 mb-6">
+        이미지 업로드 후 캔버스에서 확인/변환하거나 Unity 시뮬레이터와 연동할 수 있습니다.
+      </p>
 
       {/* 이미지 업로드 */}
       <ImageUpload projectId={1} sceneId={1} onUploaded={handleUploaded} />
 
-      {/* 변환 버튼 */}
+      {/* 변환 기능 */}
       <div className="mb-4">
         <div className="mb-2 flex items-center gap-3">
           <label className="text-sm text-gray-700">Target dots: {targetDots}</label>
@@ -57,7 +80,7 @@ export default function EditorPage() {
             onChange={(e) => setTargetDots(parseInt(e.target.value, 10))}
           />
         </div>
-        {/* JSON 파일로 만들기 버튼 (SVG → JSON) */}
+        {/* JSON 파일 생성 버튼 */}
         <div className="mb-2">
           <button
             onClick={async () => {
@@ -75,7 +98,6 @@ export default function EditorPage() {
                 if (jsonUrl) {
                   const base = client.defaults.baseURL?.replace(/\/$/, '') || '';
                   const full = jsonUrl.startsWith('http') ? jsonUrl : `${base}/${jsonUrl.replace(/^\//,'')}`;
-                  // 간단 알림 및 새 탭 열기
                   window.open(full, '_blank', 'noopener');
                 } else {
                   alert('JSON 생성에 실패했습니다.');
@@ -89,7 +111,6 @@ export default function EditorPage() {
           >
             JSON 파일로만들기
           </button>
-          {/* Unity 보내기 버튼이 있다면 이 버튼 위에 위치합니다. */}
         </div>
         <button
           onClick={handleTransform}
@@ -98,6 +119,21 @@ export default function EditorPage() {
         >
           {processing ? "변환 중..." : "변환"}
         </button>
+      </div>
+
+      {/* Unity 기능 */}
+      <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
+        <div style={{ marginBottom: '15px' }}>
+          {!isUnityVisible ? (
+            <button style={buttonStyle} onClick={showUnity}>🎮 Unity 시뮬레이터 열기</button>
+          ) : (
+            <button style={closeButtonStyle} onClick={hideUnity}>🎮 Unity 시뮬레이터 닫기</button>
+          )}
+          <button style={sendButtonStyle} onClick={sendTestData}>Unity로 데이터 전송</button>
+        </div>
+        <p style={{ fontSize: '14px', color: '#666', margin: '0' }}>
+          Unity 시뮬레이터를 열고 데이터를 전송해보세요. Unity 인스턴스는 페이지 이동 시에도 메모리가 유지됩니다.
+        </p>
       </div>
 
       {/* 캔버스 */}
