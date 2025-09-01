@@ -5,15 +5,14 @@ import asyncpg
 from typing import Optional
 
 from app.db.database import get_conn
-from app.schemas import User, UserInDB
-from app.utils import security
-
 from app.db.user import get_user_by_username
+from app.schemas import UserInDB, UserResponse
+from app.utils import security
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 
-async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
+async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserResponse:
     try:
         payload = security.decode_token(token)
         username: str | None = payload.get("sub")
@@ -37,4 +36,4 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user"
         )
-    return User(username=user_in_db.username, disabled=user_in_db.disabled)
+    return UserResponse(username=user_in_db.username, disabled=user_in_db.disabled)
