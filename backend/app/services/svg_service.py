@@ -43,6 +43,39 @@ def svg_to_coords(svg_path: str) -> List[Tuple[float, float]]:
     return coords
 
 
+def get_svg_size(svg_path: str) -> Tuple[float, float, float]:
+    """
+    Determine (width, height, z) for the scene_size field from the SVG.
+    - Prefer explicit width/height attributes.
+    - Fallback to viewBox width/height.
+    - Return (0.0, 0.0, 0.0) if not determinable.
+    """
+    if not os.path.exists(svg_path):
+        raise FileNotFoundError(f"SVG not found: {svg_path}")
+
+    try:
+        tree = ET.parse(svg_path)
+        root = tree.getroot()
+
+        w = _parse_float(root.get("width"), 0.0)
+        h = _parse_float(root.get("height"), 0.0)
+
+        if w <= 0.0 or h <= 0.0:
+            vb = root.get("viewBox") or root.get("viewbox")
+            if vb:
+                parts = re.split(r"[\s,]+", vb.strip())
+                if len(parts) == 4:
+                    try:
+                        w = float(parts[2])
+                        h = float(parts[3])
+                    except Exception:
+                        pass
+
+        return float(w), float(h), 0.0
+    except Exception:
+        return 0.0, 0.0, 0.0
+
+
 def coords_to_json(
     coords: List[Tuple[float, float]],
     *,
@@ -51,6 +84,7 @@ def coords_to_json(
     max_drone: Optional[int] = None,
     scene_number: int = 1,
     scene_holder: int = 0,
+    scene_size: Optional[Tuple[float, float, float]] = None,
     # mapping params
     z_value: float = 0.0,
     scale_x: float = 1.0,
@@ -105,10 +139,10 @@ def coords_to_json(
             {
                 "scene_number": int(scene_number),
                 "scene_holder": int(scene_holder),
+                **({"scene_size": [float(scene_size[0]), float(scene_size[1]), float(scene_size[2])]} if scene_size is not None else {}),
                 "action_data": actions,
             }
         ],
     }
 
     return data
-
