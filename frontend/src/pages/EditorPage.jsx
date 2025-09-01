@@ -1,43 +1,163 @@
-import React from 'react';
+import React, { useRef, useState } from "react";
 import Canvas from "../components/Canvas.jsx";
 import ImageUpload from "../components/ImageUpload.jsx";
+import client from "../api/client";
 import { useUnity } from "../contexts/UnityContext.jsx";
 
 export default function EditorPage() {
+  // image change 관련 상태
+  const [imageUrl, setImageUrl] = useState("");
+  const [processing, setProcessing] = useState(false);
+  const [targetDots, setTargetDots] = useState(2000);
+  const stageRef = useRef(null);
+  const sceneId = 1; // 현재 에디터의 씬 ID (임시 하드코딩)
+
+  // unity 관련 상태
   const { isUnityVisible, showUnity, hideUnity, sendTestData } = useUnity();
 
+  // 업로드 완료 핸들러
+  const handleUploaded = (webUrl) => {
+    setImageUrl(webUrl || "");
+  };
+
+  // 이미지 변환 핸들러
+  const handleTransform = async () => {
+    if (!stageRef.current) return;
+    try {
+      setProcessing(true);
+      const resp = await client.post(
+        `/image/process?target_dots=${encodeURIComponent(
+          targetDots
+        )}&scene_id=${encodeURIComponent(sceneId)}`
+      );
+      let outputUrl = resp.data?.output_url || "";
+      if (outputUrl.startsWith("http")) {
+        setImageUrl(outputUrl);
+      } else {
+        const base = client.defaults.baseURL?.replace(/\/$/, "") || "";
+        const path = String(outputUrl).replace(/\\/g, "/");
+        setImageUrl(`${base}/${path.replace(/^\//, "")}`);
+      }
+    } catch (e) {
+      console.error("Transform error", e);
+      alert("이미지 변환 중 오류가 발생했습니다.");
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  // 버튼 스타일
   const buttonStyle = {
-    padding: '10px 20px',
-    backgroundColor: '#007bff',
-    color: 'white',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    marginRight: '10px'
+    padding: "10px 20px",
+    backgroundColor: "#007bff",
+    color: "white",
+    border: "none",
+    borderRadius: "4px",
+    cursor: "pointer",
+    marginRight: "10px",
   };
-
-  const sendButtonStyle = {
-    ...buttonStyle,
-    backgroundColor: '#28a745'
-  };
-
-  const closeButtonStyle = {
-    ...buttonStyle,
-    backgroundColor: '#dc3545'
-  };
+  const sendButtonStyle = { ...buttonStyle, backgroundColor: "#28a745" };
+  const closeButtonStyle = { ...buttonStyle, backgroundColor: "#dc3545" };
 
   return (
     <section className="p-6">
       <h1 className="text-2xl font-bold mb-4">Editor</h1>
-      <p className="text-gray-600 mb-6">간단한 Konva 캔버스 예시입니다.</p>
+      <p className="text-gray-600 mb-6">
+        이미지 업로드 후 캔버스에서 확인/변환하거나 Unity 시뮬레이터와 연동할 수
+        있습니다.
+      </p>
 
-      {/* 이미지 업로드 컴포넌트 */}
-      {/* 일단은 1,1로 고정 */}
-      <ImageUpload projectId={1} sceneId={1} />
+      {/* 이미지 업로드 */}
+      <ImageUpload projectId={1} sceneId={1} onUploaded={handleUploaded} />
 
-            
-      <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
-        <div style={{ marginBottom: '15px' }}>
+      {/* 변환 기능 */}
+      <div className="mb-4">
+        <div className="mb-2 flex items-center gap-3">
+          <label className="text-sm text-gray-700 flex items-center">
+            Target dots:
+            <span
+              style={{
+                display: "inline-block",
+                minWidth: "50px",
+                textAlign: "right",
+              }}
+            >
+              {targetDots}
+            </span>
+          </label>
+          <input
+            type="range"
+            min={100}
+            max={10000}
+            step={100}
+            value={targetDots}
+            onChange={(e) => setTargetDots(parseInt(e.target.value, 10))}
+          />
+        </div>
+        {/* JSON 파일 생성 버튼 */}
+        <div className="mb-2">
+          <button
+            onClick={async () => {
+              try {
+                if (!imageUrl || !imageUrl.endsWith(".svg")) {
+                  alert("먼저 변환하여 SVG를 생성해주세요.");
+                  return;
+                }
+                const resp = await fetch(imageUrl);
+                const svgBlob = await resp.blob();
+                const fd = new FormData();
+                fd.append(
+                  "file",
+                  new File([svgBlob], "canvas.svg", { type: "image/svg+xml" })
+                );
+                const jsonResp = await client.post("/image/svg-to-json", fd);
+                const jsonUrl = jsonResp.data?.json_url;
+                const unitySent = jsonResp.data?.unity_sent;
+                if (jsonUrl) {
+                  const base = 
+                        client.defaults.baseURL?.replace(/\/$/, '') || '';
+                  const full = jsonUrl.startsWith('http')
+                    ? jsonUrl
+                    : `${base}/${jsonUrl.replace(/^\//,'')}`;
+                  window.open(full, '_blank', 'noopener');
+                  if (unitySent) {
+                    alert('JSON 파일이 생성되었고 Unity로 데이터가 전송되었습니다!');
+                  }
+
+                } else {
+                  alert("JSON 생성에 실패했습니다.");
+                }
+              } catch (e) {
+                console.error("SVG to JSON error", e);
+                alert("JSON 생성 중 오류가 발생했습니다.");
+              }
+            }}
+            className="px-4 py-2 mr-3 rounded bg-emerald-600 hover:bg-emerald-700 text-white"
+          >
+            JSON 파일로만들기
+          </button>
+        </div>
+        <button
+          onClick={handleTransform}
+          disabled={processing}
+          className={`px-4 py-2 rounded text-white ${
+            processing ? "bg-gray-400" : "bg-blue-600 hover:bg-blue-700"
+          }`}
+        >
+          {processing ? "변환 중..." : "변환"}
+        </button>
+      </div>
+
+      {/* Unity 기능 */}
+      <div
+        style={{
+          marginBottom: "20px",
+          padding: "15px",
+          backgroundColor: "#f8f9fa",
+          borderRadius: "8px",
+        }}
+      >
+        <div style={{ marginBottom: "15px" }}>
           {!isUnityVisible ? (
             <button style={buttonStyle} onClick={showUnity}>
               🎮 Unity 시뮬레이터 열기
@@ -47,20 +167,19 @@ export default function EditorPage() {
               🎮 Unity 시뮬레이터 닫기
             </button>
           )}
-          
-          <button style={sendButtonStyle} onClick={sendTestData}>
-            Unity로 데이터 전송
-          </button>
         </div>
-        
         <p style={{ fontSize: '14px', color: '#666', margin: '0' }}>
-          Unity 시뮬레이터를 열고 데이터를 전송해보세요. Unity 인스턴스는 페이지 이동 시에도 메모리가 유지됩니다.
+          Unity 시뮬레이터를 열고 'JSON 파일로만들기' 버튼을 클릭하면 Unity로 데이터가 자동 전송됩니다.
         </p>
       </div>
-      
 
-      {/* 캔버스 컴포넌트 */}
-      <Canvas width={800} height={500} />
+      {/* 캔버스 */}
+      <Canvas
+        width={800}
+        height={500}
+        imageUrl={imageUrl}
+        stageRef={stageRef}
+      />
     </section>
   );
 }
