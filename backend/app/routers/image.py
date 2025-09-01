@@ -73,9 +73,10 @@ async def upload_image(
     return JSONResponse(
         status_code=200,
         content={
-            "message": "이미지 업로드 및 DB 업데이트 성공",
-            "db_s3_key": file_path,
-            "filename": unique_filename,
+            "success": true,
+            "message": "이미지가 업로드되었습니다.",
+            "image_url": file_path
         },
 
     )
+
