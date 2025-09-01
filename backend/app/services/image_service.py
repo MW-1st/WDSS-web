@@ -23,7 +23,10 @@ def process_image(
     if not os.path.exists(input_path):
         raise FileNotFoundError(f"Input image not found: {input_path}")
 
-    img = cv2.imread(input_path)
+    # Use imdecode to support non-ASCII (e.g., Korean) paths on Windows
+    with open(input_path, "rb") as f:
+        file_bytes = np.frombuffer(f.read(), dtype=np.uint8)
+    img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
     if img is None:
         raise ValueError(f"Failed to read image: {input_path}")
 
@@ -63,4 +66,3 @@ def process_image(
     # 백엔드 루트 기준 상대 경로 반환 (예: uploaded_images/processed_xxx.png)
     rel_path = os.path.relpath(output_path, start=backend_dir)
     return rel_path
-
