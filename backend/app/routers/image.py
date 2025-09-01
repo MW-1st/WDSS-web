@@ -27,7 +27,7 @@ async def upload_image(
     이미지를 서버에 업로드하고, asyncpg를 사용해 DB에 경로를 업데이트합니다.
     """
     # 1. 파일 확장자 검사 및 경로 설정
-    allowed_extensions = {"png", "jpg", "jpeg", "gif"}
+    allowed_extensions = {"png", "jpg", "jpeg"}
     file_extension = image.filename.split(".")[-1].lower()
     if file_extension not in allowed_extensions:
         raise HTTPException(status_code=400, detail="허용되지 않는 파일 형식입니다.")
@@ -77,4 +77,5 @@ async def upload_image(
             "db_s3_key": file_path,
             "filename": unique_filename,
         },
+
     )
