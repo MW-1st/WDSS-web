@@ -6,6 +6,7 @@ import client from "../api/client";
 export default function EditorPage() {
   const [imageUrl, setImageUrl] = useState("");
   const [processing, setProcessing] = useState(false);
+  const [targetDots, setTargetDots] = useState(2000);
   const stageRef = useRef(null);
 
   const handleUploaded = (webUrl) => {
@@ -23,12 +24,15 @@ export default function EditorPage() {
       const formData = new FormData();
       formData.append("file", new File([blob], "canvas.png", { type: "image/png" }));
 
-      const resp = await client.post("/image/process", formData);
-      const outputPath = resp.data?.output_path || "";
-      const normalized = String(outputPath).replace(/\\/g, "/");
-      const publicPath = normalized.replace(/^\.?\/?uploaded_images\/?/, "uploads/");
-      const webUrl = `${client.defaults.baseURL.replace(/\/$/, "")}/${publicPath.replace(/^\//, "")}`;
-      setImageUrl(webUrl);
+      const resp = await client.post(`/image/process?target_dots=${encodeURIComponent(targetDots)}`, formData);
+      let outputUrl = resp.data?.output_url || "";
+      if (outputUrl.startsWith("http")) {
+        setImageUrl(outputUrl);
+      } else {
+        const base = client.defaults.baseURL?.replace(/\/$/, "") || "";
+        const path = String(outputUrl).replace(/\\/g, "/");
+        setImageUrl(`${base}/${path.replace(/^\//, "")}`);
+      }
     } catch (e) {
       console.error("Transform error", e);
       alert("이미지 변환 중 오류가 발생했습니다.");
@@ -47,6 +51,17 @@ export default function EditorPage() {
 
       {/* 변환 버튼 */}
       <div className="mb-4">
+        <div className="mb-2 flex items-center gap-3">
+          <label className="text-sm text-gray-700">Target dots: {targetDots}</label>
+          <input
+            type="range"
+            min={100}
+            max={20000}
+            step={100}
+            value={targetDots}
+            onChange={(e) => setTargetDots(parseInt(e.target.value, 10))}
+          />
+        </div>
         <button
           onClick={handleTransform}
           disabled={processing}
@@ -61,4 +76,3 @@ export default function EditorPage() {
     </section>
   );
 }
-

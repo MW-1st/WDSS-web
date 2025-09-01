@@ -8,7 +8,7 @@ router = APIRouter(prefix="/image", tags=["image"])
 
 
 @router.post("/process")
-async def process_uploaded_image(file: UploadFile = File(...)):
+async def process_uploaded_image(file: UploadFile = File(...), target_dots: int | None = None):
     # 임시 저장 경로
     backend_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
     tmp_dir = os.path.join(backend_root, "tmp")
@@ -22,7 +22,7 @@ async def process_uploaded_image(file: UploadFile = File(...)):
         shutil.copyfileobj(file.file, buffer)
 
     try:
-        output_path = process_image(temp_path)
+        output_path = process_image(temp_path, target_dots=target_dots)
     finally:
         # 임시 파일 정리
         try:
@@ -30,4 +30,4 @@ async def process_uploaded_image(file: UploadFile = File(...)):
         except OSError:
             pass
 
-    return {"output_path": output_path}
+    return {"output_url": f"/uploads/{os.path.basename(output_path)}"}

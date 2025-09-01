@@ -32,3 +32,8 @@ app.mount(
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+
+@app.get("/")
+def root():
+    return {"message": "Backend is running"}
