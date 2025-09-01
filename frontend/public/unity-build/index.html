@@ -52,12 +52,12 @@
       }
 
       var buildUrl = "Build";
-      var loaderUrl = buildUrl + "/Krafton-Jungle.loader.js";
+      var loaderUrl = buildUrl + "/Test3.loader.js";
       var config = {
         arguments: [],
-        dataUrl: buildUrl + "/Krafton-Jungle.data.gz",
-        frameworkUrl: buildUrl + "/Krafton-Jungle.framework.js.gz",
-        codeUrl: buildUrl + "/Krafton-Jungle.wasm.gz",
+        dataUrl: buildUrl + "/Test3.data.gz",
+        frameworkUrl: buildUrl + "/Test3.framework.js.gz",
+        codeUrl: buildUrl + "/Test3.wasm.gz",
         streamingAssetsUrl: "StreamingAssets",
         companyName: "DefaultCompany",
         productName: "DroneShow",
@@ -107,6 +107,9 @@
       var script = document.createElement("script");
       script.src = loaderUrl;
       script.onload = () => {
+        // Add autostart configuration
+        config.autoStart = true;
+        
         createUnityInstance(canvas, config, (progress) => {
           document.querySelector("#unity-progress-bar-full").style.width = 100 * progress + "%";
               }).then((unityInstance) => {
@@ -114,6 +117,18 @@
                 document.querySelector("#unity-fullscreen-button").onclick = () => {
                   unityInstance.SetFullscreen(1);
                 };
+                
+                // Auto-focus canvas to start Unity immediately
+                setTimeout(() => {
+                  canvas.focus();
+                  // Simulate click to start Unity
+                  var clickEvent = new MouseEvent('click', {
+                    view: window,
+                    bubbles: true,
+                    cancelable: true
+                  });
+                  canvas.dispatchEvent(clickEvent);
+                }, 100);
 
               }).catch((message) => {
                 alert(message);
