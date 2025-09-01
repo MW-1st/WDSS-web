@@ -1,5 +1,3 @@
-# 기존 라우터 파일
-
 import os
 import uuid
 from fastapi import APIRouter, File, UploadFile, HTTPException
@@ -73,7 +71,7 @@ async def upload_image(
     return JSONResponse(
         status_code=200,
         content={
-            "success": true,
+            "success": True,
             "message": "이미지가 업로드되었습니다.",
             "image_url": file_path
         },
