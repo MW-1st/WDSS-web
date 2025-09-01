@@ -7,6 +7,9 @@ import DashboardPage from "./pages/DashboardPage.jsx";
 import SimulatorPage from "./pages/SimulatorPage.jsx";
 import PrivateRoute from "./components/PrivateRoute.jsx";
 
+//임시
+import ProjectStart from "./pages/ProjectStart";
+
 export default function App() {
   const navigate = useNavigate();
   const [isAuth, setIsAuth] = useState(!!localStorage.getItem("token"));
@@ -48,6 +51,8 @@ export default function App() {
         <Route path="/" element={<MainPage />} />
         <Route path="/editor" element={<EditorPage />} />
         <Route path="/simulator" element={<SimulatorPage />} />
+        {/* 임시 */}
+        <Route path="/" element={<ProjectStart />} />
         <Route
           path="/login"
           element={isAuth ? <Navigate to="/dashboard" replace /> : <LoginPage />}

@@ -60,6 +60,14 @@ CREATE TABLE "scene" (
   "s3_key" VARCHAR(1024),
   "scene_num" int
 );
+-- CREATE TABLE IF NOT EXISTS scene_payload (
+--   scene_id uuid PRIMARY KEY,
+--   drones   jsonb,
+--   preview  text,
+--   updated_at timestamptz DEFAULT now(),
+--   CONSTRAINT fk_scene_payload_scene
+--     FOREIGN KEY (scene_id) REFERENCES scene(id) ON DELETE CASCADE
+-- );
 
 CREATE INDEX ON "refresh_tokens" ("user_id");
 
