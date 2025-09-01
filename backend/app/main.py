@@ -18,8 +18,11 @@ app.add_middleware(
 
 # Routers
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
-app.include_router(image.router, prefix="/projects/{project_id}/scenes/{scene_id}", tags=["image"])
+app.include_router(
+    image.router, prefix="/projects/{project_id}/scenes/{scene_id}", tags=["image"]
+)
 app.include_router(image_router.router)
+app.include_router(websocket.router)
 
 # Static files for uploaded/processed images
 # Serves files under backend/uploaded_images at /uploads/*
