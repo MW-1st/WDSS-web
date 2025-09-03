@@ -1,7 +1,7 @@
 import datetime
-
+import uuid
 from pydantic import BaseModel, EmailStr, Field
-from typing import Optional
+from typing import Optional, List
 
 
 class Token(BaseModel):
@@ -18,6 +18,7 @@ class TokenPayload(BaseModel):
 #     username: str
 #     disabled: bool = False
 class UserResponse(BaseModel):
+    id: uuid.UUID
     username: str
     disabled: bool = False
 
