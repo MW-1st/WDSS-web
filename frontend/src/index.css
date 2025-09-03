@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
@@ -12,6 +14,26 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+@font-face {
+  font-family: "TwaySky";
+  src: url("https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_tway@1.0/twaysky.woff")
+    format("woff");
+  font-weight: normal;
+  font-display: swap;
+}
+@theme {
+  --font-tway: "TwaySky", ui-sans-serif, system-ui, sans-serif;
+}
+@font-face {
+  font-family: "YUniverse";
+  src: url("https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_yuniverse@1.0/YUniverse-B.woff2")
+    format("woff2");
+  font-weight: 700;
+  font-display: swap;
+}
+@theme {
+  --font-yuniverse: "YUniverse", ui-sans-serif, system-ui, sans-serif;
+}
 
 a {
   font-weight: 500;
@@ -24,8 +46,6 @@ a:hover {
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
   min-width: 320px;
   min-height: 100vh;
 }
