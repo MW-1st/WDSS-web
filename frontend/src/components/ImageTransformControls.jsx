@@ -7,8 +7,16 @@ export default function ImageTransformControls({
   processing,
   onTransform,
   imageUrl,
-  sceneId = 1
+  sceneId = 1,
 }) {
+  const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
+  const handleRange = (e) => {
+    const v = Number(e.target.value);
+    const safe = Number.isFinite(v)
+      ? clamp(v, 100, 10000)
+      : Number(targetDots) || 2000;
+    setTargetDots(safe);
+  };
   const handleJsonGeneration = async () => {
     try {
       if (!stageRef.current || !stageRef.current.getCurrentCanvasAsSvg) {
@@ -16,36 +24,45 @@ export default function ImageTransformControls({
         return;
       }
 
-       // 현재 캔버스의 수정된 상태를 SVG로 가져오기
+      // 현재 캔버스의 수정된 상태를 SVG로 가져오기
       const canvasSvgData = stageRef.current.getCurrentCanvasAsSvg();
 
       if (!canvasSvgData || canvasSvgData.totalDots === 0) {
-        alert("그릴 도트가 없습니다. 먼저 이미지를 변환하거나 그림을 그려주세요.");
+        alert(
+          "그릴 도트가 없습니다. 먼저 이미지를 변환하거나 그림을 그려주세요."
+        );
         return;
       }
 
       // 수정된 캔버스 SVG를 Blob으로 변환
-      const svgBlob = new Blob([canvasSvgData.svgString], { type: "image/svg+xml" });
+      const svgBlob = new Blob([canvasSvgData.svgString], {
+        type: "image/svg+xml",
+      });
       const fd = new FormData();
       fd.append(
         "file",
-      new File([svgBlob], "modified_canvas.svg", { type: "image/svg+xml" })      );
+        new File([svgBlob], "modified_canvas.svg", { type: "image/svg+xml" })
+      );
 
       const jsonResp = await client.post("/image/svg-to-json", fd);
       const jsonUrl = jsonResp.data?.json_url;
       const unitySent = jsonResp.data?.unity_sent;
 
       if (jsonUrl) {
-        const base = client.defaults.baseURL?.replace(/\/$/, '') || '';
-        const full = jsonUrl.startsWith('http')
+        const base = client.defaults.baseURL?.replace(/\/$/, "") || "";
+        const full = jsonUrl.startsWith("http")
           ? jsonUrl
-          : `${base}/${jsonUrl.replace(/^\//,'')}`;
-        window.open(full, '_blank', 'noopener');
+          : `${base}/${jsonUrl.replace(/^\//, "")}`;
+        window.open(full, "_blank", "noopener");
 
         if (unitySent) {
-          alert(`수정된 캔버스가 JSON으로 생성되었고 Unity로 데이터가 전송되었습니다! (총 ${canvasSvgData.totalDots}개 도트)`);
+          alert(
+            `수정된 캔버스가 JSON으로 생성되었고 Unity로 데이터가 전송되었습니다! (총 ${canvasSvgData.totalDots}개 도트)`
+          );
         } else {
-          alert(`수정된 캔버스가 JSON으로 생성되었습니다! (총 ${canvasSvgData.totalDots}개 도트)`);
+          alert(
+            `수정된 캔버스가 JSON으로 생성되었습니다! (총 ${canvasSvgData.totalDots}개 도트)`
+          );
         }
       } else {
         alert("JSON 생성에 실패했습니다.");
@@ -57,17 +74,11 @@ export default function ImageTransformControls({
   };
 
   return (
-    <div className="mb-4">
-      <div className="mb-2 flex items-center gap-3">
-        <label className="text-sm text-gray-700 flex items-center">
+    <div>
+      <div className="mb-4">
+        <label className="block text-sm text-gray-700 mb-1">
           Target dots:
-          <span
-            style={{
-              display: "inline-block",
-              minWidth: "50px",
-              textAlign: "right",
-            }}
-          >
+          <span className="ml-2 inline-block min-w-[50px] text-right">
             {targetDots}
           </span>
         </label>
@@ -76,15 +87,19 @@ export default function ImageTransformControls({
           min={100}
           max={10000}
           step={100}
-          value={targetDots}
-          onChange={(e) => setTargetDots(parseInt(e.target.value, 10))}
+          value={Number(targetDots) || 0}
+          onChange={handleRange}
+          onInput={handleRange}
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          className="w-full cursor-pointer"
         />
       </div>
 
       <div className="mb-2">
         <button
           onClick={handleJsonGeneration}
-          className="px-4 py-2 mr-3 rounded bg-emerald-600 hover:bg-emerald-700 text-white"
+          className="px-4 py-2 mr-3 rounded !bg-blue-600 hover:!bg-blue-700 text-white"
         >
           JSON 파일로만들기
         </button>
@@ -94,7 +109,7 @@ export default function ImageTransformControls({
         onClick={onTransform}
         disabled={processing}
         className={`px-4 py-2 rounded text-white ${
-          processing ? "bg-gray-400" : "bg-blue-600 hover:bg-blue-700"
+          processing ? "!bg-blue-600" : "!bg-blue-600 hover:!bg-blue-700"
         }`}
       >
         {processing ? "변환 중..." : "변환"}

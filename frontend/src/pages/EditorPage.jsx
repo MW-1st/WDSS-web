@@ -217,7 +217,19 @@ export default function EditorPage({ projectId = DUMMY }) {
 
   return (
     <div style={{ width: "100%", background: "#fff", display: 'flex', minHeight: '100vh' }}>
-      <aside style={{ width: 280, borderRight: '1px solid #eee', padding: 16 }}>
+      <aside
+        style={{
+          width: 280,
+          borderRight: '1px solid #eee',
+          padding: 16,
+          position: 'sticky',
+          top: 0,
+          alignSelf: 'flex-start',
+          height: '100vh',
+          overflowY: 'auto',
+          background: '#fff',
+        }}
+      >
         <EditorToolbar
           pid={pid}
           selectedId={selectedId}
