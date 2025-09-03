@@ -17,8 +17,8 @@ os.makedirs(UPLOAD_DIRECTORY, exist_ok=True)
 
 @router.post("/upload-image")
 async def upload_image(
-    project_id: int,
-    scene_id: int,  # DB의 scene_num 컬럼과 매칭
+    project_id: uuid.UUID,
+    scene_id: uuid.UUID,  # DB의 scene_num 컬럼과 매칭
     image: UploadFile = File(...),
 ):
     """
@@ -46,7 +46,7 @@ async def upload_image(
         # 3-1. get_conn 컨텍스트 관리자를 사용해 DB 커넥션을 얻습니다.
         async with get_conn() as conn:
             # 3-2. 실행할 SQL 쿼리 (SQL 인젝션 방지를 위해 $1, $2 사용)
-            query = "UPDATE scene SET s3_key = $1 WHERE scene_num = $2"
+            query = "UPDATE scene SET s3_key = $1 WHERE id = $2"
 
             # 3-3. 쿼리를 실행하고 결과를 받습니다.
             # conn.execute는 "UPDATE 1"과 같은 상태 메시지를 문자열로 반환합니다.

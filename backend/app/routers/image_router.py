@@ -30,14 +30,20 @@ async def process_uploaded_image(
     # 1) scene_id가 있으면 DB에서 원본 경로 조회
     if scene_id is not None:
         async with get_conn() as conn:
-            db_path = await conn.fetchval("SELECT s3_key FROM scene WHERE scene_num = $1", scene_id)
+            db_path = await conn.fetchval(
+                "SELECT s3_key FROM scene WHERE id = $1", scene_id
+            )
         if not db_path:
-            raise HTTPException(status_code=404, detail="Original image not found for the scene")
+            raise HTTPException(
+                status_code=404, detail="Original image not found for the scene"
+            )
         if not os.path.isabs(db_path):
             # 상대 경로로 저장된 경우 백엔드 루트 기준으로 보정
             db_path = os.path.join(backend_root, db_path)
         if not os.path.exists(db_path):
-            raise HTTPException(status_code=404, detail="Original image file does not exist on disk")
+            raise HTTPException(
+                status_code=404, detail="Original image file does not exist on disk"
+            )
         input_path = db_path
 
     # 2) scene_id가 없고 업로드 파일이 오면 임시 파일로 처리
@@ -134,6 +140,7 @@ async def svg_to_json_endpoint(
 
         # Save JSON with timestamped filename
         from datetime import datetime
+
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         base = os.path.splitext(os.path.basename(file.filename or "import.svg"))[0]
         safe_base = base or "svg"
