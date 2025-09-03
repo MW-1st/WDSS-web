@@ -4,6 +4,7 @@ import EditorToolbar from "../components/EditorToolbar.jsx";
 import MainCanvasSection from "../components/MainCanvasSection.jsx";
 import SceneCarousel from "../components/SceneCarousel.jsx";
 import ImageUpload from "../components/ImageUpload.jsx";
+import ImageGallery from "../components/ImageGallery.jsx";
 import client from "../api/client";
 import { useUnity } from "../contexts/UnityContext.jsx";
 
@@ -302,39 +303,51 @@ export default function EditorPage({ projectId = DUMMY }) {
   const closeButtonStyle = { ...buttonStyle, backgroundColor: "#dc3545" };
 
   return (
-    <div style={{ width: "100%", background: "#fff" }}>
-      {/* 업로드 및 도구 바 */}
-      <EditorToolbar
-        pid={pid}
-        selectedId={selectedId}
-        imageUrl={imageUrl}
-        targetDots={targetDots}
-        setTargetDots={setTargetDots}
-        processing={processing}
-        onUploaded={handleUploaded}
-        onTransform={handleTransform}
-        isUnityVisible={isUnityVisible}
-        showUnity={showUnity}
-        hideUnity={hideUnity}
+    <div style={{ width: "100%", background: "#fff", display: "flex" }}>
+      {/* 이미지 갤러리 사이드바 */}
+      <ImageGallery 
+        projectId={pid} 
+        sceneId={selectedId}
+        onImageDragStart={(imageUrl) => {
+          console.log("Image dragged from gallery:", imageUrl);
+        }}
       />
 
-      {/* 메인 캔버스 */}
-      <MainCanvasSection
-        selectedScene={selectedScene}
-        imageUrl={imageUrl}
-        stageRef={stageRef}
-        onChange={handleSceneChange}
-      />
+      {/* 메인 에디터 영역 */}
+      <div style={{ flex: 1 }}>
+        {/* 업로드 및 도구 바 */}
+        <EditorToolbar
+          pid={pid}
+          selectedId={selectedId}
+          imageUrl={imageUrl}
+          targetDots={targetDots}
+          setTargetDots={setTargetDots}
+          processing={processing}
+          onUploaded={handleUploaded}
+          onTransform={handleTransform}
+          isUnityVisible={isUnityVisible}
+          showUnity={showUnity}
+          hideUnity={hideUnity}
+        />
 
-      {/* 씬 캐러셀 */}
-      <SceneCarousel
-        scenes={scenes}
-        selectedId={selectedId}
-        start={start}
-        setStart={setStart}
-        onAddScene={handleAddScene}
-        onSelectScene={handleSelect}
-      />
+        {/* 메인 캔버스 */}
+        <MainCanvasSection
+          selectedScene={selectedScene}
+          imageUrl={imageUrl}
+          stageRef={stageRef}
+          onChange={handleSceneChange}
+        />
+
+        {/* 씬 캐러셀 */}
+        <SceneCarousel
+          scenes={scenes}
+          selectedId={selectedId}
+          start={start}
+          setStart={setStart}
+          onAddScene={handleAddScene}
+          onSelectScene={handleSelect}
+        />
+      </div>
     </div>
   );
 }
