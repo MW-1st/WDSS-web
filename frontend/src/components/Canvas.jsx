@@ -1,4 +1,4 @@
-import { useRef, useLayoutEffect, useEffect, useState } from "react";
+import { useRef, useLayoutEffect, useEffect, useState, useCallback } from "react";
 // fabric.js 최적화: 필요한 부분만 import
 import { Canvas as FabricCanvas, Circle, FabricImage, PencilBrush } from "fabric";
 
@@ -54,43 +54,94 @@ export default function Canvas({ width = 800, height = 500, imageUrl = "", stage
     if (!imageUrl || !fabricCanvas.current) return;
     const canvas = fabricCanvas.current;
 
-    FabricImage.fromURL(imageUrl, {
-      crossOrigin: 'anonymous'
-    }).then(img => {
-      // Clear previous image
-      const existingImage = canvas.getObjects('image')[0];
-      if (existingImage) {
-        canvas.remove(existingImage);
-      }
+    // SVG 파일인지 확인
+    if (imageUrl.endsWith('.svg')) {
+      // SVG 파일을 직접 로드하여 개별 요소들에 접근 가능하도록 처리
+      fetch(imageUrl)
+        .then(response => response.text())
+        .then(svgText => {
+          // 기존 SVG 요소들 제거
+          const existingSvgObjects = canvas.getObjects().filter(obj => 
+            obj.customType === 'svgDot' || obj.type === 'image'
+          );
+          existingSvgObjects.forEach(obj => canvas.remove(obj));
 
-      const scale = Math.min(width / img.width, height / img.height, 1);
-      img.set({
-        left: (width - img.width * scale) / 2,
-        top: (height - img.height * scale) / 2,
-        scaleX: scale,
-        scaleY: scale,
-        selectable: false,
-        evented: false,
+          // SVG를 파싱하여 개별 도트들을 Fabric 객체로 변환
+          const parser = new DOMParser();
+          const svgDoc = parser.parseFromString(svgText, 'image/svg+xml');
+          const circles = svgDoc.querySelectorAll('circle');
+          
+          circles.forEach(circleEl => {
+            const cx = parseFloat(circleEl.getAttribute('cx') || '0');
+            const cy = parseFloat(circleEl.getAttribute('cy') || '0');
+            const r = parseFloat(circleEl.getAttribute('r') || '2');
+            const fill = circleEl.getAttribute('fill') || '#000000';
+
+            const fabricCircle = new Circle({
+              left: cx - r,
+              top: cy - r,
+              radius: r,
+              fill: fill,
+              selectable: false,
+              evented: true, // 그리기/지우기 상호작용 가능하도록 true로 설정
+              customType: 'svgDot', // 커스텀 타입 추가로 식별 가능
+              originalCx: cx,
+              originalCy: cy,
+              hoverCursor: 'crosshair',
+              moveCursor: 'crosshair'
+            });
+
+            canvas.add(fabricCircle);
+            // 배경으로 보내지 않고 같은 레이어에 유지
+          });
+
+          canvas.renderAll();
+        })
+        .catch(err => {
+          console.error('SVG 로드 실패:', err);
+          // SVG 로드 실패 시 기본 이미지 방식으로 폴백
+          loadAsImage();
+        });
+    } else {
+      loadAsImage();
+    }
+
+    function loadAsImage() {
+      FabricImage.fromURL(imageUrl, {
+        crossOrigin: 'anonymous'
+      }).then(img => {
+        // Clear previous image
+        const existingImage = canvas.getObjects('image')[0];
+        if (existingImage) {
+          canvas.remove(existingImage);
+        }
+
+        const scale = Math.min(width / img.width, height / img.height, 1);
+        img.set({
+          left: (width - img.width * scale) / 2,
+          top: (height - img.height * scale) / 2,
+          scaleX: scale,
+          scaleY: scale,
+          selectable: false,
+          evented: false,
+        });
+
+        canvas.add(img);
+        canvas.sendToBack(img);
+        canvas.renderAll();
       });
-
-      canvas.add(img);
-      canvas.sendToBack(img);
-      canvas.renderAll();
-    });
+    }
   }, [imageUrl, width, height]);
 
-  // 지우개 크기가 변경될 때 브러시 업데이트
+  // 크기가 변경될 때 현재 모드에 따라 업데이트
   useEffect(() => {
-    if ((drawingMode === 'erase' || drawingMode === 'pixelErase') && fabricCanvas.current) {
-      const canvas = fabricCanvas.current;
-      if (canvas.freeDrawingBrush) {
-        canvas.freeDrawingBrush.width = eraserSize;
-      }
-    }
-  }, [eraserSize, drawingMode]);
+    if (!fabricCanvas.current || !drawingMode) return;
+    
+    // 현재 모드를 다시 적용하여 크기 반영
+    applyDrawingMode(drawingMode);
+  }, [eraserSize, brushSize]);
 
-  const toggleDrawingMode = (mode) => {
-    setDrawingMode(mode);
+  const applyDrawingMode = (mode) => {
     if (!fabricCanvas.current) return;
     
     const canvas = fabricCanvas.current;
@@ -103,6 +154,11 @@ export default function Canvas({ width = 800, height = 500, imageUrl = "", stage
       canvas.off('mouse:down', eraseHandlers.current.startErase);
       canvas.off('mouse:move', eraseHandlers.current.erase);
       canvas.off('mouse:up', eraseHandlers.current.stopErase);
+    }
+    if (eraseHandlers.current.startDraw) {
+      canvas.off('mouse:down', eraseHandlers.current.startDraw);
+      canvas.off('mouse:move', eraseHandlers.current.continueDraw);
+      canvas.off('mouse:up', eraseHandlers.current.stopDraw);
     }
     
     // isDrawingMode가 true일 때는 fabric이 내부적으로 핸들러를 관리하므로
@@ -130,14 +186,44 @@ export default function Canvas({ width = 800, height = 500, imageUrl = "", stage
       canvas.setCursor('crosshair');
       
     } else if (mode === 'brush') {
-      canvas.isDrawingMode = true;
+      canvas.isDrawingMode = false; // SVG 도트와 상호작용하기 위해 false로 설정
       canvas.selection = false;
       
-      // 브러시 설정
-      const brush = new PencilBrush(canvas);
-      brush.width = brushSize;
-      brush.color = "rgba(0,0,0,1)";
-      canvas.freeDrawingBrush = brush;
+      let isDrawing = false;
+      
+      const startDraw = (e) => {
+        isDrawing = true;
+        drawDotAtPoint(e);
+      };
+      
+      const continueDraw = (e) => {
+        if (!isDrawing) return;
+        drawDotAtPoint(e);
+      };
+      
+      const stopDraw = () => {
+        isDrawing = false;
+      };
+      
+      const drawDotAtPoint = (e) => {
+        const pointer = canvas.getPointer(e.e);
+        
+        // 새로운 도트 생성
+        const newDot = new Circle({
+          left: pointer.x - brushSize/2,
+          top: pointer.y - brushSize/2,
+          radius: brushSize/2,
+          fill: "rgba(0,0,0,1)",
+          selectable: false,
+          evented: true,
+          customType: 'drawnDot', // 그려진 도트로 구분
+          hoverCursor: 'crosshair',
+          moveCursor: 'crosshair'
+        });
+        
+        canvas.add(newDot);
+        canvas.renderAll();
+      };
       
       // 원형 커서 생성 함수
       const createBrushCursor = (size) => {
@@ -184,21 +270,20 @@ export default function Canvas({ width = 800, height = 500, imageUrl = "", stage
             newSize = Math.min(100, prevSize + step);
           }
           
-          // 브러시 크기 업데이트
-          if (canvas.freeDrawingBrush) {
-            canvas.freeDrawingBrush.width = newSize;
-          }
           const newBrushCursor = createBrushCursor(newSize);
           canvas.defaultCursor = newBrushCursor;
           canvas.hoverCursor = newBrushCursor;
           canvas.moveCursor = newBrushCursor;
-          canvas.freeDrawingCursor = newBrushCursor;
           canvas.setCursor(newBrushCursor);
           return newSize;
         });
       };
       
-      eraseHandlers.current = { wheelHandler };
+      eraseHandlers.current = { startDraw, continueDraw, stopDraw, wheelHandler };
+      
+      canvas.on('mouse:down', startDraw);
+      canvas.on('mouse:move', continueDraw);
+      canvas.on('mouse:up', stopDraw);
       canvas.on('mouse:wheel', wheelHandler);
       
     } else if (mode === 'erase') {
@@ -251,19 +336,33 @@ export default function Canvas({ width = 800, height = 500, imageUrl = "", stage
         const pointer = canvas.getPointer(e.e);
         const objects = canvas.getObjects();
         const objectsToRemove = [];
+        const eraserRadius = eraserSize / 2;
         
         objects.forEach(obj => {
-          if (obj.type === 'path') {
-            // 객체의 경계 박스와 지우개 영역이 교차하는지 확인
-            const bounds = obj.getBoundingRect();
-            const eraserRadius = eraserSize / 2;
-            
-            // 간단한 교차 검사
-            if (pointer.x + eraserRadius >= bounds.left && 
-                pointer.x - eraserRadius <= bounds.left + bounds.width &&
-                pointer.y + eraserRadius >= bounds.top && 
-                pointer.y - eraserRadius <= bounds.top + bounds.height) {
-              objectsToRemove.push(obj);
+          // 그려진 패스들, SVG 도트들, 그려진 도트들 모두 지우기 가능
+          if (obj.type === 'path' || obj.customType === 'svgDot' || obj.customType === 'drawnDot') {
+            if (obj.customType === 'svgDot' || obj.customType === 'drawnDot') {
+              // 도트들의 경우 원의 중심점과의 거리 계산
+              const dotCenterX = obj.left + obj.radius;
+              const dotCenterY = obj.top + obj.radius;
+              const distance = Math.sqrt(
+                Math.pow(pointer.x - dotCenterX, 2) + 
+                Math.pow(pointer.y - dotCenterY, 2)
+              );
+              
+              if (distance <= eraserRadius + obj.radius) {
+                objectsToRemove.push(obj);
+              }
+            } else {
+              // 패스의 경우 기존 로직 사용
+              const bounds = obj.getBoundingRect();
+              
+              if (pointer.x + eraserRadius >= bounds.left && 
+                  pointer.x - eraserRadius <= bounds.left + bounds.width &&
+                  pointer.y + eraserRadius >= bounds.top && 
+                  pointer.y - eraserRadius <= bounds.top + bounds.height) {
+                objectsToRemove.push(obj);
+              }
             }
           }
         });
@@ -376,6 +475,11 @@ export default function Canvas({ width = 800, height = 500, imageUrl = "", stage
       
       canvas.on('mouse:wheel', wheelHandler);
     }
+  };
+
+  const toggleDrawingMode = (mode) => {
+    setDrawingMode(mode);
+    applyDrawingMode(mode);
   };
 
   return (
