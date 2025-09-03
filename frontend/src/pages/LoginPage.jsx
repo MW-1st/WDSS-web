@@ -72,10 +72,9 @@ export default function LoginPage() {
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
       });
 
-      // [수정] access_token 대신, user 객체가 있는지 확인합니다.
       if (data?.user) {
-        // [수정] localStorage에 토큰을 저장할 필요가 없습니다.
         window.dispatchEvent(new Event("auth-change"));
+        login(data.user);
         navigate("/dashboard");
       } else {
         // 자동 로그인이 실패하면 수동 로그인을 유도합니다.
