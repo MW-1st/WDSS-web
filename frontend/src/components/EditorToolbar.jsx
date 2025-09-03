@@ -26,7 +26,7 @@ export default function EditorToolbar({
         fontWeight: 700,
         marginBottom: 12,
       }}>
-        이미지 업로드
+        프로젝트 이름
       </h2>
 
       <ImageUpload
