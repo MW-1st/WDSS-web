@@ -54,6 +54,7 @@ async def login(
     response.set_cookie(
         key="access_token",
         value=access_token,
+        path="/",
         httponly=True,  # JavaScript에서 접근 불가
         secure=False,  # 프로덕션(HTTPS) 환경에서는 True로 설정 권장
         samesite="lax",  # CSRF 방어
@@ -118,8 +119,9 @@ async def logout(response: Response):
     # 1. 'access_token'이라는 이름의 쿠키를 삭제하도록 응답을 설정합니다.
     response.delete_cookie(
         key="access_token",
+        path="/",
         httponly=True,
-        secure=True,  # 쿠키를 설정할 때와 동일한 옵션을 사용하는 것이 안전합니다.
+        secure=False,
         samesite="lax",
     )
 
