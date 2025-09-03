@@ -8,14 +8,23 @@ export default function ImageTransformControls({
   onTransform,
   imageUrl,
   sceneId = 1,
+  layout = "full",
 }) {
+  // Local state for smooth slider drag
+  const [localDots, setLocalDots] = React.useState(Number(targetDots) || 2000);
+  React.useEffect(() => {
+    setLocalDots(Number(targetDots) || 2000);
+  }, [targetDots]);
+
   const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
-  const handleRange = (e) => {
+  const handleRangeImmediate = (e) => {
     const v = Number(e.target.value);
-    const safe = Number.isFinite(v)
-      ? clamp(v, 100, 10000)
-      : Number(targetDots) || 2000;
-    setTargetDots(safe);
+    const safe = Number.isFinite(v) ? clamp(v, 100, 10000) : 2000;
+    setLocalDots(safe);
+  };
+  const commitToParent = () => {
+    const safe = clamp(Number(localDots) || 2000, 100, 10000);
+    if (safe !== targetDots) setTargetDots(safe);
   };
   const handleJsonGeneration = async () => {
     try {
@@ -79,20 +88,27 @@ export default function ImageTransformControls({
         <label className="block text-sm text-gray-700 mb-1">
           Target dots:
           <span className="ml-2 inline-block min-w-[50px] text-right">
-            {targetDots}
+            {localDots}
           </span>
         </label>
         <input
           type="range"
           min={100}
           max={10000}
-          step={100}
-          value={Number(targetDots) || 0}
-          onChange={handleRange}
-          onInput={handleRange}
+          step={10}
+          value={Number(localDots) || 0}
+          onChange={handleRangeImmediate}
+          onInput={handleRangeImmediate}
+          onPointerDown={(e) => e.stopPropagation()}
+          onPointerMove={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
           onTouchStart={(e) => e.stopPropagation()}
-          className="w-full cursor-pointer"
+          onMouseUp={commitToParent}
+          onTouchEnd={commitToParent}
+          onKeyUp={(e) => {
+            if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) commitToParent();
+          }}
+          className={`${layout === "sidebar" ? "w-full" : "w-64"} cursor-pointer`}
         />
       </div>
 

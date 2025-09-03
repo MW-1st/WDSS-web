@@ -20,12 +20,14 @@ export default function EditorToolbar({
 }) {
   const Inner = () => (
     <>
-      <h2 style={{
-        margin: 0,
-        fontSize: 20,
-        fontWeight: 700,
-        marginBottom: 12,
-      }}>
+      <h2
+        style={{
+          margin: 0,
+          fontSize: 20,
+          fontWeight: 700,
+          marginBottom: 12,
+        }}
+      >
         프로젝트 이름
       </h2>
 
@@ -43,6 +45,7 @@ export default function EditorToolbar({
           onTransform={onTransform}
           imageUrl={imageUrl}
           sceneId={selectedId}
+          layout={layout}
         />
       </div>
 

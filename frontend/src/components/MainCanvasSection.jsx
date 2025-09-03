@@ -1,7 +1,6 @@
 import React from "react";
 import Canvas from "../components/Canvas.jsx";
-
-export default function MainCanvasSection({
+function MainCanvasSection({
   selectedScene,
   imageUrl,
   stageRef,
@@ -47,3 +46,5 @@ export default function MainCanvasSection({
     </section>
   );
 }
+
+export default React.memo(MainCanvasSection);
