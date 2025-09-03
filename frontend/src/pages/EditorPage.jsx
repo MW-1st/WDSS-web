@@ -247,7 +247,7 @@ export default function EditorPage({ projectId = DUMMY }) {
         start={start}
         setStart={setStart}
         onAddScene={handleAddScene}
-        onSelectScene={handleSelectScene}
+        onSelectScene={handleSelect}
       />
     </div>
   );
