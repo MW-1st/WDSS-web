@@ -216,21 +216,26 @@ export default function EditorPage({ projectId = DUMMY }) {
   const closeButtonStyle = { ...buttonStyle, backgroundColor: "#dc3545" };
 
   return (
-    <div style={{ width: "100%", background: "#fff" }}>
+    <div style={{ width: "100%", background: "#fff", display: 'flex', minHeight: '100vh' }}>
+      <aside style={{ width: 280, borderRight: '1px solid #eee', padding: 16 }}>
+        <EditorToolbar
+          pid={pid}
+          selectedId={selectedId}
+          imageUrl={imageUrl}
+          targetDots={targetDots}
+          setTargetDots={setTargetDots}
+          processing={processing}
+          onUploaded={handleUploaded}
+          onTransform={handleTransform}
+          isUnityVisible={isUnityVisible}
+          showUnity={showUnity}
+          hideUnity={hideUnity}
+          layout="sidebar"
+        />
+      </aside>
+      <div style={{ flex: 1 }}>
       {/* 업로드 및 도구 바 */}
-      <EditorToolbar
-        pid={pid}
-        selectedId={selectedId}
-        imageUrl={imageUrl}
-        targetDots={targetDots}
-        setTargetDots={setTargetDots}
-        processing={processing}
-        onUploaded={handleUploaded}
-        onTransform={handleTransform}
-        isUnityVisible={isUnityVisible}
-        showUnity={showUnity}
-        hideUnity={hideUnity}
-      />
+      
 
       {/* 메인 캔버스 */}
       <MainCanvasSection
@@ -249,6 +254,7 @@ export default function EditorPage({ projectId = DUMMY }) {
         onAddScene={handleAddScene}
         onSelectScene={handleSelect}
       />
+      </div>
     </div>
   );
 }

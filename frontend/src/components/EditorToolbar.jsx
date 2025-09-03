@@ -16,48 +16,63 @@ export default function EditorToolbar({
   isUnityVisible,
   showUnity,
   hideUnity,
+  layout = "full",
 }) {
+  const Inner = () => (
+    <>
+      <h2 style={{
+        margin: 0,
+        fontSize: 20,
+        fontWeight: 700,
+        marginBottom: 12,
+      }}>
+        이미지 업로드
+      </h2>
+
+      <ImageUpload
+        projectId={pid ?? 1}
+        sceneId={selectedId ?? 1}
+        onUploaded={onUploaded}
+      />
+
+      <div style={{ marginTop: 16 }}>
+        <ImageTransformControls
+          targetDots={targetDots}
+          setTargetDots={setTargetDots}
+          processing={processing}
+          onTransform={onTransform}
+          imageUrl={imageUrl}
+          sceneId={selectedId}
+        />
+      </div>
+
+      <UnitySimulatorControls
+        isUnityVisible={isUnityVisible}
+        showUnity={showUnity}
+        hideUnity={hideUnity}
+      />
+    </>
+  );
+
+  if (layout === "sidebar") {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <Inner />
+      </div>
+    );
+  }
+
   return (
-    <section style={{
-      display: "flex",
-      justifyContent: "center",
-      padding: "24px 0",
-      borderBottom: "1px solid #eee"
-    }}>
+    <section
+      style={{
+        display: "flex",
+        justifyContent: "center",
+        padding: "24px 0",
+        borderBottom: "1px solid #eee",
+      }}
+    >
       <div style={{ width: "70%", maxWidth: 980 }}>
-        <h2 style={{
-          margin: 0,
-          fontSize: 20,
-          fontWeight: 700,
-          marginBottom: 12
-        }}>
-          이미지 업로드
-        </h2>
-
-        <ImageUpload
-          projectId={pid ?? 1}
-          sceneId={selectedId ?? 1}
-          onUploaded={onUploaded}
-        />
-
-        {/* 변환 기능 */}
-        <div style={{ marginTop: 16 }}>
-          <ImageTransformControls
-            targetDots={targetDots}
-            setTargetDots={setTargetDots}
-            processing={processing}
-            onTransform={onTransform}
-            imageUrl={imageUrl}
-            sceneId={selectedId}
-          />
-        </div>
-
-        {/* Unity 기능 */}
-        <UnitySimulatorControls
-          isUnityVisible={isUnityVisible}
-          showUnity={showUnity}
-          hideUnity={hideUnity}
-        />
+        <Inner />
       </div>
     </section>
   );
