@@ -9,23 +9,27 @@ export default function MainPage() {
     const { isAuthenticated } = useAuth();
 
     return (
-        <section>
-            <h1>Main Page</h1>
-            <p>여기는 메인 페이지입니다. 상단 메뉴에서 Editor로 이동하세요.</p>
+    <main className="min-h-screen flex flex-col items-center justify-center gap-6 px-6">
+      <h1 className="text-5xl md:text-6xl font-bold text-white font-tway">WDSS</h1>
+      <p className="text-gray-300 text-2xl font-bold text-center font-yuniverse">
+        디자인 없이 이미지로 드론쇼 만들기
+      </p>
 
-            <div style={{marginTop: '20px'}}>
-                {isAuthenticated ? (
-                    // isAuth가 true일 경우: 최근 프로젝트의 편집 화면으로 이동
-                    <a href="/projects/recent">
-                        <button>시작하기</button>
-                    </a>
-                ) : (
-                    // isAuth가 false일 경우: 로그인 페이지로 이동
-                    <Link to="/login">
-                        <button>로그인하여 시작하기</button>
-                    </Link>
-                )}
-            </div>
-        </section>
+      {isAuthenticated ? (
+        <Link 
+          to="/projects/recent"
+          className="px-5 py-2.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition font-yuniverse"
+        >
+          시작하기
+        </Link>
+      ) : (
+        <Link
+          to="/login"
+          className="px-5 py-2.5 rounded-lg bg-zinc-700 text-white hover:bg-zinc-600 transition font-yuniverse"
+        >
+          로그인하여 시작하기
+        </Link>
+      )}
+    </main>
     );
 }
