@@ -36,7 +36,7 @@ export default function EditorToolbar({
 
         <ImageUpload
           projectId={pid ?? 1}
-          sceneId={selectedId ?? 1}
+          sceneId={selectedId}
           onUploaded={onUploaded}
         />
 
