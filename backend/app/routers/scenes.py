@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS scene_payload (
 
 
 # ---- 목록 ----
-@router.get("/{project_id}/scenes", response_model=List[SceneBrief])
+@router.get("/", response_model=List[SceneBrief])
 async def list_scenes(project_id: str, user_id: str = Depends(get_current_user_id)):
     async with get_conn() as conn:
         await conn.execute(CREATE_PAYLOAD_SQL)
@@ -74,7 +74,7 @@ async def list_scenes(project_id: str, user_id: str = Depends(get_current_user_i
 
 
 # ---- 생성 ----
-@router.post("/{project_id}/scenes", response_model=SceneBrief)
+@router.post("/", response_model=SceneBrief)
 async def create_scene(
     project_id: str,
     body: SceneCreateReq,
@@ -108,7 +108,7 @@ async def create_scene(
 
 
 # ---- 상세 ----
-@router.get("/{project_id}/scenes/{scene_id}", response_model=SceneDetail)
+@router.get("/{scene_id}", response_model=SceneDetail)
 async def get_scene(
     project_id: str, scene_id: str, user_id: str = Depends(get_current_user_id)
 ):
@@ -136,7 +136,7 @@ async def get_scene(
 
 
 # ---- 저장(덮어쓰기) ----
-@router.put("/{project_id}/scenes/{scene_id}", response_model=SceneDetail)
+@router.put("/{scene_id}", response_model=SceneDetail)
 async def save_scene(
     project_id: str,
     scene_id: str,
@@ -185,7 +185,7 @@ async def save_scene(
 
 
 # ---- 삭제 ----
-@router.delete("/{project_id}/scenes/{scene_id}")
+@router.delete("/{scene_id}")
 async def delete_scene(
     project_id: str, scene_id: str, user_id: str = Depends(get_current_user_id)
 ):
