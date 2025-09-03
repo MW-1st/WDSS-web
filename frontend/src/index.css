@@ -21,4 +21,40 @@
   --font-yuniverse: "YUniverse", ui-sans-serif, system-ui, sans-serif;
 }
 
+/* 부드럽게 색이 흐르도록 */
+@keyframes gradientMove {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* 일렁이는 그라데이션 */
+.bg-wavy {
+  background-image: linear-gradient(
+    270deg,
+    #191970 0%,
+    #483d8b 25%,
+    #7b68ee 50%,
+    #ff69b4 75%,
+    #ffffe0 100%
+  );
+  background-size: 400% 400%;
+  animation: gradientMove 20s ease-in-out infinite;
+}
+
+/* 가독성용 살짝 눌러주는 오버레이(선택) */
+.bg-veil {
+  background: radial-gradient(
+      80% 60% at 50% 40%,
+      rgba(0, 0, 0, 0.18),
+      transparent 70%
+    ),
+    rgba(0, 0, 0, 0.06);
+}
 

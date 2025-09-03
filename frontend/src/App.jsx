@@ -88,6 +88,7 @@ function AppContent() {
 
   return (
     <div style={{ padding: 16 }}>
+
       <Navbar />
       <Routes>
         <Route path="/" element={<MainPage />} />
