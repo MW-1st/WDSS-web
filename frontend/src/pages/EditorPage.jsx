@@ -5,6 +5,11 @@ import SceneCarousel from "../components/SceneCarousel.jsx";
 import client from "../api/client";
 import { useUnity } from "../contexts/UnityContext.jsx";
 
+const VISIBLE = 4;
+const THUMB_W = 200;
+const THUMB_H = 120;
+const GAP = 48;
+const BTN_SIZE = 48;
 const DUMMY = "11111111-1111-1111-1111-111111111111";
 
 function useDebounced(fn, delay = 400) {
@@ -16,13 +21,13 @@ function useDebounced(fn, delay = 400) {
 }
 
 export default function EditorPage({ projectId = DUMMY }) {
-  // 프로젝트 및 씬 관리
+  // 프로젝트 및 씬 관리 상태
   const [pid, setPid] = useState(projectId && projectId !== DUMMY ? projectId : null);
   const [scenes, setScenes] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [start, setStart] = useState(0);
 
-  // 이미지 변환 관련 상태 (기존 기능)
+  // 이미지 변환 관련 상태
   const [imageUrl, setImageUrl] = useState("");
   const [processing, setProcessing] = useState(false);
   const [targetDots, setTargetDots] = useState(2000);
@@ -31,7 +36,13 @@ export default function EditorPage({ projectId = DUMMY }) {
   // Unity 관련 상태
   const { isUnityVisible, showUnity, hideUnity } = useUnity();
 
-  // 선택된 씬 계산
+  // + 카드까지 포함
+  const items = useMemo(() => [...scenes, { id: "__ADD__", isAdd: true }], [scenes]);
+  const total = items.length;
+  const canSlide = total > VISIBLE;
+  const end = Math.min(start + VISIBLE, total);
+  const visibleItems = items.slice(start, end);
+
   const selectedScene = useMemo(
     () => scenes.find((s) => s.id === selectedId) || null,
     [scenes, selectedId]
@@ -78,14 +89,21 @@ export default function EditorPage({ projectId = DUMMY }) {
       try {
         const detail = await client.get(`/projects/${pid}/scenes/${selectedId}`);
         setScenes((prev) => prev.map((s) => (s.id === selectedId ? { ...s, ...detail } : s)));
+
+        // 씬이 변경될 때 해당 씬의 이미지 URL도 업데이트
+        if (detail.imageUrl) {
+          setImageUrl(detail.imageUrl);
+        } else {
+          setImageUrl("");
+        }
       } catch (e) {
         console.error(e);
       }
     })();
-  }, [selectedId, pid]);
+  }, [selectedId, pid, scenes]);
 
   // 저장(디바운스)
-  const saveDebounced = useDebounced(async (scene_id, drones, preview) => {
+  const saveDebounced = useDebounced(async (scene_id, drones, preview, imageUrl) => {
     if (!pid) return;
     try {
       const saved = await client.put(`/projects/${pid}/scenes/${scene_id}`, {
@@ -93,6 +111,7 @@ export default function EditorPage({ projectId = DUMMY }) {
         scene_id,
         drones,
         preview,
+        imageUrl, // 이미지 URL도 저장
       });
       setScenes((prev) => prev.map((s) => (s.id === scene_id ? { ...s, ...saved } : s)));
     } catch (e) {
@@ -103,7 +122,7 @@ export default function EditorPage({ projectId = DUMMY }) {
   // Canvas → 변경 반영
   const handleSceneChange = (id, patch) => {
     setScenes((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
-    saveDebounced(id, patch.data, patch.preview);
+    saveDebounced(id, patch.data, patch.preview, imageUrl);
   };
 
   // + 생성
@@ -120,24 +139,35 @@ export default function EditorPage({ projectId = DUMMY }) {
       setScenes(nextScenes);
       setSelectedId(created.id);
       const nextTotal = nextScenes.length + 1;
-      if (nextTotal > 4) setStart(nextTotal - 4); // VISIBLE = 4
+      if (nextTotal > VISIBLE) setStart(nextTotal - VISIBLE);
+
+      // 새 씬으로 전환하면서 이미지 URL 초기화
+      setImageUrl("");
     } catch (e) {
       console.error(e);
       alert("씬 생성 실패");
     }
   };
 
-  // 씬 선택
-  const handleSelectScene = (id) => {
+  // 선택
+  const handleSelect = (id) => {
+    if (id === "__ADD__") return;
     setSelectedId(id);
+    const idx = items.findIndex((it) => it.id === id);
+    if (idx < start) setStart(idx);
+    if (idx >= start + VISIBLE) setStart(idx - VISIBLE + 1);
   };
 
-  // 업로드 완료 핸들러 (기존 기능)
+  // 업로드 완료 핸들러
   const handleUploaded = (webUrl) => {
     setImageUrl(webUrl || "");
+    // 현재 선택된 씬에 이미지 URL 저장
+    if (selectedId && pid) {
+      saveDebounced(selectedId, selectedScene?.drones, selectedScene?.preview, webUrl);
+    }
   };
 
-  // 이미지 변환 핸들러 (기존 기능)
+  // 이미지 변환 핸들러
   const handleTransform = async () => {
     if (!stageRef.current || !selectedId) return;
 
@@ -156,6 +186,11 @@ export default function EditorPage({ projectId = DUMMY }) {
         const base = client.defaults.baseURL?.replace(/\/$/, "") || "";
         const path = String(outputUrl).replace(/\\/g, "/");
         setImageUrl(`${base}/${path.replace(/^\//, "")}`);
+      }
+
+      // 변환된 이미지 URL을 현재 씬에 저장
+      if (selectedId && pid) {
+        saveDebounced(selectedId, selectedScene?.drones, selectedScene?.preview, outputUrl);
       }
     } catch (e) {
       console.error("Transform error", e);
