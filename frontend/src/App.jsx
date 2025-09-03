@@ -4,11 +4,13 @@ import MainPage from "./pages/MainPage.jsx";
 import EditorPage from "./pages/EditorPage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import DashboardPage from "./pages/DashboardPage.jsx";
-import PrivateRoute from "./components/PrivateRoute.jsx";
+
 import { UnityProvider, useUnity } from "./contexts/UnityContext.jsx";
 import { AuthProvider, useAuth } from "./contexts/AuthContext.jsx";
-//임시
-import ProjectStart from "./pages/ProjectStart";
+
+import PrivateRoute from "./routes/PrivateRoute.jsx";
+import PublicRoute from "./routes/PublicRoute.jsx";
+import ProjectOwnerRoute from "./routes/ProjectOwnerRoute.jsx";
 
 function AppContent() {
   const navigate = useNavigate();
@@ -100,22 +102,11 @@ function AppContent() {
 
       <Routes>
         <Route path="/" element={<MainPage />} />
-        <Route path="/editor" element={<EditorPage />} />
-        {/* 임시 */}
-        <Route path="/" element={<ProjectStart />} />
-        <Route
-          path="/login"
-          element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />}
-        />
-        <Route
-          path="/dashboard"
-          element={
-            <PrivateRoute>
-              <DashboardPage />
-            </PrivateRoute>
-          }
-        />
-        <Route path="/projects/:project_id" element={isAuthenticated ? <EditorPage /> : <LoginPage/>}/>
+        <Route path="/login" element={<PublicRoute> <LoginPage /> </PublicRoute>}/>
+        <Route path="/dashboard" element={<PrivateRoute> <DashboardPage /> </PrivateRoute> }/>
+        <Route path="/projects" element={<Navigate to="/dashboard" replace />}/>
+        <Route path="/projects/:project_id" element={ <EditorPage />}/>
+        {/*<Route path="/projects/:project_id" element={<ProjectOwnerRoute> <EditorPage /> </ProjectOwnerRoute>}/>*/}
       </Routes>
 
       {/* Persistent Unity iframe */}
