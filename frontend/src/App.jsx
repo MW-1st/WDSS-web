@@ -11,7 +11,6 @@ import MainPage from "./pages/MainPage.jsx";
 import EditorPage from "./pages/EditorPage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import DashboardPage from "./pages/DashboardPage.jsx";
-import PrivateRoute from "./components/PrivateRoute.jsx";
 import Navbar from "./components/Navbar";
 import { UnityProvider, useUnity } from "./contexts/UnityContext.jsx";
 import { AuthProvider, useAuth } from "./contexts/AuthContext.jsx";

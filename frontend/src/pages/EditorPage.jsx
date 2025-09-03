@@ -66,7 +66,7 @@ export default function EditorPage({ projectId = DUMMY }) {
     if (!pid) return;
     (async () => {
       try {
-        const list = await client.get(`/projects/${pid}/scenes`);
+        const list = await client.get(`/projects/${pid}/scenes/`);
         setScenes(list.map((s, i) => ({ ...s, name: s.name || `Scene ${s.scene_num ?? i + 1}` })));
         if (list[0]) setSelectedId(list[0].id);
       } catch (e) {
@@ -128,7 +128,7 @@ export default function EditorPage({ projectId = DUMMY }) {
       console.log("확인된 Project ID:", projectIdReady);
       const scene_num = scenes.length + 1;
       console.log("확인된 scene_num:", scene_num);
-      const created = await client.post(`/projects/${projectIdReady}/scenes`, {
+      const created = await client.post(`/projects/${projectIdReady}/scenes/`, {
         project_id: projectIdReady,
         scene_num,
       });
