@@ -25,23 +25,108 @@ export default function EditorPage() {
     if (!stageRef.current) return;
     try {
       setProcessing(true);
-      const resp = await client.post(
-        `/image/process?target_dots=${encodeURIComponent(
-          targetDots
-        )}&scene_id=${encodeURIComponent(sceneId)}`
-      );
-      let outputUrl = resp.data?.output_url || "";
-      if (outputUrl.startsWith("http")) {
-        setImageUrl(outputUrl);
+      
+      // 캔버스에 펜으로 그린 내용이 있는지 확인
+      const hasContent = stageRef.current.hasDrawnContent && stageRef.current.hasDrawnContent();
+      
+      if (hasContent) {
+        console.log("캔버스에 그려진 내용이 있어서 캔버스를 변환합니다");
+        // 현재 캔버스 내용을 이미지로 변환
+        const canvasImage = stageRef.current.exportCanvasAsImage();
+        
+        if (!canvasImage) {
+          alert("캔버스 이미지를 생성할 수 없습니다.");
+          setProcessing(false);
+          return;
+        }
+        
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const img = new Image();
+        
+        img.onload = async () => {
+          canvas.width = img.width;
+          canvas.height = img.height;
+          ctx.drawImage(img, 0, 0);
+          
+          // 캔버스를 blob으로 변환
+          canvas.toBlob(async (blob) => {
+            const fd = new FormData();
+            fd.append('image', blob, 'canvas_drawing.png');
+            
+            try {
+              // 먼저 캔버스 이미지를 업로드
+              console.log("캔버스 이미지를 업로드합니다");
+              const uploadResp = await client.post(`/projects/1/scenes/${sceneId}/upload-image`, fd);
+              const uploadedImagePath = uploadResp.data?.image_url;
+              
+              if (!uploadedImagePath) {
+                alert("캔버스 이미지 업로드에 실패했습니다.");
+                setProcessing(false);
+                return;
+              }
+              
+              console.log("업로드된 이미지:", uploadedImagePath);
+              
+              // 업로드된 이미지를 변환
+              const resp = await client.post(
+                `/image/process?target_dots=${encodeURIComponent(targetDots)}&scene_id=${encodeURIComponent(sceneId)}`
+              );
+              let outputUrl = resp.data?.output_url || "";
+              console.log("변환 완료, 서버 응답:", resp.data);
+              console.log("새로운 SVG URL:", outputUrl);
+              
+              if (!outputUrl) {
+                alert("서버에서 변환된 이미지 URL을 받지 못했습니다.");
+                setProcessing(false);
+                return;
+              }
+              
+              // 먼저 캔버스 초기화 (기존 내용 제거)
+              if (stageRef.current && stageRef.current.clear) {
+                stageRef.current.clear();
+              }
+              
+              let finalUrl;
+              if (outputUrl.startsWith("http")) {
+                finalUrl = outputUrl;
+              } else {
+                const base = client.defaults.baseURL?.replace(/\/$/, "") || "";
+                const path = String(outputUrl).replace(/\\/g, "/");
+                finalUrl = `${base}/${path.replace(/^\//, "")}`;
+              }
+              
+              console.log("최종 이미지 URL:", finalUrl);
+              setImageUrl(finalUrl);
+            } catch (e) {
+              console.error("Canvas transform error", e);
+              alert("캔버스 변환 중 오류가 발생했습니다.");
+            } finally {
+              setProcessing(false);
+            }
+          }, 'image/png');
+        };
+        
+        img.src = canvasImage;
       } else {
-        const base = client.defaults.baseURL?.replace(/\/$/, "") || "";
-        const path = String(outputUrl).replace(/\\/g, "/");
-        setImageUrl(`${base}/${path.replace(/^\//, "")}`);
+        console.log("캔버스에 그려진 내용이 없어서 기존 이미지를 변환합니다");
+        // 기존 로직: 업로드된 이미지가 있을 때
+        const resp = await client.post(
+          `/image/process?target_dots=${encodeURIComponent(targetDots)}&scene_id=${encodeURIComponent(sceneId)}`
+        );
+        let outputUrl = resp.data?.output_url || "";
+        if (outputUrl.startsWith("http")) {
+          setImageUrl(outputUrl);
+        } else {
+          const base = client.defaults.baseURL?.replace(/\/$/, "") || "";
+          const path = String(outputUrl).replace(/\\/g, "/");
+          setImageUrl(`${base}/${path.replace(/^\//, "")}`);
+        }
+        setProcessing(false);
       }
     } catch (e) {
       console.error("Transform error", e);
       alert("이미지 변환 중 오류가 발생했습니다.");
-    } finally {
       setProcessing(false);
     }
   };

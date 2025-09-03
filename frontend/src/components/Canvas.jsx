@@ -28,7 +28,7 @@ export default function Canvas({ width = 800, height = 500, imageUrl = "", stage
     // 그리기 모드 설정 (성능 최적화)
     canvas.isDrawingMode = true;
     const brush = new PencilBrush(canvas);
-    brush.width = 2;
+    brush.width = 2; // 원래 크기로 복원
     brush.color = "#222";
     brush.decimate = 2; // 브러시 포인트 간소화
     brush.limitedToCanvasSize = true; // 캔버스 경계 제한
@@ -50,15 +50,22 @@ export default function Canvas({ width = 800, height = 500, imageUrl = "", stage
 
   // Effect for loading the background image
   useEffect(() => {
+    console.log("imageUrl 변경됨:", imageUrl);
     if (!imageUrl || !fabricCanvas.current) return;
     const canvas = fabricCanvas.current;
 
     // SVG 파일인지 확인
     if (imageUrl.endsWith('.svg')) {
+      console.log("SVG 파일 로드 시작:", imageUrl);
       // SVG 파일을 직접 로드하여 개별 요소들에 접근 가능하도록 처리
       fetch(imageUrl)
-        .then(response => response.text())
+        .then(response => {
+          console.log("SVG fetch 응답:", response.status);
+          return response.text();
+        })
         .then(svgText => {
+          console.log("SVG 텍스트 길이:", svgText.length);
+          console.log("SVG 내용 시작:", svgText.substring(0, 200));
           // 기존 SVG 요소들 제거
           const existingSvgObjects = canvas.getObjects().filter(obj => 
             obj.customType === 'svgDot' || obj.type === 'image'
@@ -69,12 +76,18 @@ export default function Canvas({ width = 800, height = 500, imageUrl = "", stage
           const parser = new DOMParser();
           const svgDoc = parser.parseFromString(svgText, 'image/svg+xml');
           const circles = svgDoc.querySelectorAll('circle');
+          console.log("찾은 circle 개수:", circles.length);
           
-          circles.forEach(circleEl => {
+          let addedCount = 0;
+          circles.forEach((circleEl, index) => {
             const cx = parseFloat(circleEl.getAttribute('cx') || '0');
             const cy = parseFloat(circleEl.getAttribute('cy') || '0');
             const r = parseFloat(circleEl.getAttribute('r') || '2');
             const fill = circleEl.getAttribute('fill') || '#000000';
+
+            if (index < 5) {
+              console.log(`Circle ${index}: cx=${cx}, cy=${cy}, r=${r}, fill=${fill}`);
+            }
 
             const fabricCircle = new Circle({
               left: cx - r,
@@ -91,8 +104,11 @@ export default function Canvas({ width = 800, height = 500, imageUrl = "", stage
             });
 
             canvas.add(fabricCircle);
-            // 배경으로 보내지 않고 같은 레이어에 유지
+            addedCount++;
           });
+          
+          console.log(`총 ${addedCount}개의 circle을 캔버스에 추가했습니다`);
+          console.log("캔버스 객체 개수:", canvas.getObjects().length);
 
           canvas.renderAll();
         })
@@ -177,9 +193,9 @@ export default function Canvas({ width = 800, height = 500, imageUrl = "", stage
       canvas.freeDrawingCursor = 'crosshair';
       
       const brush = new PencilBrush(canvas);
-      brush.width = 2;
+      brush.width = 2; // 원래 크기로 복원
       brush.color = "#222";
-      brush.decimate = 2;
+      brush.decimate = 2; // 브러시 포인트 간소화
       brush.limitedToCanvasSize = true;
       canvas.freeDrawingBrush = brush;
       
@@ -461,6 +477,16 @@ export default function Canvas({ width = 800, height = 500, imageUrl = "", stage
     applyDrawingMode(mode);
   };
 
+  // 전체 지우기 핸들러
+  const handleClearAll = () => {
+    if (!fabricCanvas.current) return;
+    
+    if (confirm('캔버스의 모든 내용을 지우시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
+      clearCanvas();
+      console.log('캔버스 전체가 초기화되었습니다');
+    }
+  };
+
   // 현재 캔버스의 도트들을 SVG 문자열로 생성
   const getCurrentCanvasAsSvg = () => {
     if (!fabricCanvas.current) return null;
@@ -497,10 +523,87 @@ export default function Canvas({ width = 800, height = 500, imageUrl = "", stage
     };
   };
 
+  // 현재 캔버스 전체를 이미지로 내보내기
+  const exportCanvasAsImage = () => {
+    if (!fabricCanvas.current) return null;
+    
+    const canvas = fabricCanvas.current;
+    // 캔버스를 데이터 URL로 변환 (PNG 형태)
+    const dataURL = canvas.toDataURL({
+      format: 'png',
+      quality: 1.0,
+      multiplier: 1
+    });
+    
+    return dataURL;
+  };
+
+  // 펜으로 그린 선만 별도로 이미지로 내보내기
+  const exportDrawnLinesOnly = () => {
+    if (!fabricCanvas.current) return null;
+    
+    const canvas = fabricCanvas.current;
+    const objects = canvas.getObjects();
+    
+    // 배경 이미지와 SVG 도트들을 임시로 숨기기
+    const hiddenObjects = [];
+    objects.forEach(obj => {
+      if (obj.type === 'image' || obj.customType === 'svgDot') {
+        obj.visible = false;
+        hiddenObjects.push(obj);
+      }
+    });
+    
+    canvas.renderAll();
+    
+    // 펜으로 그린 선만 포함된 이미지 생성
+    const dataURL = canvas.toDataURL({
+      format: 'png',
+      quality: 1.0,
+      multiplier: 1,
+      backgroundColor: 'white' // 배경을 흰색으로 설정
+    });
+    
+    // 숨겼던 객체들 다시 보이게 하기
+    hiddenObjects.forEach(obj => {
+      obj.visible = true;
+    });
+    
+    canvas.renderAll();
+    
+    return dataURL;
+  };
+
+  // 캔버스에 그려진 객체가 있는지 확인
+  const hasDrawnContent = () => {
+    if (!fabricCanvas.current) return false;
+    
+    const canvas = fabricCanvas.current;
+    const objects = canvas.getObjects();
+    
+    // path(펜으로 그린 선)나 drawnDot(브러시 도트)가 있는지 확인
+    return objects.some(obj => obj.type === 'path' || obj.customType === 'drawnDot');
+  };
+
+  // 캔버스 초기화 (모든 객체 제거)
+  const clearCanvas = () => {
+    if (!fabricCanvas.current) return;
+    
+    const canvas = fabricCanvas.current;
+    // 모든 객체 제거
+    canvas.getObjects().forEach(obj => canvas.remove(obj));
+    canvas.backgroundColor = '#fafafa';
+    canvas.renderAll();
+  };
+
   // 외부에서 사용할 수 있도록 ref에 함수 등록
   useEffect(() => {
     if (externalStageRef && externalStageRef.current) {
       externalStageRef.current.getCurrentCanvasAsSvg = getCurrentCanvasAsSvg;
+      externalStageRef.current.exportCanvasAsImage = exportCanvasAsImage;
+      externalStageRef.current.exportDrawnLinesOnly = exportDrawnLinesOnly;
+      externalStageRef.current.hasDrawnContent = hasDrawnContent;
+      externalStageRef.current.clear = clearCanvas;
     }
   }, [externalStageRef]);
 
@@ -557,10 +660,25 @@ export default function Canvas({ width = 800, height = 500, imageUrl = "", stage
             border: '1px solid #ccc',
             padding: '8px 16px',
             borderRadius: '4px',
-            cursor: 'pointer'
+            cursor: 'pointer',
+            marginRight: '10px'
           }}
         >
           픽셀 지우개
+        </button>
+        <button 
+          onClick={() => handleClearAll()} 
+          style={{ 
+            backgroundColor: '#dc3545',
+            color: 'white',
+            border: '1px solid #dc3545',
+            padding: '8px 16px',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontWeight: 'bold'
+          }}
+        >
+          전체 지우기
         </button>
       </div>
       <p>Fabric.js Canvas: 자유 그리기 및 이미지 표시 ({
