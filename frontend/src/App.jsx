@@ -115,7 +115,7 @@ function AppContent() {
             </PrivateRoute>
           }
         />
-
+        <Route path="/projects/:project_id" element={isAuthenticated ? <EditorPage /> : <LoginPage/>}/>
       </Routes>
 
       {/* Persistent Unity iframe */}
