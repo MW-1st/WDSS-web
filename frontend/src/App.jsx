@@ -7,12 +7,10 @@ import DashboardPage from "./pages/DashboardPage.jsx";
 import PrivateRoute from "./components/PrivateRoute.jsx";
 import { UnityProvider, useUnity } from "./contexts/UnityContext.jsx";
 import { AuthProvider, useAuth } from "./contexts/AuthContext.jsx";
-
-function AppContent() {
 //임시
 import ProjectStart from "./pages/ProjectStart";
 
-export default function App() {
+function AppContent() {
   const navigate = useNavigate();
   const { isUnityVisible, showUnity, hideUnity } = useUnity();
   const { isAuthenticated, logout, loading } = useAuth();
