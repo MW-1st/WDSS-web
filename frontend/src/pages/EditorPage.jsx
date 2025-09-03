@@ -1,35 +1,186 @@
-import React, { useRef, useState } from "react";
-import Canvas from "../components/Canvas.jsx";
-import ImageUpload from "../components/ImageUpload.jsx";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import EditorToolbar from "../components/EditorToolbar.jsx";
+import MainCanvasSection from "../components/MainCanvasSection.jsx";
+import SceneCarousel from "../components/SceneCarousel.jsx";
 import client from "../api/client";
 import { useUnity } from "../contexts/UnityContext.jsx";
 
-export default function EditorPage() {
-  // image change 관련 상태
+const VISIBLE = 4;
+const THUMB_W = 200;
+const THUMB_H = 120;
+const GAP = 48;
+const BTN_SIZE = 48;
+const DUMMY = "11111111-1111-1111-1111-111111111111";
+
+function useDebounced(fn, delay = 400) {
+  const t = useRef(null);
+  return (...args) => {
+    if (t.current) clearTimeout(t.current);
+    t.current = setTimeout(() => fn(...args), delay);
+  };
+}
+
+export default function EditorPage({ projectId = DUMMY }) {
+  // 프로젝트 및 씬 관리 상태
+  const [pid, setPid] = useState(projectId && projectId !== DUMMY ? projectId : null);
+  const [scenes, setScenes] = useState([]);
+  const [selectedId, setSelectedId] = useState(null);
+  const [start, setStart] = useState(0);
+
+  // 이미지 변환 관련 상태
   const [imageUrl, setImageUrl] = useState("");
   const [processing, setProcessing] = useState(false);
   const [targetDots, setTargetDots] = useState(2000);
   const stageRef = useRef(null);
-  const sceneId = 1; // 현재 에디터의 씬 ID (임시 하드코딩)
+  // const sceneId = 1; // 현재 에디터의 씬 ID (임시 하드코딩)
 
   // unity 관련 상태
   const { isUnityVisible, showUnity, hideUnity, sendTestData } = useUnity();
 
+  // 프로젝트가 없으면 생성하는 헬퍼
+  const ensureProjectId = async () => {
+    if (pid) return pid;
+    const newId =
+      (crypto && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g,c=>(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16));
+
+    const { data } = await client.post("/projects", {
+      id: newId,
+      project_name: "Untitled Project",
+      user_id: null,
+    });
+    setPid(data.id);
+    return data.id;
+  };
+
+  // 초기: 프로젝트가 있으면 목록 로드
+  useEffect(() => {
+    if (!pid) return;
+    (async () => {
+      try {
+        const list = await client.get(`/projects/${pid}/scenes`);
+        setScenes(list.map((s, i) => ({ ...s, name: s.name || `Scene ${s.scene_num ?? i + 1}` })));
+        if (list[0]) setSelectedId(list[0].id);
+      } catch (e) {
+        console.error(e);
+      }
+    })();
+  }, [pid]);
+
+  // 씬 선택 → 상세 로드
+  useEffect(() => {
+    if (!pid) return;
+    (async () => {
+      if (!selectedId) return;
+      const current = scenes.find((s) => s.id === selectedId);
+      if (!current || "drones" in current) return;
+      try {
+        const detail = await client.get(`/projects/${pid}/scenes/${selectedId}`);
+        setScenes((prev) => prev.map((s) => (s.id === selectedId ? { ...s, ...detail } : s)));
+
+        // 씬이 변경될 때 해당 씬의 이미지 URL도 업데이트
+        if (detail.imageUrl) {
+          setImageUrl(detail.imageUrl);
+        } else {
+          setImageUrl("");
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    })();
+  }, [selectedId, pid, scenes]);
+
+  // 저장(디바운스)
+  const saveDebounced = useDebounced(async (scene_id, drones, preview, imageUrl) => {
+    if (!pid) return;
+    try {
+      const saved = await client.put(`/projects/${pid}/scenes/${scene_id}`, {
+        project_id: pid,
+        scene_id,
+        drones,
+        preview,
+        imageUrl, // 이미지 URL도 저장
+      });
+      setScenes((prev) => prev.map((s) => (s.id === scene_id ? { ...s, ...saved } : s)));
+    } catch (e) {
+      console.error(e);
+    }
+  }, 500);
+
+  // Canvas → 변경 반영
+  const handleSceneChange = (id, patch) => {
+    setScenes((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
+    saveDebounced(id, patch.data, patch.preview, imageUrl);
+  };
+
+  // + 생성
+  const handleAddScene = async () => {
+    try {
+      const projectIdReady = await ensureProjectId();
+      const scene_num = scenes.length + 1;
+      const created = await client.post(`/projects/${projectIdReady}/scenes`, {
+        project_id: projectIdReady,
+        scene_num,
+      });
+
+      const nextScenes = [...scenes, created];
+      setScenes(nextScenes);
+      setSelectedId(created.id);
+      const nextTotal = nextScenes.length + 1;
+      if (nextTotal > VISIBLE) setStart(nextTotal - VISIBLE);
+
+      // 새 씬으로 전환하면서 이미지 URL 초기화
+      setImageUrl("");
+    } catch (e) {
+      console.error(e);
+      alert("씬 생성 실패");
+    }
+  };
+
+  // 선택
+  const handleSelect = (id) => {
+    if (id === "__ADD__") return;
+    setSelectedId(id);
+    const idx = items.findIndex((it) => it.id === id);
+    if (idx < start) setStart(idx);
+    if (idx >= start + VISIBLE) setStart(idx - VISIBLE + 1);
+  };
+
+   // + 카드까지 포함
+  const items = useMemo(() => [...scenes, { id: "__ADD__", isAdd: true }], [scenes]);
+  const total = items.length;
+  const canSlide = total > VISIBLE;
+  const end = Math.min(start + VISIBLE, total);
+  const visibleItems = items.slice(start, end);
+
+  const selectedScene = useMemo(
+    () => scenes.find((s) => s.id === selectedId) || null,
+    [scenes, selectedId]
+  );
+
+
   // 업로드 완료 핸들러
   const handleUploaded = (webUrl) => {
     setImageUrl(webUrl || "");
+    // 현재 선택된 씬에 이미지 URL 저장
+    if (selectedId && pid) {
+      saveDebounced(selectedId, selectedScene?.drones, selectedScene?.preview, webUrl);
+    }
   };
 
   // 이미지 변환 핸들러
   const handleTransform = async () => {
-    if (!stageRef.current) return;
+    if (!stageRef.current || !selectedId) return;
+
     try {
       setProcessing(true);
       const resp = await client.post(
         `/image/process?target_dots=${encodeURIComponent(
           targetDots
-        )}&scene_id=${encodeURIComponent(sceneId)}`
+        )}&scene_id=${encodeURIComponent(selectedId)}`
       );
+
       let outputUrl = resp.data?.output_url || "";
       if (outputUrl.startsWith("http")) {
         setImageUrl(outputUrl);
@@ -37,6 +188,11 @@ export default function EditorPage() {
         const base = client.defaults.baseURL?.replace(/\/$/, "") || "";
         const path = String(outputUrl).replace(/\\/g, "/");
         setImageUrl(`${base}/${path.replace(/^\//, "")}`);
+      }
+
+      // 변환된 이미지 URL을 현재 씬에 저장
+      if (selectedId && pid) {
+        saveDebounced(selectedId, selectedScene?.drones, selectedScene?.preview, outputUrl);
       }
     } catch (e) {
       console.error("Transform error", e);
@@ -60,138 +216,39 @@ export default function EditorPage() {
   const closeButtonStyle = { ...buttonStyle, backgroundColor: "#dc3545" };
 
   return (
-    <section className="p-6">
-      <h1 className="text-2xl font-bold mb-4">Editor</h1>
-      <p className="text-gray-600 mb-6">
-        이미지 업로드 후 캔버스에서 확인/변환하거나 Unity 시뮬레이터와 연동할 수
-        있습니다.
-      </p>
+    <div style={{ width: "100%", background: "#fff" }}>
+      {/* 업로드 및 도구 바 */}
+      <EditorToolbar
+        pid={pid}
+        selectedId={selectedId}
+        imageUrl={imageUrl}
+        targetDots={targetDots}
+        setTargetDots={setTargetDots}
+        processing={processing}
+        onUploaded={handleUploaded}
+        onTransform={handleTransform}
+        isUnityVisible={isUnityVisible}
+        showUnity={showUnity}
+        hideUnity={hideUnity}
+      />
 
-      {/* 이미지 업로드 */}
-      <ImageUpload projectId={1} sceneId={1} onUploaded={handleUploaded} />
-
-      {/* 변환 기능 */}
-      <div className="mb-4">
-        <div className="mb-2 flex items-center gap-3">
-          <label className="text-sm text-gray-700 flex items-center">
-            Target dots:
-            <span
-              style={{
-                display: "inline-block",
-                minWidth: "50px",
-                textAlign: "right",
-              }}
-            >
-              {targetDots}
-            </span>
-          </label>
-          <input
-            type="range"
-            min={100}
-            max={10000}
-            step={100}
-            value={targetDots}
-            onChange={(e) => setTargetDots(parseInt(e.target.value, 10))}
-          />
-        </div>
-        {/* JSON 파일 생성 버튼 */}
-        <div className="mb-2">
-          <button
-            onClick={async () => {
-              try {
-                if (!stageRef.current || !stageRef.current.getCurrentCanvasAsSvg) {
-                  alert("캔버스가 준비되지 않았습니다.");
-                  return;
-                }
-                
-                // 현재 캔버스의 수정된 상태를 SVG로 가져오기
-                const canvasSvgData = stageRef.current.getCurrentCanvasAsSvg();
-                
-                if (!canvasSvgData || canvasSvgData.totalDots === 0) {
-                  alert("그릴 도트가 없습니다. 먼저 이미지를 변환하거나 그림을 그려주세요.");
-                  return;
-                }
-                
-                // 수정된 캔버스 SVG를 Blob으로 변환
-                const svgBlob = new Blob([canvasSvgData.svgString], { type: "image/svg+xml" });
-                const fd = new FormData();
-                fd.append(
-                  "file",
-                  new File([svgBlob], "modified_canvas.svg", { type: "image/svg+xml" })
-                );
-                
-                // 기존 엔드포인트 사용
-                const jsonResp = await client.post("/image/svg-to-json", fd);
-                const jsonUrl = jsonResp.data?.json_url;
-                const unitySent = jsonResp.data?.unity_sent;
-                
-                if (jsonUrl) {
-                  const base = client.defaults.baseURL?.replace(/\/$/, '') || '';
-                  const full = jsonUrl.startsWith('http')
-                    ? jsonUrl
-                    : `${base}/${jsonUrl.replace(/^\//,'')}`;
-                  window.open(full, '_blank', 'noopener');
-                  if (unitySent) {
-                    alert(`수정된 캔버스가 JSON으로 생성되었고 Unity로 데이터가 전송되었습니다! (총 ${canvasSvgData.totalDots}개 도트)`);
-                  } else {
-                    alert(`수정된 캔버스가 JSON으로 생성되었습니다! (총 ${canvasSvgData.totalDots}개 도트)`);
-                  }
-                } else {
-                  alert("JSON 생성에 실패했습니다.");
-                }
-              } catch (e) {
-                console.error("SVG to JSON error", e);
-                alert("JSON 생성 중 오류가 발생했습니다.");
-              }
-            }}
-            className="px-4 py-2 mr-3 rounded bg-emerald-600 hover:bg-emerald-700 text-white"
-          >
-            JSON 파일로만들기
-          </button>
-        </div>
-        <button
-          onClick={handleTransform}
-          disabled={processing}
-          className={`px-4 py-2 rounded text-white ${
-            processing ? "bg-gray-400" : "bg-blue-600 hover:bg-blue-700"
-          }`}
-        >
-          {processing ? "변환 중..." : "변환"}
-        </button>
-      </div>
-
-      {/* Unity 기능 */}
-      <div
-        style={{
-          marginBottom: "20px",
-          padding: "15px",
-          backgroundColor: "#f8f9fa",
-          borderRadius: "8px",
-        }}
-      >
-        <div style={{ marginBottom: "15px" }}>
-          {!isUnityVisible ? (
-            <button style={buttonStyle} onClick={showUnity}>
-              🎮 Unity 시뮬레이터 열기
-            </button>
-          ) : (
-            <button style={closeButtonStyle} onClick={hideUnity}>
-              🎮 Unity 시뮬레이터 닫기
-            </button>
-          )}
-        </div>
-        <p style={{ fontSize: '14px', color: '#666', margin: '0' }}>
-          Unity 시뮬레이터를 열고 'JSON 파일로만들기' 버튼을 클릭하면 Unity로 데이터가 자동 전송됩니다.
-        </p>
-      </div>
-
-      {/* 캔버스 */}
-      <Canvas
-        width={800}
-        height={500}
+      {/* 메인 캔버스 */}
+      <MainCanvasSection
+        selectedScene={selectedScene}
         imageUrl={imageUrl}
         stageRef={stageRef}
+        onChange={handleSceneChange}
       />
-    </section>
+
+      {/* 씬 캐러셀 */}
+      <SceneCarousel
+        scenes={scenes}
+        selectedId={selectedId}
+        start={start}
+        setStart={setStart}
+        onAddScene={handleAddScene}
+        onSelectScene={handleSelect}
+      />
+    </div>
   );
 }

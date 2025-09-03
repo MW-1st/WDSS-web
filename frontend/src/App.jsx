@@ -7,6 +7,8 @@ import DashboardPage from "./pages/DashboardPage.jsx";
 import PrivateRoute from "./components/PrivateRoute.jsx";
 import { UnityProvider, useUnity } from "./contexts/UnityContext.jsx";
 import { AuthProvider, useAuth } from "./contexts/AuthContext.jsx";
+//임시
+import ProjectStart from "./pages/ProjectStart";
 
 function AppContent() {
   const navigate = useNavigate();
@@ -99,6 +101,8 @@ function AppContent() {
       <Routes>
         <Route path="/" element={<MainPage />} />
         <Route path="/editor" element={<EditorPage />} />
+        {/* 임시 */}
+        <Route path="/" element={<ProjectStart />} />
         <Route
           path="/login"
           element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />}

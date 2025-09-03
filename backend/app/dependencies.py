@@ -8,8 +8,9 @@ from app.schemas import UserInDB, UserResponse
 from app.utils import security
 
 
-# OAuth2PasswordBearer 제거하고 쿠키 기반으로 변경
-async def get_current_user(access_token: Optional[str] = Cookie(None)) -> UserResponse:
+async def get_current_user(
+    access_token: Optional[str] = Cookie(None),
+) -> UserResponse:
     if access_token is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -42,4 +43,8 @@ async def get_current_user(access_token: Optional[str] = Cookie(None)) -> UserRe
             status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user"
         )
 
-    return UserResponse(username=user_in_db.username, disabled=user_in_db.disabled)
+    return UserResponse(
+        id=user_in_db.id,
+        username=user_in_db.username,
+        disabled=user_in_db.disabled,
+    )

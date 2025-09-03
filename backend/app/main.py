@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from app.routers import auth, image, websocket, project, image_router
+from app.routers import auth, image, scenes, websocket, project, image_router
+from app.db.database import init_db, close_db
 
 app = FastAPI()
 
@@ -16,15 +17,17 @@ app.add_middleware(
 
 # Routers
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
+app.include_router(project.router, prefix="/projects", tags=["project"])
 app.include_router(
     image.router, prefix="/projects/{project_id}/scenes/{scene_id}", tags=["image"]
 )
-app.include_router(project.router, prefix="/projects", tags=["project"])
+app.include_router(
+    scenes.router, prefix="/projects/{project_id}/scenes", tags=["scenes"]
+)
+
 app.include_router(image_router.router)
 app.include_router(websocket.router)
 
-# Static files for uploaded/processed images
-# Serves files under backend/uploaded_images at /uploads/*
 app.mount(
     "/uploads",
     StaticFiles(directory="uploaded_images"),
@@ -37,6 +40,16 @@ app.mount(
     StaticFiles(directory="svg_json"),
     name="svg_json",
 )
+
+
+@app.on_event("startup")
+async def startup():
+    await init_db()
+
+
+@app.on_event("shutdown")
+async def shutdown():
+    await close_db()
 
 
 @app.get("/health")
