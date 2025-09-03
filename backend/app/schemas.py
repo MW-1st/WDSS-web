@@ -1,7 +1,7 @@
 import datetime
-
+import uuid
 from pydantic import BaseModel, EmailStr, Field
-from typing import Optional
+from typing import Optional, List
 
 
 class Token(BaseModel):
@@ -18,6 +18,7 @@ class TokenPayload(BaseModel):
 #     username: str
 #     disabled: bool = False
 class UserResponse(BaseModel):
+    id: uuid.UUID
     username: str
     disabled: bool = False
 
@@ -59,3 +60,95 @@ class Project(BaseModel):
 class ProjectListResponse(BaseModel):
     success: bool = True
     projects: list[Project]
+
+
+class ProjectBase(BaseModel):
+    """프로젝트의 기본 필드를 정의하는 모델"""
+
+    project_name: str = Field(
+        ..., description="프로젝트 이름", example="새 드론쇼 프로젝트"
+    )
+    format: str = Field("dsj", description="프로젝트 포맷", example="dsj")
+    max_scene: int = Field(..., description="최대 씬 개수", example=15)
+    max_speed: float = Field(..., description="최대 속도", example=6.0)
+    max_accel: float = Field(..., description="최대 가속도", example=3.0)
+    min_separation: float = Field(..., description="드론간 최소 이격 거리", example=2.0)
+
+
+class ProjectCreate(ProjectBase):
+    """프로젝트 생성 시 요청 본문에 사용되는 모델"""
+
+    pass
+
+
+class ProjectUpdate(BaseModel):
+    """프로젝트 수정 시 요청 본문에 사용되는 모델 (모든 필드는 선택적)"""
+
+    project_name: Optional[str] = Field(
+        None, description="수정할 프로젝트 이름", example="수정된 프로젝트 이름"
+    )
+    max_scene: Optional[int] = Field(
+        None, description="수정할 최대 씬 개수", example=20
+    )
+    max_speed: Optional[float] = Field(
+        None, description="수정할 최대 속도", example=8.0
+    )
+    max_accel: Optional[float] = Field(
+        None, description="수정할 최대 가속도", example=4.0
+    )
+    min_separation: Optional[float] = Field(
+        None, description="수정할 드론간 최소 이격 거리", example=1.5
+    )
+
+
+class ProjectResponse(ProjectBase):
+    """프로젝트 생성 또는 수정 후 응답에 포함될 프로젝트 정보 모델"""
+
+    id: uuid.UUID = Field(..., description="프로젝트 고유 ID")
+    user_id: uuid.UUID = Field(..., description="사용자 고유 ID")
+    created_at: datetime.datetime = Field(..., description="생성 일시")
+    updated_at: datetime.datetime = Field(..., description="수정 일시")
+
+    class Config:
+        orm_mode = True  # orm_mode 대신 from_attributes=True (Pydantic v2)
+
+
+class SceneResponse(BaseModel):
+    """프로젝트 상세 조회 시 포함될 씬 정보 모델"""
+
+    id: uuid.UUID = Field(..., description="씬 고유 ID")
+    scene_num: int = Field(..., description="씬 번호")
+    s3_key: str = Field(..., description="S3에 저장된 씬 파일의 키")
+
+    class Config:
+        orm_mode = True
+
+
+class ProjectDetailResponse(ProjectResponse):
+    """프로젝트 상세 조회 응답에 사용될 모델"""
+
+    scenes: List[SceneResponse] = []
+
+
+class ProjectListResponse(BaseModel):
+    """프로젝트 목록 조회 응답 모델"""
+
+    projects: List[ProjectResponse]
+
+
+class SuccessResponse(BaseModel):
+    """성공 여부만 반환하는 응답 모델"""
+
+    success: bool = True
+
+
+class ProjectDataResponse(SuccessResponse):
+    """프로젝트 데이터를 포함하는 성공 응답 모델"""
+
+    project: ProjectResponse
+
+
+class ProjectDetailDataResponse(SuccessResponse):
+    """상세 프로젝트 데이터를 포함하는 성공 응답 모델"""
+
+    project: ProjectDetailResponse
