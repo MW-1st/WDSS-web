@@ -1,15 +1,15 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import auth, image, scenes
+from fastapi.staticfiles import StaticFiles
+from app.routers import auth, image, scenes, websocket, project, image_router
 from app.db.database import init_db, close_db
-from app.routers import auth, image, scenes, projects
 
 app = FastAPI()
 
 # CORS for local dev (Vite on 5173)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "*"],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -17,18 +17,11 @@ app.add_middleware(
 
 # Routers
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
-app.include_router(
-    image.router, prefix="/projects/{project_id}/scenes/{scene_id}", tags=["image"]
-)
+app.include_router(image.router, prefix="/projects/{project_id}/scenes/{scene_id}", tags=["image"])
 app.include_router(scenes.router, prefix="/api/projects", tags=["scenes"])
-# 임시
-app.include_router(auth.router, prefix="/auth", tags=["auth"])
-app.include_router(
-    image.router, prefix="/projects/{project_id}/scenes/{scene_id}", tags=["image"]
-)
-app.include_router(scenes.router, prefix="/api/projects", tags=["scenes"])
-app.include_router(projects.router)  # ← /api/projects POST 등록
-
+app.include_router(project.router, prefix="/projects", tags=["project"])
+app.include_router(image_router.router)
+app.include_router(websocket.router)
 
 @app.on_event("startup")
 async def startup():
@@ -39,12 +32,12 @@ async def startup():
 async def shutdown():
     await close_db()
 
-
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
 
 
-@app.get("/", include_in_schema=False)
+@app.get("/")
 def root():
-    return {"ok": True, "docs": "/docs", "health": "/health"}
+    return {"message": "Backend is running"}
+

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 import client from "../api/client";
 
 export default function LoginPage() {
@@ -10,6 +11,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [mode, setMode] = useState("login"); // "login" | "register"
+  const { login } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -17,7 +19,6 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      // OAuth2PasswordRequestForm expects x-www-form-urlencoded body
       const body = new URLSearchParams();
       body.append("username", username);
       body.append("password", password);
@@ -26,10 +27,13 @@ export default function LoginPage() {
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
       });
 
-      if (data?.access_token) {
-        localStorage.setItem("token", data.access_token);
-        localStorage.setItem("token_type", data.token_type || "bearer");
-        window.dispatchEvent(new Event("auth-change"));
+      // [수정] access_token 대신, user 객체가 있는지 확인합니다.
+      if (data?.user) {
+        // [수정] localStorage에 토큰을 저장할 필요가 없습니다. 쿠키가 알아서 처리합니다.
+        // localStorage.setItem("token", data.access_token);
+        // localStorage.setItem("token_type", data.token_type || "bearer");
+        login(data.user);
+        // window.dispatchEvent(new Event("auth-change")); // 다른 컴포넌트에 로그인 상태 변경 알림
         navigate("/dashboard");
       } else {
         setError("Unexpected response from server.");
@@ -47,7 +51,7 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      // Call register
+      // 1. 회원가입 요청
       const payload = { email, username, password };
       const { data: reg } = await client.post("/auth/register", payload, {
         headers: { "Content-Type": "application/json" },
@@ -55,10 +59,12 @@ export default function LoginPage() {
 
       if (!reg?.id) {
         setError("Registration failed. Try again.");
+        // [추가] 로딩 상태를 false로 변경하고 함수를 종료합니다.
+        setLoading(false);
         return;
       }
 
-      // Auto-login after successful registration
+      // 2. 회원가입 성공 후 자동 로그인
       const body = new URLSearchParams();
       body.append("username", username);
       body.append("password", password);
@@ -66,12 +72,13 @@ export default function LoginPage() {
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
       });
 
-      if (data?.access_token) {
-        localStorage.setItem("token", data.access_token);
-        localStorage.setItem("token_type", data.token_type || "bearer");
+      // [수정] access_token 대신, user 객체가 있는지 확인합니다.
+      if (data?.user) {
+        // [수정] localStorage에 토큰을 저장할 필요가 없습니다.
         window.dispatchEvent(new Event("auth-change"));
         navigate("/dashboard");
       } else {
+        // 자동 로그인이 실패하면 수동 로그인을 유도합니다.
         setError("Registered, but auto-login failed. Please login.");
         setMode("login");
       }
