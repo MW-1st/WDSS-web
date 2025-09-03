@@ -1,6 +1,7 @@
 import React, { useRef, useState } from "react";
 import Canvas from "../components/Canvas.jsx";
 import ImageUpload from "../components/ImageUpload.jsx";
+import ImageGallery from "../components/ImageGallery.jsx";
 import client from "../api/client";
 import { useUnity } from "../contexts/UnityContext.jsx";
 
@@ -145,15 +146,17 @@ export default function EditorPage() {
   const closeButtonStyle = { ...buttonStyle, backgroundColor: "#dc3545" };
 
   return (
-    <section className="p-6">
-      <h1 className="text-2xl font-bold mb-4">Editor</h1>
-      <p className="text-gray-600 mb-6">
-        이미지 업로드 후 캔버스에서 확인/변환하거나 Unity 시뮬레이터와 연동할 수
-        있습니다.
-      </p>
-
-      {/* 이미지 업로드 */}
-      <ImageUpload projectId={1} sceneId={1} onUploaded={handleUploaded} />
+    <div style={{ display: 'flex', height: '100vh' }}>
+      {/* 이미지 갤러리 사이드바 */}
+      <ImageGallery projectId={1} sceneId={1} />
+      
+      {/* 메인 편집 영역 */}
+      <section className="p-6" style={{ flex: 1, overflowY: 'auto' }}>
+        <h1 className="text-2xl font-bold mb-4">Editor</h1>
+        <p className="text-gray-600 mb-6">
+          왼쪽에서 이미지를 업로드하고 캔버스로 드래그하여 배치할 수 있습니다. 
+          캔버스에서 그리기 및 변환하거나 Unity 시뮬레이터와 연동할 수 있습니다.
+        </p>
 
       {/* 변환 기능 */}
       <div className="mb-4">
@@ -270,13 +273,14 @@ export default function EditorPage() {
         </p>
       </div>
 
-      {/* 캔버스 */}
-      <Canvas
-        width={800}
-        height={500}
-        imageUrl={imageUrl}
-        stageRef={stageRef}
-      />
-    </section>
+        {/* 캔버스 */}
+        <Canvas
+          width={800}
+          height={500}
+          imageUrl={imageUrl}
+          stageRef={stageRef}
+        />
+      </section>
+    </div>
   );
 }

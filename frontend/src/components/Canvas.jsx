@@ -8,6 +8,7 @@ export default function Canvas({ width = 800, height = 500, imageUrl = "", stage
   const [drawingMode, setDrawingMode] = useState('draw');
   const [eraserSize, setEraserSize] = useState(20);
   const eraseHandlers = useRef({});
+  const [isDragOver, setIsDragOver] = useState(false);
 
   // Use useLayoutEffect to initialize the canvas
   useLayoutEffect(() => {
@@ -19,8 +20,8 @@ export default function Canvas({ width = 800, height = 500, imageUrl = "", stage
       height: height,
       backgroundColor: '#fafafa',
       renderOnAddRemove: false, // 성능 최적화
-      selection: false, // 선택 기능 비활성화로 성능 향상
-      skipTargetFind: true, // 대상 찾기 건너뛰기로 성능 향상
+      selection: false, // 처음엔 선택 비활성화 (나중에 모드별로 설정)
+      skipTargetFind: false, // 이미지 선택을 위해 false로 변경
       perPixelTargetFind: false, // 픽셀 단위 대상 찾기 비활성화
       enableRetinaScaling: false // 레티나 스케일링 비활성화로 성능 향상
     });
@@ -187,6 +188,7 @@ export default function Canvas({ width = 800, height = 500, imageUrl = "", stage
     if (mode === 'draw') {
       canvas.isDrawingMode = true;
       canvas.selection = false;
+      canvas.skipTargetFind = true; // 그리기 모드에서는 대상 찾기 건너뛰기
       canvas.defaultCursor = 'crosshair';
       canvas.hoverCursor = 'crosshair';
       canvas.moveCursor = 'crosshair';
@@ -205,6 +207,7 @@ export default function Canvas({ width = 800, height = 500, imageUrl = "", stage
     } else if (mode === 'brush') {
       canvas.isDrawingMode = false; // SVG 도트와 상호작용하기 위해 false로 설정
       canvas.selection = false;
+      canvas.skipTargetFind = true; // 브러시 모드에서는 대상 찾기 건너뛰기
       
       let isDrawing = false;
       
@@ -284,6 +287,7 @@ export default function Canvas({ width = 800, height = 500, imageUrl = "", stage
     } else if (mode === 'erase') {
       canvas.isDrawingMode = false;
       canvas.selection = false;
+      canvas.skipTargetFind = true; // 지우개 모드에서는 대상 찾기 건너뛰기
       
       // 원형 커서 생성 함수
       const createEraserCursor = (size) => {
@@ -404,6 +408,7 @@ export default function Canvas({ width = 800, height = 500, imageUrl = "", stage
     } else if (mode === 'pixelErase') {
       canvas.isDrawingMode = true;
       canvas.selection = false;
+      canvas.skipTargetFind = true; // 픽셀 지우개 모드에서는 대상 찾기 건너뛰기
 
       // 픽셀 지우개용 브러시 설정 (배경색으로 칠하기)
       const eraserBrush = new PencilBrush(canvas);
@@ -475,6 +480,131 @@ export default function Canvas({ width = 800, height = 500, imageUrl = "", stage
   const toggleDrawingMode = (mode) => {
     setDrawingMode(mode);
     applyDrawingMode(mode);
+  };
+
+  // 드래그&드롭 이벤트 핸들러들
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    
+    const imageUrl = e.dataTransfer.getData("text/plain");
+    if (imageUrl && fabricCanvas.current) {
+      addImageToCanvas(imageUrl, e.clientX, e.clientY);
+    }
+  };
+
+  // 캔버스에 이미지 추가하는 함수
+  const addImageToCanvas = (imageUrl, clientX = null, clientY = null) => {
+    if (!fabricCanvas.current) return;
+    
+    const canvas = fabricCanvas.current;
+    
+    FabricImage.fromURL(imageUrl, {
+      crossOrigin: 'anonymous'
+    }).then(img => {
+      // 이미지 크기 조정 (최대 200px)
+      const maxSize = 200;
+      const scale = Math.min(maxSize / img.width, maxSize / img.height, 1);
+      
+      // 드롭 위치 계산 (마우스 위치 또는 중앙)
+      let left, top;
+      if (clientX && clientY) {
+        const rect = canvas.getElement().getBoundingClientRect();
+        left = clientX - rect.left - (img.width * scale) / 2;
+        top = clientY - rect.top - (img.height * scale) / 2;
+      } else {
+        left = (width - img.width * scale) / 2;
+        top = (height - img.height * scale) / 2;
+      }
+      
+      img.set({
+        left: Math.max(0, Math.min(left, width - img.width * scale)),
+        top: Math.max(0, Math.min(top, height - img.height * scale)),
+        scaleX: scale,
+        scaleY: scale,
+        selectable: true,
+        evented: true,
+        hasControls: true,
+        hasBorders: true,
+        cornerStyle: 'circle',
+        cornerColor: '#007bff',
+        cornerSize: 12,
+        transparentCorners: false,
+        borderColor: '#007bff',
+        customType: 'droppedImage', // 구분을 위한 커스텀 타입
+        // 회전 컨트롤 활성화
+        hasRotatingPoint: true,
+        rotatingPointOffset: 30,
+        // 균등 스케일링 옵션
+        lockUniScaling: false,
+        // 컨트롤 포인트 설정
+        centeredScaling: false,
+        centeredRotation: true
+      });
+
+      canvas.add(img);
+      canvas.setActiveObject(img);
+      canvas.renderAll();
+    }).catch(err => {
+      console.error('이미지 로드 실패:', err);
+      alert('이미지를 로드할 수 없습니다.');
+    });
+  };
+
+  // 선택 모드 토글
+  const toggleSelectionMode = () => {
+    if (!fabricCanvas.current) return;
+    
+    const canvas = fabricCanvas.current;
+    const isSelectionMode = !canvas.isDrawingMode;
+    
+    if (isSelectionMode) {
+      // 그리기 모드로 전환
+      setDrawingMode('draw');
+      applyDrawingMode('draw');
+    } else {
+      // 선택 모드로 전환
+      canvas.isDrawingMode = false;
+      canvas.selection = true;
+      canvas.skipTargetFind = false; // 선택 모드에서는 대상 찾기 활성화
+      canvas.defaultCursor = 'default';
+      canvas.hoverCursor = 'move';
+      canvas.moveCursor = 'move';
+      
+      // 모든 객체를 선택 가능하게 설정
+      canvas.getObjects().forEach(obj => {
+        if (obj.customType === 'droppedImage') {
+          obj.selectable = true;
+          obj.evented = true;
+          obj.hasControls = true;
+          obj.hasBorders = true;
+        }
+      });
+      
+      setDrawingMode('select');
+      
+      // 이전 핸들러들 정리
+      Object.values(eraseHandlers.current).forEach(handler => {
+        if (typeof handler === 'function') {
+          canvas.off('mouse:down', handler);
+          canvas.off('mouse:move', handler);
+          canvas.off('mouse:up', handler);
+          canvas.off('mouse:wheel', handler);
+        }
+      });
+      eraseHandlers.current = {};
+    }
   };
 
   // 전체 지우기 핸들러
@@ -625,6 +755,20 @@ export default function Canvas({ width = 800, height = 500, imageUrl = "", stage
           펜
         </button>
         <button 
+          onClick={toggleSelectionMode} 
+          style={{ 
+            marginRight: '10px', 
+            backgroundColor: drawingMode === 'select' ? '#17a2b8' : '#f8f9fa',
+            color: drawingMode === 'select' ? 'white' : 'black',
+            border: '1px solid #ccc',
+            padding: '8px 16px',
+            borderRadius: '4px',
+            cursor: 'pointer'
+          }}
+        >
+          선택/이동
+        </button>
+        <button 
           onClick={() => toggleDrawingMode('brush')} 
           style={{ 
             marginRight: '10px', 
@@ -685,9 +829,41 @@ export default function Canvas({ width = 800, height = 500, imageUrl = "", stage
         drawingMode === 'draw' ? '펜 모드' : 
         drawingMode === 'brush' ? '브러시 모드' : 
         drawingMode === 'erase' ? `선 지우개 모드 (크기: ${eraserSize}px, 휠로 조절)` :
+        drawingMode === 'select' ? '선택/이동 모드 (이미지를 선택하여 이동, 크기 조정, 회전 가능)' :
         `픽셀 지우개 모드 (크기: ${eraserSize}px, 휠로 조절)`
       })</p>
-      <canvas ref={canvasRef} />
+      <div 
+        style={{ 
+          position: 'relative',
+          display: 'inline-block',
+          border: isDragOver ? '3px dashed #007bff' : 'none',
+          backgroundColor: isDragOver ? 'rgba(0, 123, 255, 0.1)' : 'transparent',
+          transition: 'all 0.2s ease'
+        }}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        <canvas ref={canvasRef} />
+        {isDragOver && (
+          <div style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            backgroundColor: 'rgba(0, 123, 255, 0.9)',
+            color: 'white',
+            padding: '12px 24px',
+            borderRadius: '8px',
+            fontSize: '16px',
+            fontWeight: 'bold',
+            pointerEvents: 'none',
+            zIndex: 1000
+          }}>
+            이미지를 여기에 놓으세요
+          </div>
+        )}
+      </div>
     </div>
   );
 }
