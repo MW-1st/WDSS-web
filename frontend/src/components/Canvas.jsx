@@ -115,6 +115,9 @@ export default function Canvas({ width = 800, height = 500, imageUrl = "", stage
       canvas.isDrawingMode = true;
       canvas.selection = false;
       canvas.defaultCursor = 'crosshair';
+      canvas.hoverCursor = 'crosshair';
+      canvas.moveCursor = 'crosshair';
+      canvas.freeDrawingCursor = 'crosshair';
       
       const brush = new PencilBrush(canvas);
       brush.width = 2;
@@ -160,7 +163,12 @@ export default function Canvas({ width = 800, height = 500, imageUrl = "", stage
       };
       
       // 커서 설정
-      canvas.setCursor(createBrushCursor(brushSize));
+      const brushCursor = createBrushCursor(brushSize);
+      canvas.defaultCursor = brushCursor;
+      canvas.hoverCursor = brushCursor;
+      canvas.moveCursor = brushCursor;
+      canvas.freeDrawingCursor = brushCursor;
+      canvas.setCursor(brushCursor);
       
       // 휠 이벤트로 크기 조절
       const wheelHandler = (e) => {
@@ -180,7 +188,12 @@ export default function Canvas({ width = 800, height = 500, imageUrl = "", stage
           if (canvas.freeDrawingBrush) {
             canvas.freeDrawingBrush.width = newSize;
           }
-          canvas.setCursor(createBrushCursor(newSize));
+          const newBrushCursor = createBrushCursor(newSize);
+          canvas.defaultCursor = newBrushCursor;
+          canvas.hoverCursor = newBrushCursor;
+          canvas.moveCursor = newBrushCursor;
+          canvas.freeDrawingCursor = newBrushCursor;
+          canvas.setCursor(newBrushCursor);
           return newSize;
         });
       };
@@ -211,7 +224,11 @@ export default function Canvas({ width = 800, height = 500, imageUrl = "", stage
       };
       
       // 커서 설정
-      canvas.setCursor(createEraserCursor(eraserSize));
+      const eraserCursor = createEraserCursor(eraserSize);
+      canvas.defaultCursor = eraserCursor;
+      canvas.hoverCursor = eraserCursor;
+      canvas.moveCursor = eraserCursor;
+      canvas.setCursor(eraserCursor);
       
       // 지우개 구현
       let isErasing = false;
@@ -274,7 +291,11 @@ export default function Canvas({ width = 800, height = 500, imageUrl = "", stage
             newSize = Math.min(100, prevSize + step);
           }
           
-          canvas.setCursor(createEraserCursor(newSize));
+          const newEraserCursor = createEraserCursor(newSize);
+          canvas.defaultCursor = newEraserCursor;
+          canvas.hoverCursor = newEraserCursor;
+          canvas.moveCursor = newEraserCursor;
+          canvas.setCursor(newEraserCursor);
           return newSize;
         });
       };
@@ -316,7 +337,12 @@ export default function Canvas({ width = 800, height = 500, imageUrl = "", stage
       };
       
       // 커서 설정
-      canvas.setCursor(createPixelEraserCursor(eraserSize));
+      const pixelEraserCursor = createPixelEraserCursor(eraserSize);
+      canvas.defaultCursor = pixelEraserCursor;
+      canvas.hoverCursor = pixelEraserCursor;
+      canvas.moveCursor = pixelEraserCursor;
+      canvas.freeDrawingCursor = pixelEraserCursor;
+      canvas.setCursor(pixelEraserCursor);
       
       // 휠 이벤트로 크기 조절
       const wheelHandler = (e) => {
@@ -336,7 +362,12 @@ export default function Canvas({ width = 800, height = 500, imageUrl = "", stage
             canvas.freeDrawingBrush.width = newSize;
           }
           
-          canvas.setCursor(createPixelEraserCursor(newSize));
+          const newPixelEraserCursor = createPixelEraserCursor(newSize);
+          canvas.defaultCursor = newPixelEraserCursor;
+          canvas.hoverCursor = newPixelEraserCursor;
+          canvas.moveCursor = newPixelEraserCursor;
+          canvas.freeDrawingCursor = newPixelEraserCursor;
+          canvas.setCursor(newPixelEraserCursor);
           return newSize;
         });
       };
