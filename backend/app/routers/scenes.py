@@ -1,4 +1,6 @@
 # app/routers/scenes.py
+import json
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from typing import Any, List, Optional
@@ -145,7 +147,7 @@ async def save_scene(
 ):
     async with get_conn() as conn:
         await conn.execute(CREATE_PAYLOAD_SQL)
-
+        drones_as_json_string = json.dumps(body.drones)
         rel = await conn.fetchval(
             "SELECT 1 FROM project_scenes WHERE project_id=$1 AND scene_id=$2",
             project_id,
@@ -163,7 +165,7 @@ async def save_scene(
                     preview = COALESCE(EXCLUDED.preview, scene_payload.preview)
             """,
             scene_id,
-            body.drones,
+            drones_as_json_string,
             body.preview,
         )
 
@@ -176,10 +178,11 @@ async def save_scene(
             """,
             scene_id,
         )
+        drones_list = json.loads(row["drones"]) if row["drones"] else []
         return {
             "id": str(row["id"]),
             "scene_num": row["scene_num"],
-            "drones": row["drones"] or [],
+            "drones": drones_list,
             "preview": row["preview"],
         }
 

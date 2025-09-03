@@ -4,6 +4,7 @@ import MainCanvasSection from "../components/MainCanvasSection.jsx";
 import SceneCarousel from "../components/SceneCarousel.jsx";
 import client from "../api/client";
 import { useUnity } from "../contexts/UnityContext.jsx";
+import {useParams} from "react-router-dom";
 
 const VISIBLE = 4;
 const THUMB_W = 200;
@@ -27,7 +28,8 @@ function useDebounced(fn, delay = 400) {
 
 export default function EditorPage({ projectId = DUMMY }) {
   // 프로젝트 및 씬 관리 상태
-  const [pid, setPid] = useState(projectId && projectId !== DUMMY ? projectId : null);
+  const {project_id} = useParams();
+  const [pid, setPid] = useState(project_id);
   const [scenes, setScenes] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [start, setStart] = useState(0);
@@ -123,7 +125,9 @@ export default function EditorPage({ projectId = DUMMY }) {
   const handleAddScene = async () => {
     try {
       const projectIdReady = await ensureProjectId();
+      console.log("확인된 Project ID:", projectIdReady);
       const scene_num = scenes.length + 1;
+      console.log("확인된 scene_num:", scene_num);
       const created = await client.post(`/projects/${projectIdReady}/scenes`, {
         project_id: projectIdReady,
         scene_num,
@@ -131,7 +135,10 @@ export default function EditorPage({ projectId = DUMMY }) {
 
       const nextScenes = [...scenes, created];
       setScenes(nextScenes);
-      setSelectedId(created.id);
+      setSelectedId(created.data.id);
+
+      // console.log(`created ${created}`)
+      // console.log(`setSelectedId ${created.id}`)
       const nextTotal = nextScenes.length + 1;
       if (nextTotal > VISIBLE) setStart(nextTotal - VISIBLE);
 

@@ -1,5 +1,5 @@
 import { Navigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext'; // 👈 컨텍스트 훅 import
+import { useAuth } from '../contexts/AuthContext.jsx'; // 👈 컨텍스트 훅 import
 
 export default function PrivateRoute({ children }) {
   const { isAuthenticated } = useAuth(); // 👈 컨텍스트에서 인증 상태 가져오기
