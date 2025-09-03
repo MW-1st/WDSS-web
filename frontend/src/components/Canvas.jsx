@@ -7,7 +7,6 @@ export default function Canvas({ width = 800, height = 500, imageUrl = "", stage
   const fabricCanvas = useRef(null);
   const [drawingMode, setDrawingMode] = useState('draw');
   const [eraserSize, setEraserSize] = useState(20);
-  const [brushSize, setBrushSize] = useState(10);
   const eraseHandlers = useRef({});
 
   // Use useLayoutEffect to initialize the canvas
@@ -133,13 +132,15 @@ export default function Canvas({ width = 800, height = 500, imageUrl = "", stage
     }
   }, [imageUrl, width, height]);
 
-  // 크기가 변경될 때 현재 모드에 따라 업데이트
+  // 지우개 크기가 변경될 때 현재 모드에 따라 업데이트
   useEffect(() => {
     if (!fabricCanvas.current || !drawingMode) return;
     
-    // 현재 모드를 다시 적용하여 크기 반영
-    applyDrawingMode(drawingMode);
-  }, [eraserSize, brushSize]);
+    // erase 모드일 때만 크기 반영
+    if (drawingMode === 'erase') {
+      applyDrawingMode(drawingMode);
+    }
+  }, [eraserSize]);
 
   const applyDrawingMode = (mode) => {
     if (!fabricCanvas.current) return;
@@ -208,11 +209,12 @@ export default function Canvas({ width = 800, height = 500, imageUrl = "", stage
       const drawDotAtPoint = (e) => {
         const pointer = canvas.getPointer(e.e);
         
-        // 새로운 도트 생성
+        // 새로운 도트 생성 (SVG circle과 같은 크기 2px 사용)
+        const dotRadius = 1;
         const newDot = new Circle({
-          left: pointer.x - brushSize/2,
-          top: pointer.y - brushSize/2,
-          radius: brushSize/2,
+          left: pointer.x - dotRadius,
+          top: pointer.y - dotRadius,
+          radius: dotRadius,
           fill: "rgba(0,0,0,1)",
           selectable: false,
           evented: true,
@@ -225,66 +227,43 @@ export default function Canvas({ width = 800, height = 500, imageUrl = "", stage
         canvas.renderAll();
       };
       
-      // 원형 커서 생성 함수
-      const createBrushCursor = (size) => {
+      // 고정 크기 브러시 커서 생성
+      const createBrushCursor = () => {
         const cursorCanvas = document.createElement('canvas');
         const ctx = cursorCanvas.getContext('2d');
-        const cursorSize = size + 10;
+        const dotRadius = 2;
+        const cursorSize = dotRadius * 2 + 10;
         
         cursorCanvas.width = cursorSize;
         cursorCanvas.height = cursorSize;
         
         ctx.fillStyle = 'rgba(0,0,0,0.3)';
         ctx.beginPath();
-        ctx.arc(cursorSize/2, cursorSize/2, size/2, 0, 2 * Math.PI);
+        ctx.arc(cursorSize/2, cursorSize/2, dotRadius, 0, 2 * Math.PI);
         ctx.fill();
         
         ctx.strokeStyle = '#000';
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.arc(cursorSize/2, cursorSize/2, size/2, 0, 2 * Math.PI);
+        ctx.arc(cursorSize/2, cursorSize/2, dotRadius, 0, 2 * Math.PI);
         ctx.stroke();
         
         return `url(${cursorCanvas.toDataURL()}) ${cursorSize/2} ${cursorSize/2}, crosshair`;
       };
       
       // 커서 설정
-      const brushCursor = createBrushCursor(brushSize);
+      const brushCursor = createBrushCursor();
       canvas.defaultCursor = brushCursor;
       canvas.hoverCursor = brushCursor;
       canvas.moveCursor = brushCursor;
       canvas.freeDrawingCursor = brushCursor;
       canvas.setCursor(brushCursor);
       
-      // 휠 이벤트로 크기 조절
-      const wheelHandler = (e) => {
-        e.e.preventDefault();
-        const delta = e.e.deltaY;
-        const step = 3;
-        
-        setBrushSize(prevSize => {
-          let newSize;
-          if (delta > 0) {
-            newSize = Math.max(1, prevSize - step);
-          } else {
-            newSize = Math.min(100, prevSize + step);
-          }
-          
-          const newBrushCursor = createBrushCursor(newSize);
-          canvas.defaultCursor = newBrushCursor;
-          canvas.hoverCursor = newBrushCursor;
-          canvas.moveCursor = newBrushCursor;
-          canvas.setCursor(newBrushCursor);
-          return newSize;
-        });
-      };
-      
-      eraseHandlers.current = { startDraw, continueDraw, stopDraw, wheelHandler };
+      eraseHandlers.current = { startDraw, continueDraw, stopDraw };
       
       canvas.on('mouse:down', startDraw);
       canvas.on('mouse:move', continueDraw);
       canvas.on('mouse:up', stopDraw);
-      canvas.on('mouse:wheel', wheelHandler);
       
     } else if (mode === 'erase') {
       canvas.isDrawingMode = false;
@@ -586,7 +565,7 @@ export default function Canvas({ width = 800, height = 500, imageUrl = "", stage
       </div>
       <p>Fabric.js Canvas: 자유 그리기 및 이미지 표시 ({
         drawingMode === 'draw' ? '펜 모드' : 
-        drawingMode === 'brush' ? `브러시 모드 (크기: ${brushSize}px, 휠로 조절)` : 
+        drawingMode === 'brush' ? '브러시 모드' : 
         drawingMode === 'erase' ? `선 지우개 모드 (크기: ${eraserSize}px, 휠로 조절)` :
         `픽셀 지우개 모드 (크기: ${eraserSize}px, 휠로 조절)`
       })</p>
