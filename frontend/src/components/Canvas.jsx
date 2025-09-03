@@ -482,6 +482,49 @@ export default function Canvas({ width = 800, height = 500, imageUrl = "", stage
     applyDrawingMode(mode);
   };
 
+  // 현재 캔버스의 도트들을 SVG 문자열로 생성
+  const getCurrentCanvasAsSvg = () => {
+    if (!fabricCanvas.current) return null;
+    
+    const canvas = fabricCanvas.current;
+    const objects = canvas.getObjects();
+    const dots = [];
+    
+    objects.forEach(obj => {
+      if (obj.customType === 'svgDot' || obj.customType === 'drawnDot') {
+        // 도트의 중심점 계산
+        const centerX = obj.left + obj.radius;
+        const centerY = obj.top + obj.radius;
+        
+        dots.push({
+          cx: centerX,
+          cy: centerY,
+          r: obj.radius,
+          fill: obj.fill
+        });
+      }
+    });
+    
+    // SVG 문자열 생성
+    let svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="${canvas.width}" height="${canvas.height}">`;
+    dots.forEach(dot => {
+      svgContent += `<circle cx="${dot.cx}" cy="${dot.cy}" r="${dot.r}" fill="${dot.fill}" />`;
+    });
+    svgContent += '</svg>';
+    
+    return {
+      svgString: svgContent,
+      totalDots: dots.length
+    };
+  };
+
+  // 외부에서 사용할 수 있도록 ref에 함수 등록
+  useEffect(() => {
+    if (externalStageRef && externalStageRef.current) {
+      externalStageRef.current.getCurrentCanvasAsSvg = getCurrentCanvasAsSvg;
+    }
+  }, [externalStageRef]);
+
   return (
     <div>
       <div style={{ marginBottom: '10px' }}>
