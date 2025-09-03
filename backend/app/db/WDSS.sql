@@ -1,3 +1,5 @@
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
 CREATE TABLE "users" (
   "id" uuid PRIMARY KEY,
   "email" varchar(32) UNIQUE,
@@ -84,3 +86,48 @@ ALTER TABLE "project" ADD FOREIGN KEY ("user_id") REFERENCES "users" ("id");
 ALTER TABLE "project_scenes" ADD FOREIGN KEY ("scene_id") REFERENCES "scene" ("id");
 
 ALTER TABLE "project_scenes" ADD FOREIGN KEY ("project_id") REFERENCES "project" ("id");
+
+-- 2. updated_at 자동 갱신을 위한 공용 트리거 함수 생성
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+   NEW.updated_at = NOW(); -- NEW는 UPDATE 될 행의 새로운 버전을 의미합니다.
+   RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+
+-- 3. 각 테이블의 컬럼에 기본값(DEFAULT) 설정
+-- users 테이블
+ALTER TABLE "users" ALTER COLUMN "id" SET DEFAULT gen_random_uuid();
+
+-- refresh_tokens 테이블
+ALTER TABLE "refresh_tokens" ALTER COLUMN "id" SET DEFAULT gen_random_uuid();
+
+-- project 테이블
+ALTER TABLE "project" ALTER COLUMN "id" SET DEFAULT gen_random_uuid();
+ALTER TABLE "project" ALTER COLUMN "created_at" SET DEFAULT NOW();
+ALTER TABLE "project" ALTER COLUMN "updated_at" SET DEFAULT NOW();
+
+-- scene 테이블
+ALTER TABLE "scene" ALTER COLUMN "id" SET DEFAULT gen_random_uuid();
+
+
+-- 4. updated_at 자동 갱신 트리거 적용
+-- users 테이블에 트리거 적용
+CREATE TRIGGER set_timestamp_users
+BEFORE UPDATE ON "users"
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
+
+-- auth_credentials 테이블에 트리거 적용
+CREATE TRIGGER set_timestamp_auth_credentials
+BEFORE UPDATE ON "auth_credentials"
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
+
+-- project 테이블에 트리거 적용
+CREATE TRIGGER set_timestamp_project
+BEFORE UPDATE ON "project"
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
