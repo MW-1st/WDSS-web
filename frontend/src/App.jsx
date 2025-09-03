@@ -86,14 +86,15 @@ function AppContent() {
     return <div>Loading...</div>;
   }
 
-  return (
-    <div style={{ padding: 16 }}>
+return (
+  <div style={{ padding: 0 }}>
+    {/* 메인에서는 전역 Navbar를 숨기고, 다른 페이지에서만 보이게 */}
+    {location.pathname !== "/" && <Navbar />}
 
-      <Navbar />
-      <Routes>
-        <Route path="/" element={<MainPage />} />
-        <Route path="/editor" element={<EditorPage />} />
-        <Route path="/" element={<ProjectStart />} />
+    <Routes>
+      <Route path="/" element={<MainPage />} />
+      <Route path="/editor" element={<EditorPage />} />
+      <Route path="/" element={<ProjectStart />} />
         <Route
           path="/login"
           element={
