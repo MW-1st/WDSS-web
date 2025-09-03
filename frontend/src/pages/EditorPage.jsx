@@ -14,10 +14,15 @@ const DUMMY = "11111111-1111-1111-1111-111111111111";
 
 function useDebounced(fn, delay = 400) {
   const t = useRef(null);
-  return (...args) => {
+  const fnRef = useRef(fn);
+  useEffect(() => {
+    fnRef.current = fn;
+  }, [fn]);
+  const debounced = React.useCallback((...args) => {
     if (t.current) clearTimeout(t.current);
-    t.current = setTimeout(() => fn(...args), delay);
-  };
+    t.current = setTimeout(() => fnRef.current(...args), delay);
+  }, [delay]);
+  return debounced;
 }
 
 export default function EditorPage({ projectId = DUMMY }) {
@@ -109,10 +114,10 @@ export default function EditorPage({ projectId = DUMMY }) {
   }, 500);
 
   // Canvas → 변경 반영
-  const handleSceneChange = (id, patch) => {
+  const handleSceneChange = React.useCallback((id, patch) => {
     setScenes((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
     saveDebounced(id, patch.data, patch.preview, imageUrl);
-  };
+  }, [saveDebounced, imageUrl, setScenes]);
 
   // + 생성
   const handleAddScene = async () => {
@@ -216,21 +221,38 @@ export default function EditorPage({ projectId = DUMMY }) {
   const closeButtonStyle = { ...buttonStyle, backgroundColor: "#dc3545" };
 
   return (
-    <div style={{ width: "100%", background: "#fff" }}>
+    <div style={{ width: "100%", background: "#fff", display: 'flex', minHeight: '100vh' }}>
+      <aside
+        style={{
+          width: 280,
+          borderRight: '1px solid #eee',
+          padding: 16,
+          position: 'sticky',
+          top: 0,
+          alignSelf: 'flex-start',
+          height: '100vh',
+          overflowY: 'auto',
+          background: '#fff',
+        }}
+      >
+        <EditorToolbar
+          pid={pid}
+          selectedId={selectedId}
+          imageUrl={imageUrl}
+          targetDots={targetDots}
+          setTargetDots={setTargetDots}
+          processing={processing}
+          onUploaded={handleUploaded}
+          onTransform={handleTransform}
+          isUnityVisible={isUnityVisible}
+          showUnity={showUnity}
+          hideUnity={hideUnity}
+          layout="sidebar"
+        />
+      </aside>
+      <div style={{ flex: 1 }}>
       {/* 업로드 및 도구 바 */}
-      <EditorToolbar
-        pid={pid}
-        selectedId={selectedId}
-        imageUrl={imageUrl}
-        targetDots={targetDots}
-        setTargetDots={setTargetDots}
-        processing={processing}
-        onUploaded={handleUploaded}
-        onTransform={handleTransform}
-        isUnityVisible={isUnityVisible}
-        showUnity={showUnity}
-        hideUnity={hideUnity}
-      />
+      
 
       {/* 메인 캔버스 */}
       <MainCanvasSection
@@ -249,6 +271,7 @@ export default function EditorPage({ projectId = DUMMY }) {
         onAddScene={handleAddScene}
         onSelectScene={handleSelect}
       />
+      </div>
     </div>
   );
 }
