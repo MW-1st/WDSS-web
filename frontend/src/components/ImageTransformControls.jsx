@@ -123,7 +123,14 @@ export default function ImageTransformControls({
 
       <button
         onClick={onTransform}
-        disabled={processing}
+        disabled={processing || !sceneId}
+        title={
+          processing
+            ? "변환 중입니다"
+            : !sceneId
+              ? "먼저 씬을 추가/선택해 주세요"
+              : undefined
+        }
         className={`px-4 py-2 rounded text-white ${
           processing ? "!bg-blue-600" : "!bg-blue-600 hover:!bg-blue-700"
         }`}

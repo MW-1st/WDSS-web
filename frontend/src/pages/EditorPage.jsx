@@ -66,7 +66,7 @@ export default function EditorPage({ projectId = DUMMY }) {
     if (!pid) return;
     (async () => {
       try {
-        const list = await client.get(`/projects/${pid}/scenes/`);
+        const { data: list } = await client.get(`/projects/${pid}/scenes/`);
         setScenes(list.map((s, i) => ({ ...s, name: s.name || `Scene ${s.scene_num ?? i + 1}` })));
         if (list[0]) setSelectedId(list[0].id);
       } catch (e) {
@@ -83,7 +83,7 @@ export default function EditorPage({ projectId = DUMMY }) {
       const current = scenes.find((s) => s.id === selectedId);
       if (!current || "drones" in current) return;
       try {
-        const detail = await client.get(`/projects/${pid}/scenes/${selectedId}`);
+        const { data: detail } = await client.get(`/projects/${pid}/scenes/${selectedId}`);
         setScenes((prev) => prev.map((s) => (s.id === selectedId ? { ...s, ...detail } : s)));
 
         // 씬이 변경될 때 해당 씬의 이미지 URL도 업데이트
@@ -102,7 +102,7 @@ export default function EditorPage({ projectId = DUMMY }) {
   const saveDebounced = useDebounced(async (scene_id, drones, preview, imageUrl) => {
     if (!pid) return;
     try {
-      const saved = await client.put(`/projects/${pid}/scenes/${scene_id}`, {
+      const { data: saved } = await client.put(`/projects/${pid}/scenes/${scene_id}`, {
         project_id: pid,
         scene_id,
         drones,
@@ -128,14 +128,14 @@ export default function EditorPage({ projectId = DUMMY }) {
       console.log("확인된 Project ID:", projectIdReady);
       const scene_num = scenes.length + 1;
       console.log("확인된 scene_num:", scene_num);
-      const created = await client.post(`/projects/${projectIdReady}/scenes/`, {
+      const { data: created } = await client.post(`/projects/${projectIdReady}/scenes/`, {
         project_id: projectIdReady,
         scene_num,
       });
 
       const nextScenes = [...scenes, created];
       setScenes(nextScenes);
-      setSelectedId(created.data.id);
+      setSelectedId(created.id);
 
       // console.log(`created ${created}`)
       // console.log(`setSelectedId ${created.id}`)
@@ -183,7 +183,15 @@ export default function EditorPage({ projectId = DUMMY }) {
 
   // 이미지 변환 핸들러
   const handleTransform = async () => {
-    if (!stageRef.current || !selectedId) return;
+    // 사전 조건 확인: 씬 선택 및 캔버스 준비 여부
+    if (!selectedId) {
+      alert("먼저 씬을 추가하거나 선택해 주세요.");
+      return;
+    }
+    if (!stageRef.current) {
+      alert("캔버스가 아직 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.");
+      return;
+    }
 
     try {
       setProcessing(true);
