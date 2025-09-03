@@ -8,5 +8,5 @@ export const createProject = ({
   user_id = null,
 }) =>
   client
-    .post(`/api/projects`, { id, project_name, user_id })
+    .post(`/projects`, { id, project_name, user_id })
     .then((res) => res.data);

@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import EditorToolbar from "../components/EditorToolbar.jsx";
 import MainCanvasSection from "../components/MainCanvasSection.jsx";
 import SceneCarousel from "../components/SceneCarousel.jsx";
-import * as api from "../api/scenes";
 import client from "../api/client";
 import { useUnity } from "../contexts/UnityContext.jsx";
 
@@ -46,7 +45,7 @@ export default function EditorPage({ projectId = DUMMY }) {
         ? crypto.randomUUID()
         : ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g,c=>(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16));
 
-    const { data } = await client.post("/api/projects", {
+    const { data } = await client.post("/projects", {
       id: newId,
       project_name: "Untitled Project",
       user_id: null,
@@ -60,7 +59,7 @@ export default function EditorPage({ projectId = DUMMY }) {
     if (!pid) return;
     (async () => {
       try {
-        const list = await api.get(`/api/projects/${pid}/scenes`);
+        const list = await client.get(`/projects/${pid}/scenes`);
         setScenes(list.map((s, i) => ({ ...s, name: s.name || `Scene ${s.scene_num ?? i + 1}` })));
         if (list[0]) setSelectedId(list[0].id);
       } catch (e) {
@@ -77,7 +76,7 @@ export default function EditorPage({ projectId = DUMMY }) {
       const current = scenes.find((s) => s.id === selectedId);
       if (!current || "drones" in current) return;
       try {
-        const detail = await api.get(`/api/projects/${pid}/scenes/${selectedId}`);
+        const detail = await client.get(`/projects/${pid}/scenes/${selectedId}`);
         setScenes((prev) => prev.map((s) => (s.id === selectedId ? { ...s, ...detail } : s)));
       } catch (e) {
         console.error(e);
@@ -89,7 +88,7 @@ export default function EditorPage({ projectId = DUMMY }) {
   const saveDebounced = useDebounced(async (scene_id, drones, preview) => {
     if (!pid) return;
     try {
-      const saved = await api.put(`/api/projects/${pid}/scenes/${scene_id}`, {
+      const saved = await client.put(`/projects/${pid}/scenes/${scene_id}`, {
         project_id: pid,
         scene_id,
         drones,
@@ -112,7 +111,7 @@ export default function EditorPage({ projectId = DUMMY }) {
     try {
       const projectIdReady = await ensureProjectId();
       const scene_num = scenes.length + 1;
-      const created = await api.post(`/api/projects/${projectIdReady}/scenes`, {
+      const created = await client.post(`/projects/${projectIdReady}/scenes`, {
         project_id: projectIdReady,
         scene_num,
       });
