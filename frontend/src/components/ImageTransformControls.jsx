@@ -11,18 +11,25 @@ export default function ImageTransformControls({
 }) {
   const handleJsonGeneration = async () => {
     try {
-      if (!imageUrl || !imageUrl.endsWith(".svg")) {
-        alert("먼저 변환하여 SVG를 생성해주세요.");
+      if (!stageRef.current || !stageRef.current.getCurrentCanvasAsSvg) {
+        alert("캔버스가 준비되지 않았습니다.");
         return;
       }
 
-      const resp = await fetch(imageUrl);
-      const svgBlob = await resp.blob();
+       // 현재 캔버스의 수정된 상태를 SVG로 가져오기
+      const canvasSvgData = stageRef.current.getCurrentCanvasAsSvg();
+
+      if (!canvasSvgData || canvasSvgData.totalDots === 0) {
+        alert("그릴 도트가 없습니다. 먼저 이미지를 변환하거나 그림을 그려주세요.");
+        return;
+      }
+
+      // 수정된 캔버스 SVG를 Blob으로 변환
+      const svgBlob = new Blob([canvasSvgData.svgString], { type: "image/svg+xml" });
       const fd = new FormData();
       fd.append(
         "file",
-        new File([svgBlob], "canvas.svg", { type: "image/svg+xml" })
-      );
+      new File([svgBlob], "modified_canvas.svg", { type: "image/svg+xml" })      );
 
       const jsonResp = await client.post("/image/svg-to-json", fd);
       const jsonUrl = jsonResp.data?.json_url;
@@ -36,7 +43,9 @@ export default function ImageTransformControls({
         window.open(full, '_blank', 'noopener');
 
         if (unitySent) {
-          alert('JSON 파일이 생성되었고 Unity로 데이터가 전송되었습니다!');
+          alert(`수정된 캔버스가 JSON으로 생성되었고 Unity로 데이터가 전송되었습니다! (총 ${canvasSvgData.totalDots}개 도트)`);
+        } else {
+          alert(`수정된 캔버스가 JSON으로 생성되었습니다! (총 ${canvasSvgData.totalDots}개 도트)`);
         }
       } else {
         alert("JSON 생성에 실패했습니다.");

@@ -32,21 +32,10 @@ export default function EditorPage({ projectId = DUMMY }) {
   const [processing, setProcessing] = useState(false);
   const [targetDots, setTargetDots] = useState(2000);
   const stageRef = useRef(null);
+  // const sceneId = 1; // 현재 에디터의 씬 ID (임시 하드코딩)
 
-  // Unity 관련 상태
-  const { isUnityVisible, showUnity, hideUnity } = useUnity();
-
-  // + 카드까지 포함
-  const items = useMemo(() => [...scenes, { id: "__ADD__", isAdd: true }], [scenes]);
-  const total = items.length;
-  const canSlide = total > VISIBLE;
-  const end = Math.min(start + VISIBLE, total);
-  const visibleItems = items.slice(start, end);
-
-  const selectedScene = useMemo(
-    () => scenes.find((s) => s.id === selectedId) || null,
-    [scenes, selectedId]
-  );
+  // unity 관련 상태
+  const { isUnityVisible, showUnity, hideUnity, sendTestData } = useUnity();
 
   // 프로젝트가 없으면 생성하는 헬퍼
   const ensureProjectId = async () => {
@@ -158,6 +147,19 @@ export default function EditorPage({ projectId = DUMMY }) {
     if (idx >= start + VISIBLE) setStart(idx - VISIBLE + 1);
   };
 
+   // + 카드까지 포함
+  const items = useMemo(() => [...scenes, { id: "__ADD__", isAdd: true }], [scenes]);
+  const total = items.length;
+  const canSlide = total > VISIBLE;
+  const end = Math.min(start + VISIBLE, total);
+  const visibleItems = items.slice(start, end);
+
+  const selectedScene = useMemo(
+    () => scenes.find((s) => s.id === selectedId) || null,
+    [scenes, selectedId]
+  );
+
+
   // 업로드 완료 핸들러
   const handleUploaded = (webUrl) => {
     setImageUrl(webUrl || "");
@@ -199,6 +201,19 @@ export default function EditorPage({ projectId = DUMMY }) {
       setProcessing(false);
     }
   };
+
+  // 버튼 스타일
+  const buttonStyle = {
+    padding: "10px 20px",
+    backgroundColor: "#007bff",
+    color: "white",
+    border: "none",
+    borderRadius: "4px",
+    cursor: "pointer",
+    marginRight: "10px",
+  };
+  const sendButtonStyle = { ...buttonStyle, backgroundColor: "#28a745" };
+  const closeButtonStyle = { ...buttonStyle, backgroundColor: "#dc3545" };
 
   return (
     <div style={{ width: "100%", background: "#fff" }}>

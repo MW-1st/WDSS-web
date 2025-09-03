@@ -80,18 +80,23 @@ function AppContent() {
 
   return (
     <div style={{ padding: 16 }}>
-        <nav style={{ display: "flex", gap: 12, marginBottom: 16, alignItems: "center" }}>
-          <Link to="/">Main</Link>
-          <Link to="/editor">Editor</Link>
-          {!isAuthenticated && <Link to="/login">Login</Link>}
-          {isAuthenticated && <Link to="/dashboard">Dashboard</Link>}
+        <nav className="flex items-center justify-between px-4 py-2 mb-4">
+  {/* 메뉴: 중앙 정렬 */}
+  <div className="flex-1 flex justify-center gap-40 font-yuniverse">
+    <Link to="/" >Main</Link>
+    <Link to="/editor">Editor</Link>
+    {!isAuthenticated && <Link to="/login">Login</Link>}
+    {isAuthenticated && <Link to="/dashboard">Dashboard</Link>}
+  </div>
 
-          {isAuthenticated && (
-            <button onClick={logout} style={{ marginLeft: "auto" }}>
-              Logout
-            </button>
-          )}
-      </nav>
+  {/* 오른쪽 끝 로그아웃 */}
+  {isAuthenticated && (
+    <button onClick={logout} className="ml-4 font-yuniverse">
+      Logout
+    </button>
+  )}
+</nav>
+
 
       <Routes>
         <Route path="/" element={<MainPage />} />
