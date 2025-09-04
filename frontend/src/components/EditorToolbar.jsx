@@ -3,6 +3,7 @@ import ImageTransformControls from "../components/ImageTransformControls.jsx";
 import UnitySimulatorControls from "../components/UnitySimulatorControls.jsx";
 import ImageGallery from "../components/ImageGallery.jsx";
 import CanvasTools from "../components/CanvasTools.jsx";
+import { FaImage } from "react-icons/fa";
 
 export default function EditorToolbar({
   pid,
@@ -26,23 +27,34 @@ export default function EditorToolbar({
   stageRef, // stageRef prop 추가
   layout = "full",
 }) {
+  const [showGallery, setShowGallery] = React.useState(true);
   const Inner = () => (
     <>
-      <h2
-        style={{
-          margin: 0,
-          fontSize: 20,
-          fontWeight: 700,
-          marginBottom: 12,
-        }}
-      >
-        프로젝트 이름
-      </h2>
-
       <div style={{ marginBottom: 16 }}>
-        <ImageGallery
-          onImageDragStart={onImageDragStart}
-        />
+        {layout === "sidebar" && (
+          <button
+            onClick={() => setShowGallery((v) => !v)}
+            title={showGallery ? "이미지 갤러리 닫기" : "이미지 갤러리 열기"}
+            style={{
+              border: "1px solid #ccc",
+              padding: "8px 12px",
+              borderRadius: 4,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              cursor: "pointer",
+              background: "#f8f9fa",
+              marginBottom: 8,
+            }}
+            aria-label="이미지 갤러리 토글"
+          >
+            <FaImage />
+            <span style={{ fontSize: 14 }}>
+              {showGallery ? "갤러리 숨기기" : "갤러리 열기"}
+            </span>
+          </button>
+        )}
+        {showGallery && <ImageGallery onImageDragStart={onImageDragStart} />}
       </div>
 
       <div style={{ marginBottom: 16 }}>
