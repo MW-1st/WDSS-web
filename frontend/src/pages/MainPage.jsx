@@ -35,13 +35,13 @@ export default function MainPage() {
         <h1 className="text-5xl md:text-6xl font-bold font-tway text-white mix-blend-difference drop-shadow-[0_2px_8px_rgba(0,0,0,0.35)]">
           WDSS
         </h1>
-        <p className="text-2xl font-yuniverse text-white/95 mix-blend-difference drop-shadow-[0_2px_6px_rgba(0,0,0,0.35)]">
+        <p className="text-2xl font-yuniverse text-white/95 mix-blend-difference drop-shadow-[0_2px_6px_rgba(0,0,0,0.35)] font-bold">
           디자인 없이 이미지로 드론쇼 만들기
         </p>
         {isAuthenticated ? (
           <Link
             to="/projects/recent"
-            className="px-5 py-2.5 rounded-lg bg-white/85 text-black hover:bg-white transition font-yuniverse"
+            className="px-5 py-2.5 rounded-lg bg-white/85 text-black hover:bg-white transition font-yuniverse font-bold text-lg"
           >
             시작하기
           </Link>

@@ -29,7 +29,7 @@ export default function Navbar({ transparent: propTransparent = false }) {
 
   return (
     <div className={navWrap}>
-      <nav className={`${base} relative flex items-center h-16 px-8`}>
+      <nav className={`${base} relative flex items-center h-16 px-8 font-bold`}>
         {/* 중앙 메뉴 */}
         <div className="absolute left-1/2 -translate-x-1/2 flex gap-40 text-xl pt-1">
           <Link className="hover:underline underline-offset-4 decoration-2" to="/">
@@ -62,12 +62,12 @@ export default function Navbar({ transparent: propTransparent = false }) {
 
         {/* 우측 로그아웃 */}
         {isAuthenticated && (
-          <div className="ml-auto">
+          <div className="ml-auto" >
             <button
               onClick={logout}
               className={
                 transparent
-                  ? "px-5 py-2 text-xl font-extrabold rounded bg-white/80 hover:bg-white transition text-transparent bg-clip-text hover:underline underline-offset-4"
+                  ? "px-5 py-2 text-xl font-extrabold rounded bg-white/80 hover:bg-white transition text-transparent bg-clip-text hover:underline underline-offset-4 decoration-2 decoration-white"
                   : "px-5 py-2 text-lg rounded bg-gray-900 hover:bg-black text-white transition"
               }
             >

@@ -89,53 +89,51 @@ export default function LoginModal() {
       aria-modal="true"
     >
       {/* 카드 */}
-      <div className="w-full max-w-md md:max-w-lg rounded-2xl bg-white shadow-xl ring-1 ring-black/5 overflow-hidden">
+      <div className="w-full max-w-md md:max-w-lg rounded-2xl bg-white/70 shadow-xl ring-1 ring-black/5 overflow-hidden">
         {/* 헤더 (탭 + 닫기) */}
         <div className="flex items-center justify-between px-5 pt-4">
-          <div className="flex gap-2">
-            <button
-              onClick={() => setMode("login")}
-              disabled={mode === "login"}
-              className={`px-3 py-1.5 rounded text-sm ${
-                mode === "login"
-                  ? "bg-gray-200 cursor-not-allowed"
-                  : "bg-gray-100 hover:bg-gray-200"
-              }`}
-            >
-              Login
-            </button>
-            <button
-              onClick={() => setMode("register")}
-              disabled={mode === "register"}
-              className={`px-3 py-1.5 rounded text-sm ${
-                mode === "register"
-                  ? "bg-gray-200 cursor-not-allowed"
-                  : "bg-gray-100 hover:bg-gray-200"
-              }`}
-            >
-              Register
-            </button>
-          </div>
+          <div className="flex gap-2 font-yuniverse">
+      <button
+        onClick={() => setMode("login")}
+        className={`px-3 py-1.5 rounded text-sm transition ${
+          mode === "login"
+            ? "bg-white shadow font-bold text-gray-900"
+            : "bg-transparent hover:bg-gray-100 text-gray-600"
+        }`}
+      >
+        Login
+      </button>
+      <button
+        onClick={() => setMode("register")}
+        className={`px-3 py-1.5 rounded text-sm transition ${
+          mode === "register"
+            ? "bg-white shadow font-bold text-gray-900"
+            : "bg-transparent hover:bg-gray-100 text-gray-600"
+        }`}
+      >
+      Register
+      </button>
+    </div>
 
           <button
             onClick={close}
             aria-label="Close"
-            className="rounded p-1 text-gray-500 hover:bg-gray-100"
+            className="rounded py-0.5 px-2 text-gray-500 hover:bg-gray-100 "
           >
             ✕
           </button>
         </div>
 
         {/* 본문: 높이 제한 + 스크롤 */}
-        <div className="px-5 pb-5 overflow-y-auto max-h-[74vh]">
+        <div className="px-5 pb-5 overflow-y-auto max-h-[74vh] font-yuniverse">
           {mode === "login" ? (
             <>
-              <h2 className="mt-3 mb-3 text-xl font-bold font-yuniverse text-gray-900">
+              <h2 className="mt-3 mb-3 text-3xl font-black  text-gray-900">
                 Login
               </h2>
               <form onSubmit={handleSubmit} className="space-y-3">
                 <label className="block">
-                  <div className="mb-1 text-sm">Username</div>
+                  <div className="mb-1 text-lg font-bold">Username</div>
                   <input
                     type="text"
                     value={username}
@@ -146,7 +144,7 @@ export default function LoginModal() {
                   />
                 </label>
                 <label className="block">
-                  <div className="mb-1 text-sm">Password</div>
+                  <div className="mb-1 text-lg font-bold">Password</div>
                   <input
                     type="password"
                     value={password}
@@ -159,7 +157,7 @@ export default function LoginModal() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full mt-1.5 rounded bg-[#646cff] hover:bg-[#5c64ed] text-white py-2 font-yuniverse transition"
+                  className="w-full mt-1.5 rounded bg-[#646cff] hover:bg-[#5c64ed] text-white py-2 font-yuniverse transition font-bold"
                 >
                   {loading ? "Logging in..." : "Login"}
                 </button>
@@ -172,7 +170,7 @@ export default function LoginModal() {
               </h2>
               <form onSubmit={handleRegister} className="space-y-3">
                 <label className="block">
-                  <div className="mb-1 text-sm">Email</div>
+                  <div className="mb-1 text-sm font-bold">Email</div>
                   <input
                     type="email"
                     value={email}
@@ -183,7 +181,7 @@ export default function LoginModal() {
                   />
                 </label>
                 <label className="block">
-                  <div className="mb-1 text-sm">Username</div>
+                  <div className="mb-1 text-sm font-bold">Username</div>
                   <input
                     type="text"
                     value={username}
@@ -196,7 +194,7 @@ export default function LoginModal() {
                   />
                 </label>
                 <label className="block">
-                  <div className="mb-1 text-sm">Password</div>
+                  <div className="mb-1 text-sm font-bold">Password</div>
                   <input
                     type="password"
                     value={password}
@@ -211,7 +209,7 @@ export default function LoginModal() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full mt-1.5 rounded bg-[#646cff] hover:bg-[#5c64ed] text-white py-2 font-yuniverse transition"
+                  className="w-full mt-1.5 rounded bg-[#646cff] hover:bg-[#5c64ed] text-white py-2 font-yuniverse transition font-bold"
                 >
                   {loading ? "Registering..." : "Create Account"}
                 </button>
