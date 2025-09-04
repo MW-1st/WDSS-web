@@ -8,10 +8,10 @@ def process_image(
     input_path: str,
     step: int = 3,
     target_dots: int | None = None,
-    canny_threshold1: int = 100,
-    canny_threshold2: int = 200,
-    blur_ksize: int = 5,
-    blur_sigma: float = 1.4,
+    canny_threshold1: int = 80,   # 강한 엣지만 검출
+    canny_threshold2: int = 200,  # 더 높은 임계값으로 선명한 윤곽선만
+    blur_ksize: int = 5,          # 더 강한 블러로 노이즈 제거
+    blur_sigma: float = 1.2,
     color_rgb: tuple[int, int, int] | None = None,
 ) -> str:
     """
@@ -34,14 +34,17 @@ def process_image(
     if img is None:
         raise ValueError(f"Failed to read image: {input_path}")
 
+    # 간단하고 빠른 엣지 검출
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-    # 가우시안 블러 (커널 홀수 보정)
+    
+    # 기본 블러 + Canny 엣지
     k = max(3, blur_ksize | 1)
     blur = cv2.GaussianBlur(gray, (k, k), blur_sigma)
-
-    # Canny edge
     edges = cv2.Canny(blur, canny_threshold1, canny_threshold2)
+    
+    # 최소한의 모폴로지 연산
+    kernel = np.ones((2,2), np.uint8)
+    edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)  # 끊어진 선만 연결
 
     # step 자동 계산 (target_dots 지정 시 우선)
     h, w = edges.shape[:2]
@@ -53,7 +56,7 @@ def process_image(
             est = int(max(1, round((edge_pixels / max(target_dots, 1)) ** 0.5)))
             step = max(1, min(est, 64))
 
-    # 좌표만 수집하여 SVG로 저장할 예정
+    # 간단한 점 선택 (원래 방식)
     points: list[tuple[int, int]] = []  # (x, y)
     if target_dots and target_dots > 0:
         coords = np.column_stack(np.where(edges != 0))  # (y, x)
@@ -80,21 +83,104 @@ def process_image(
     out_name = f"processed_{uuid.uuid4().hex}_{dot_count}.svg"
     output_path = os.path.join(out_dir, out_name)
 
-    # 각 점의 실제 이미지 색상을 분석하여 사용
+    # 색상 분석 및 펜 스트로크 통합
+    def is_yellow_like(r, g, b):
+        """노란색 계열인지 판별"""
+        hsv = cv2.cvtColor(np.uint8([[[b, g, r]]]), cv2.COLOR_BGR2HSV)[0][0]
+        hue = hsv[0]
+        saturation = hsv[1]
+        value = hsv[2]
+        return (20 <= hue <= 30) and saturation > 50 and value > 100
+    
+    def is_pen_stroke_area(img, x, y, radius=3):
+        """해당 영역이 펜 스트로크인지 판별 (균일한 색상 영역)"""
+        if y < radius or x < radius or y >= img.shape[0]-radius or x >= img.shape[1]-radius:
+            return False
+        
+        # 주변 픽셀들의 색상 분산을 체크
+        region = img[y-radius:y+radius+1, x-radius:x+radius+1]
+        mean_color = np.mean(region, axis=(0,1))
+        std_color = np.std(region, axis=(0,1))
+        
+        # RGB 각 채널의 표준편차가 모두 작으면 균일한 영역 (펜 스트로크)
+        return all(std < 15 for std in std_color)  # 표준편차 15 이하면 균일
+    
+    def get_dominant_pen_color(img, points, sample_size=50):
+        """펜 스트로크 영역에서 주요 색상들을 추출"""
+        pen_colors = []
+        
+        # 샘플링으로 성능 최적화
+        sample_points = points[:sample_size] if len(points) > sample_size else points
+        
+        for (x, y) in sample_points:
+            if y < img.shape[0] and x < img.shape[1]:
+                if is_pen_stroke_area(img, x, y):
+                    b, g, r = img[int(y), int(x)]
+                    pen_colors.append((r, g, b))
+        
+        if not pen_colors:
+            return {}
+        
+        # 색상을 클러스터링하여 주요 펜 색상들 찾기
+        unique_colors = {}
+        for color in pen_colors:
+            # 비슷한 색상들을 그룹화 (각 채널 20 이내 차이)
+            found_group = None
+            for group_color in unique_colors:
+                if all(abs(color[i] - group_color[i]) < 20 for i in range(3)):
+                    found_group = group_color
+                    break
+            
+            if found_group:
+                unique_colors[found_group] += 1
+            else:
+                unique_colors[color] = 1
+        
+        # 빈도가 높은 색상들만 반환 (전체의 10% 이상)
+        threshold = len(pen_colors) * 0.1
+        dominant_colors = {color: count for color, count in unique_colors.items() 
+                          if count >= threshold}
+        
+        return dominant_colors
+    
+    # 펜 스트로크 색상 분석 (간소화)
+    dominant_pen_colors = get_dominant_pen_color(img, points)
+    
     circles = []
     for (x, y) in points:
-        # 해당 위치의 실제 픽셀 색상 추출
         if y < img.shape[0] and x < img.shape[1]:
-            # BGR 순서로 저장되어 있으므로 RGB로 변환
             b, g, r = img[int(y), int(x)]
+            
+            # 펜 스트로크 영역인지 확인
+            if is_pen_stroke_area(img, x, y):
+                # 가장 가까운 주요 펜 색상으로 통일
+                best_match = None
+                min_distance = float('inf')
+                
+                for pen_color in dominant_pen_colors:
+                    distance = sum(abs(pen_color[i] - [r, g, b][i]) for i in range(3))
+                    if distance < min_distance:
+                        min_distance = distance
+                        best_match = pen_color
+                
+                if best_match and min_distance < 60:  # 임계값 내의 색상만 통일
+                    r, g, b = best_match
+            
+            # 노란색 계열 특별 처리
+            if is_yellow_like(r, g, b):
+                saturation_boost = 1.2
+                b = max(0, min(255, int(b * 0.8)))
+                r = max(0, min(255, int(r * saturation_boost)))
+                g = max(0, min(255, int(g * saturation_boost)))
+            
             actual_color = f"rgb({int(r)}, {int(g)}, {int(b)})"
         else:
-            # 범위를 벗어난 경우 기본 색상 사용
+            # 범위를 벗어난 경우
             if color_rgb:
                 r, g, b = color_rgb
                 actual_color = f"rgb({r}, {g}, {b})"
             else:
-                actual_color = "#000"  # 기본 검은색
+                actual_color = "#000"
         
         circles.append(f"<circle cx=\"{x}\" cy=\"{y}\" r=\"2\" fill=\"{actual_color}\" />")
 
