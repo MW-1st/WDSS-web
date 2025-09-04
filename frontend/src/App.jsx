@@ -9,7 +9,7 @@ import {
 import { useEffect, useState } from "react";
 import MainPage from "./pages/MainPage.jsx";
 import EditorPage from "./pages/EditorPage.jsx";
-import LoginPage from "./pages/LoginPage.jsx";
+import LoginModal from "./pages/LoginModal.jsx";
 import DashboardPage from "./pages/DashboardPage.jsx";
 import PrivateRoute from "./components/PrivateRoute.jsx";
 import Navbar from "./components/Navbar";
@@ -18,8 +18,10 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext.jsx";
 //임시
 import ProjectStart from "./pages/ProjectStart";
 
+
 function AppContent() {
   const location = useLocation();
+  const background = location.state && location.state.background;
   const navigate = useNavigate();
   const { isUnityVisible, showUnity, hideUnity } = useUnity();
   const { isAuthenticated, logout, loading } = useAuth();
@@ -91,20 +93,22 @@ return (
     {/* 메인에서는 전역 Navbar를 숨기고, 다른 페이지에서만 보이게 */}
     {location.pathname !== "/" && <Navbar />}
 
-    <Routes>
+      <Routes location={background || location}>
       <Route path="/" element={<MainPage />} />
       <Route path="/editor" element={<EditorPage />} />
       <Route path="/" element={<ProjectStart />} />
-        <Route
-          path="/login"
-          element={
-            isAuthenticated ? (
-              <Navigate to="/dashboard" replace />
-            ) : (
-              <LoginPage />
-            )
-          }
-        />
+         {!background && (
+          <Route
+            path="/login"
+            element={
+              <>
+                <MainPage />
+                <LoginModal />
+              </>
+            }
+          />
+        )}
+
         <Route
           path="/dashboard"
           element={
@@ -114,6 +118,11 @@ return (
           }
         />
       </Routes>
+      {background && (
+        <Routes>
+          <Route path="/login" element={<LoginModal />} />
+        </Routes>
+      )}
       <div style={unityOverlayStyle}>
         <div style={unityContainerStyle}>
           <button
