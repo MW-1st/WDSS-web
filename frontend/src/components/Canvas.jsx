@@ -100,10 +100,8 @@ export default function Canvas({
               console.log(`Circle ${index}: cx=${cx}, cy=${cy}, r=${r}, originalFill=${originalFill}`);
             }
 
-            // SVG에서 검은색이 오는 경우 현재 그리기 색상으로 대체
-            const actualFill = (originalFill === '#000000' || originalFill === 'rgb(0, 0, 0)' || originalFill === 'black') 
-              ? drawingColor 
-              : originalFill;
+            // 실제 SVG의 색상을 그대로 사용 (색상 대체하지 않음)
+            const actualFill = originalFill;
 
             if (index < 10) {
               console.log(`Circle ${index} actualFill: ${actualFill}`);
@@ -119,6 +117,7 @@ export default function Canvas({
               customType: 'svgDot', // 커스텀 타입 추가로 식별 가능
               originalCx: cx,
               originalCy: cy,
+              originalFill: originalFill, // 원본 색상 정보 보존
               hoverCursor: 'crosshair',
               moveCursor: 'crosshair'
             });
@@ -306,6 +305,7 @@ export default function Canvas({
           selectable: false,
           evented: true,
           customType: 'drawnDot', // 그려진 도트로 구분
+          originalFill: currentColor, // 원본 색상 정보 보존
           hoverCursor: 'crosshair',
           moveCursor: 'crosshair'
         });
@@ -679,21 +679,6 @@ export default function Canvas({
     }
   };
 
-  // HEX를 RGB로 변환하는 함수
-  const hexToRgb = (hex) => {
-    if (hex.startsWith('rgba(') || hex.startsWith('rgb(')) {
-      return hex; // 이미 RGB 형식이면 그대로 반환
-    }
-    
-    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    if (result) {
-      const r = parseInt(result[1], 16);
-      const g = parseInt(result[2], 16);
-      const b = parseInt(result[3], 16);
-      return `rgb(${r}, ${g}, ${b})`;
-    }
-    return hex; // 변환할 수 없으면 원본 반환
-  };
 
   // 현재 캔버스의 모든 객체를 색상별로 분석하여 SVG 생성
   const getCurrentCanvasAsSvg = () => {
@@ -713,13 +698,14 @@ export default function Canvas({
         // 도트의 중심점 계산
         const centerX = obj.left + obj.radius;
         const centerY = obj.top + obj.radius;
-        const dotColor = obj.fill || drawingColor;
+        // 실제 객체의 fill 색상을 우선 사용, 없으면 originalFill, 그것도 없으면 현재 그리기 색상
+        const dotColor = obj.fill || obj.originalFill || drawingColor;
         
         dots.push({
           cx: centerX,
           cy: centerY,
           r: obj.radius,
-          fill: hexToRgb(dotColor),
+          fill: dotColor, // hexToRgb 변환 제거하여 원본 색상 형태 유지
           originalColor: dotColor
         });
       } else if (obj.type === 'path') {
@@ -729,7 +715,7 @@ export default function Canvas({
         
         pathObjects.push({
           type: 'path',
-          fill: hexToRgb(pathColor),
+          fill: pathColor, // hexToRgb 변환 제거하여 원본 색상 형태 유지
           originalColor: pathColor,
           obj: obj
         });
