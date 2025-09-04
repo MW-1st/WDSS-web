@@ -7,6 +7,7 @@ function MainCanvasSection({
   onChange,
   drawingMode,
   eraserSize,
+  drawingColor,
   onModeChange,
 }) {
   return (
@@ -40,6 +41,7 @@ function MainCanvasSection({
               stageRef={stageRef}
               drawingMode={drawingMode}
               eraserSize={eraserSize}
+              drawingColor={drawingColor}
               onModeChange={onModeChange}
             />
           ) : (

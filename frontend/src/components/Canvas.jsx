@@ -9,12 +9,14 @@ export default function Canvas({
   stageRef: externalStageRef,
   drawingMode: externalDrawingMode = 'draw',
   eraserSize: externalEraserSize = 20,
+  drawingColor: externalDrawingColor = '#222222',
   onModeChange
 }) {
   const canvasRef = useRef(null);
   const fabricCanvas = useRef(null);
   const [drawingMode, setDrawingMode] = useState(externalDrawingMode);
   const [eraserSize, setEraserSize] = useState(externalEraserSize);
+  const [drawingColor, setDrawingColor] = useState(externalDrawingColor);
   const eraseHandlers = useRef({});
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -38,7 +40,7 @@ export default function Canvas({
     canvas.isDrawingMode = true;
     const brush = new PencilBrush(canvas);
     brush.width = 2; // 원래 크기로 복원
-    brush.color = "#222";
+    brush.color = externalDrawingColor; // 외부에서 전달받은 색상 사용
     brush.decimate = 2; // 브러시 포인트 간소화
     brush.limitedToCanvasSize = true; // 캔버스 경계 제한
     canvas.freeDrawingBrush = brush;
@@ -92,17 +94,26 @@ export default function Canvas({
             const cx = parseFloat(circleEl.getAttribute('cx') || '0');
             const cy = parseFloat(circleEl.getAttribute('cy') || '0');
             const r = parseFloat(circleEl.getAttribute('r') || '2');
-            const fill = circleEl.getAttribute('fill') || '#000000';
+            const originalFill = circleEl.getAttribute('fill') || '#000000';
 
-            if (index < 5) {
-              console.log(`Circle ${index}: cx=${cx}, cy=${cy}, r=${r}, fill=${fill}`);
+            if (index < 10) {
+              console.log(`Circle ${index}: cx=${cx}, cy=${cy}, r=${r}, originalFill=${originalFill}`);
+            }
+
+            // SVG에서 검은색이 오는 경우 현재 그리기 색상으로 대체
+            const actualFill = (originalFill === '#000000' || originalFill === 'rgb(0, 0, 0)' || originalFill === 'black') 
+              ? drawingColor 
+              : originalFill;
+
+            if (index < 10) {
+              console.log(`Circle ${index} actualFill: ${actualFill}`);
             }
 
             const fabricCircle = new Circle({
               left: cx - r,
               top: cy - r,
               radius: r,
-              fill: fill,
+              fill: actualFill,
               selectable: false,
               evented: true, // 그리기/지우기 상호작용 가능하도록 true로 설정
               customType: 'svgDot', // 커스텀 타입 추가로 식별 가능
@@ -161,9 +172,12 @@ export default function Canvas({
   useEffect(() => {
     if (externalDrawingMode !== drawingMode) {
       setDrawingMode(externalDrawingMode);
-      applyDrawingMode(externalDrawingMode);
+      // 현재 색상을 유지하면서 모드만 적용
+      setTimeout(() => {
+        applyDrawingMode(externalDrawingMode, drawingColor);
+      }, 10);
     }
-  }, [externalDrawingMode]);
+  }, [externalDrawingMode, drawingColor]); // drawingColor를 의존성으로 다시 추가
 
   // 외부에서 eraserSize가 변경될 때 반응
   useEffect(() => {
@@ -171,6 +185,15 @@ export default function Canvas({
       setEraserSize(externalEraserSize);
     }
   }, [externalEraserSize]);
+
+  // 외부에서 drawingColor가 변경될 때 반응
+  useEffect(() => {
+    console.log('외부 색상 변경:', externalDrawingColor, '현재 내부 색상:', drawingColor);
+    if (externalDrawingColor !== drawingColor) {
+      setDrawingColor(externalDrawingColor);
+      updateBrushColor(externalDrawingColor);
+    }
+  }, [externalDrawingColor]);
 
   // 지우개 크기가 변경될 때 현재 모드에 따라 업데이트
   useEffect(() => {
@@ -182,10 +205,29 @@ export default function Canvas({
     }
   }, [eraserSize]);
 
-  const applyDrawingMode = (mode) => {
+  // 브러시 색상 업데이트 함수
+  const updateBrushColor = (color) => {
     if (!fabricCanvas.current) return;
     
     const canvas = fabricCanvas.current;
+    
+    console.log('updateBrushColor 호출됨:', color);
+    
+    // 현재 그리기 브러시가 있다면 색상 업데이트
+    if (canvas.freeDrawingBrush) {
+      console.log('브러시 색상 업데이트:', canvas.freeDrawingBrush.color, '->', color);
+      canvas.freeDrawingBrush.color = color;
+    } else {
+      console.log('브러시가 없어서 색상 업데이트 불가');
+    }
+  };
+
+  const applyDrawingMode = (mode, colorOverride = null) => {
+    if (!fabricCanvas.current) return;
+    
+    const canvas = fabricCanvas.current;
+    const currentColor = colorOverride || drawingColor;
+    console.log('applyDrawingMode 호출:', mode, '사용할 색상:', currentColor);
     
     // 이전 이벤트 리스너 정리
     if (eraseHandlers.current.wheelHandler) {
@@ -219,10 +261,13 @@ export default function Canvas({
       
       const brush = new PencilBrush(canvas);
       brush.width = 2; // 원래 크기로 복원
-      brush.color = "#222";
+      brush.color = currentColor; // 현재 색상 사용
       brush.decimate = 2; // 브러시 포인트 간소화
       brush.limitedToCanvasSize = true;
       canvas.freeDrawingBrush = brush;
+      
+      // 브러시 설정 후 한 번 더 색상 확인 및 설정
+      console.log('Draw mode - 설정된 브러시 색상:', brush.color, '사용된 색상:', currentColor);
       
       // 기본 커서로 복구
       canvas.setCursor('crosshair');
@@ -257,7 +302,7 @@ export default function Canvas({
           left: pointer.x - dotRadius,
           top: pointer.y - dotRadius,
           radius: dotRadius,
-          fill: "rgba(0,0,0,1)",
+          fill: currentColor, // 현재 색상 사용
           selectable: false,
           evented: true,
           customType: 'drawnDot', // 그려진 도트로 구분
@@ -554,6 +599,13 @@ export default function Canvas({
     const imageUrl = e.dataTransfer.getData("text/plain");
     if (imageUrl && fabricCanvas.current) {
       addImageToCanvas(imageUrl, e.clientX, e.clientY);
+      
+      // 이미지 드롭 후 선택 모드로 변경
+      setDrawingMode('select');
+      applyDrawingMode('select');
+      if (onModeChange) {
+        onModeChange('select');
+      }
     }
   };
 
@@ -627,41 +679,86 @@ export default function Canvas({
     }
   };
 
-  // 현재 캔버스의 도트들을 SVG 문자열로 생성
+  // HEX를 RGB로 변환하는 함수
+  const hexToRgb = (hex) => {
+    if (hex.startsWith('rgba(') || hex.startsWith('rgb(')) {
+      return hex; // 이미 RGB 형식이면 그대로 반환
+    }
+    
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    if (result) {
+      const r = parseInt(result[1], 16);
+      const g = parseInt(result[2], 16);
+      const b = parseInt(result[3], 16);
+      return `rgb(${r}, ${g}, ${b})`;
+    }
+    return hex; // 변환할 수 없으면 원본 반환
+  };
+
+  // 현재 캔버스의 모든 객체를 색상별로 분석하여 SVG 생성
   const getCurrentCanvasAsSvg = () => {
     if (!fabricCanvas.current) return null;
     
     const canvas = fabricCanvas.current;
     const objects = canvas.getObjects();
     const dots = [];
+    const pathObjects = [];
     
-    objects.forEach(obj => {
+    console.log('getCurrentCanvasAsSvg - 총 객체 수:', objects.length);
+    
+    objects.forEach((obj, index) => {
+      console.log(`객체 ${index}: type=${obj.type}, customType=${obj.customType}, fill=${obj.fill}, stroke=${obj.stroke}`);
+      
       if (obj.customType === 'svgDot' || obj.customType === 'drawnDot') {
         // 도트의 중심점 계산
         const centerX = obj.left + obj.radius;
         const centerY = obj.top + obj.radius;
+        const dotColor = obj.fill || drawingColor;
         
         dots.push({
           cx: centerX,
           cy: centerY,
           r: obj.radius,
-          fill: obj.fill
+          fill: hexToRgb(dotColor),
+          originalColor: dotColor
+        });
+      } else if (obj.type === 'path') {
+        // 펜으로 그린 패스의 경우
+        const pathColor = obj.stroke || drawingColor;
+        console.log(`패스 객체 색상: ${pathColor}`);
+        
+        pathObjects.push({
+          type: 'path',
+          fill: hexToRgb(pathColor),
+          originalColor: pathColor,
+          obj: obj
         });
       }
     });
     
-    // SVG 문자열 생성
+    console.log('도트 개수:', dots.length, '패스 개수:', pathObjects.length);
+    
+    // SVG 문자열 생성 (모든 객체의 실제 색상 사용)
     let svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="${canvas.width}" height="${canvas.height}">`;
+    
+    // 도트들 추가
     dots.forEach(dot => {
       svgContent += `<circle cx="${dot.cx}" cy="${dot.cy}" r="${dot.r}" fill="${dot.fill}" />`;
     });
+    
+    // 패스들은 실제 변환에서 처리될 수 있도록 정보만 포함
     svgContent += '</svg>';
     
     return {
       svgString: svgContent,
-      totalDots: dots.length
+      totalDots: dots.length,
+      totalPaths: pathObjects.length,
+      dots: dots, // 개별 색상이 적용된 도트 배열
+      paths: pathObjects, // 패스 객체들의 색상 정보
+      hasMultipleColors: new Set([...dots.map(d => d.originalColor), ...pathObjects.map(p => p.originalColor)]).size > 1
     };
   };
+
 
   // 현재 캔버스 전체를 이미지로 내보내기
   const exportCanvasAsImage = () => {
@@ -721,8 +818,14 @@ export default function Canvas({
     const canvas = fabricCanvas.current;
     const objects = canvas.getObjects();
     
-    // path(펜으로 그린 선)나 drawnDot(브러시 도트)가 있는지 확인
-    return objects.some(obj => obj.type === 'path' || obj.customType === 'drawnDot');
+    // 변환 가능한 모든 콘텐츠 확인
+    return objects.some(obj => 
+      obj.type === 'path' ||                    // 펜으로 그린 선
+      obj.customType === 'drawnDot' ||         // 브러시 도트
+      obj.customType === 'droppedImage' ||     // 드래그&드롭 이미지
+      obj.customType === 'svgDot' ||           // SVG 도트들
+      obj.type === 'image'                     // 배경 이미지
+    );
   };
 
   // 캔버스 초기화 (모든 객체 제거)
@@ -736,6 +839,38 @@ export default function Canvas({
     canvas.renderAll();
   };
 
+  // 원본 캔버스 상태 저장 및 복원 기능
+  const saveOriginalCanvasState = () => {
+    if (!fabricCanvas.current) return null;
+    
+    const canvas = fabricCanvas.current;
+    const state = {
+      objects: canvas.toJSON(),
+      timestamp: Date.now()
+    };
+    
+    console.log("원본 캔버스 상태 저장:", state);
+    return state;
+  };
+
+  const restoreOriginalCanvasState = (state) => {
+    if (!fabricCanvas.current || !state) return false;
+    
+    const canvas = fabricCanvas.current;
+    
+    // 현재 캔버스 초기화
+    canvas.clear();
+    canvas.backgroundColor = '#fafafa';
+    
+    // 저장된 상태에서 복원
+    canvas.loadFromJSON(state.objects, () => {
+      canvas.renderAll();
+      console.log("원본 캔버스 상태 복원 완료");
+    });
+    
+    return true;
+  };
+
   // 외부에서 사용할 수 있도록 ref에 함수 등록
   useEffect(() => {
     if (externalStageRef && externalStageRef.current) {
@@ -744,13 +879,28 @@ export default function Canvas({
       externalStageRef.current.exportDrawnLinesOnly = exportDrawnLinesOnly;
       externalStageRef.current.hasDrawnContent = hasDrawnContent;
       externalStageRef.current.clear = clearCanvas;
-      externalStageRef.current.applyDrawingMode = applyDrawingMode;
+      externalStageRef.current.applyDrawingMode = (mode, color) => {
+        // 색상 정보를 명시적으로 전달받아 사용
+        const currentColor = color || externalDrawingColor;
+        console.log('applyDrawingMode with color:', mode, currentColor);
+        applyDrawingMode(mode, currentColor);
+      };
       externalStageRef.current.setDrawingMode = (mode) => {
         setDrawingMode(mode);
-        applyDrawingMode(mode);
+        // 현재 색상을 명시적으로 전달
+        setTimeout(() => {
+          externalStageRef.current.applyDrawingMode(mode, drawingColor);
+        }, 10);
       };
+      externalStageRef.current.setDrawingColor = (color) => {
+        setDrawingColor(color);
+        updateBrushColor(color);
+      };
+      // 원본 상태 관리 함수 추가
+      externalStageRef.current.saveOriginalCanvasState = saveOriginalCanvasState;
+      externalStageRef.current.restoreOriginalCanvasState = restoreOriginalCanvasState;
     }
-  }, [externalStageRef]);
+  }, [externalStageRef]); // drawingColor는 의존성에서 제거하여 무한 루프 방지
 
   return (
       <div 
