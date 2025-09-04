@@ -25,7 +25,7 @@ function AppContent() {
   const navigate = useNavigate();
   const { isUnityVisible, showUnity, hideUnity } = useUnity();
   const { isAuthenticated, logout, loading } = useAuth();
-
+const showGlobalNav = location.pathname !== "/" && location.pathname !== "/login";
   useEffect(() => {
     const handleEscape = (event) => {
       if (event.key === "Escape" && isUnityVisible) {
@@ -91,9 +91,8 @@ function AppContent() {
 return (
   <div style={{ padding: 0 }}>
     {/* 메인에서는 전역 Navbar를 숨기고, 다른 페이지에서만 보이게 */}
-    {location.pathname !== "/" && <Navbar />}
-
-      <Navbar />
+    {showGlobalNav && <Navbar />}  
+      
       <Routes location={background || location}>
         <Route path="/" element={<MainPage />} />
         <Route path="/dashboard" element={<PrivateRoute> <DashboardPage /> </PrivateRoute> }/>
