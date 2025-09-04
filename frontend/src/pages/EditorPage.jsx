@@ -405,6 +405,7 @@ export default function EditorPage({ projectId = DUMMY }) {
           eraserSize={eraserSize}
           onModeChange={handleModeChange}
           onClearAll={handleClearAll}
+          stageRef={stageRef} // stageRef prop 전달
           layout="sidebar"
         />
       </aside>

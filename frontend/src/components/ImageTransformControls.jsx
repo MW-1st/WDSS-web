@@ -9,6 +9,7 @@ export default function ImageTransformControls({
   imageUrl,
   sceneId = 1,
   layout = "full",
+  stageRef, // stageRef prop 추가
 }) {
   // Local state for smooth slider drag
   const [localDots, setLocalDots] = React.useState(Number(targetDots) || 2000);
