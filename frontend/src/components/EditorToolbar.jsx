@@ -23,6 +23,7 @@ export default function EditorToolbar({
   eraserSize,
   onModeChange,
   onClearAll,
+  stageRef, // stageRef prop 추가
   layout = "full",
 }) {
   const Inner = () => (
@@ -62,6 +63,7 @@ export default function EditorToolbar({
           imageUrl={imageUrl}
           sceneId={selectedId}
           layout={layout}
+          stageRef={stageRef} // stageRef prop 전달
         />
       </div>
 
