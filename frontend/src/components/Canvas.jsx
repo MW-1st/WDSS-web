@@ -9,12 +9,14 @@ export default function Canvas({
   stageRef: externalStageRef,
   drawingMode: externalDrawingMode = 'draw',
   eraserSize: externalEraserSize = 20,
+  drawingColor: externalDrawingColor = '#222222',
   onModeChange
 }) {
   const canvasRef = useRef(null);
   const fabricCanvas = useRef(null);
   const [drawingMode, setDrawingMode] = useState(externalDrawingMode);
   const [eraserSize, setEraserSize] = useState(externalEraserSize);
+  const [drawingColor, setDrawingColor] = useState(externalDrawingColor);
   const eraseHandlers = useRef({});
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -172,6 +174,14 @@ export default function Canvas({
     }
   }, [externalEraserSize]);
 
+  // 외부에서 drawingColor가 변경될 때 반응
+  useEffect(() => {
+    if (externalDrawingColor !== drawingColor) {
+      setDrawingColor(externalDrawingColor);
+      updateBrushColor(externalDrawingColor);
+    }
+  }, [externalDrawingColor]);
+
   // 지우개 크기가 변경될 때 현재 모드에 따라 업데이트
   useEffect(() => {
     if (!fabricCanvas.current || !drawingMode) return;
@@ -181,6 +191,18 @@ export default function Canvas({
       applyDrawingMode(drawingMode);
     }
   }, [eraserSize]);
+
+  // 브러시 색상 업데이트 함수
+  const updateBrushColor = (color) => {
+    if (!fabricCanvas.current) return;
+    
+    const canvas = fabricCanvas.current;
+    
+    // 현재 그리기 브러시가 있다면 색상 업데이트
+    if (canvas.freeDrawingBrush) {
+      canvas.freeDrawingBrush.color = color;
+    }
+  };
 
   const applyDrawingMode = (mode) => {
     if (!fabricCanvas.current) return;
@@ -219,7 +241,7 @@ export default function Canvas({
       
       const brush = new PencilBrush(canvas);
       brush.width = 2; // 원래 크기로 복원
-      brush.color = "#222";
+      brush.color = drawingColor;
       brush.decimate = 2; // 브러시 포인트 간소화
       brush.limitedToCanvasSize = true;
       canvas.freeDrawingBrush = brush;
@@ -257,7 +279,7 @@ export default function Canvas({
           left: pointer.x - dotRadius,
           top: pointer.y - dotRadius,
           radius: dotRadius,
-          fill: "rgba(0,0,0,1)",
+          fill: drawingColor,
           selectable: false,
           evented: true,
           customType: 'drawnDot', // 그려진 도트로 구분
@@ -554,6 +576,13 @@ export default function Canvas({
     const imageUrl = e.dataTransfer.getData("text/plain");
     if (imageUrl && fabricCanvas.current) {
       addImageToCanvas(imageUrl, e.clientX, e.clientY);
+      
+      // 이미지 드롭 후 선택 모드로 변경
+      setDrawingMode('select');
+      applyDrawingMode('select');
+      if (onModeChange) {
+        onModeChange('select');
+      }
     }
   };
 
@@ -786,6 +815,10 @@ export default function Canvas({
       externalStageRef.current.setDrawingMode = (mode) => {
         setDrawingMode(mode);
         applyDrawingMode(mode);
+      };
+      externalStageRef.current.setDrawingColor = (color) => {
+        setDrawingColor(color);
+        updateBrushColor(color);
       };
       // 원본 상태 관리 함수 추가
       externalStageRef.current.saveOriginalCanvasState = saveOriginalCanvasState;

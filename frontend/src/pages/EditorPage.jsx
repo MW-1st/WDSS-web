@@ -48,6 +48,7 @@ export default function EditorPage({ projectId = DUMMY }) {
   // 캔버스 관련 상태
   const [drawingMode, setDrawingMode] = useState('draw');
   const [eraserSize, setEraserSize] = useState(20);
+  const [drawingColor, setDrawingColor] = useState('#222222');
   // const sceneId = 1; // 현재 에디터의 씬 ID (임시 하드코딩)
 
   // unity 관련 상태
@@ -402,6 +403,20 @@ export default function EditorPage({ projectId = DUMMY }) {
     }
   };
 
+  const handleColorChange = (color) => {
+    setDrawingColor(color);
+    if (stageRef.current && stageRef.current.setDrawingColor) {
+      stageRef.current.setDrawingColor(color);
+    }
+  };
+
+  const handleColorPreview = (color) => {
+    // 미리보기용 - 실제 상태는 변경하지 않고 캔버스에만 적용
+    if (stageRef.current && stageRef.current.setDrawingColor) {
+      stageRef.current.setDrawingColor(color);
+    }
+  };
+
   return (
     <div style={{ width: "100%", background: "#fff", display: 'flex', minHeight: '100vh' }}>
       <aside
@@ -431,7 +446,10 @@ export default function EditorPage({ projectId = DUMMY }) {
           onImageDragStart={(imageUrl) => console.log('Image drag started:', imageUrl)}
           drawingMode={drawingMode}
           eraserSize={eraserSize}
+          drawingColor={drawingColor}
           onModeChange={handleModeChange}
+          onColorChange={handleColorChange}
+          onColorPreview={handleColorPreview}
           onClearAll={handleClearAll}
           stageRef={stageRef} // stageRef prop 전달
           layout="sidebar"
@@ -449,6 +467,7 @@ export default function EditorPage({ projectId = DUMMY }) {
           onChange={handleSceneChange}
           drawingMode={drawingMode}
           eraserSize={eraserSize}
+          drawingColor={drawingColor}
           onModeChange={handleModeChange}
         />
 

@@ -21,7 +21,10 @@ export default function EditorToolbar({
   // Canvas props
   drawingMode,
   eraserSize,
+  drawingColor,
   onModeChange,
+  onColorChange,
+  onColorPreview,
   onClearAll,
   stageRef, // stageRef prop 추가
   layout = "full",
@@ -49,7 +52,10 @@ export default function EditorToolbar({
         <CanvasTools
           drawingMode={drawingMode}
           eraserSize={eraserSize}
+          drawingColor={drawingColor}
           onModeChange={onModeChange}
+          onColorChange={onColorChange}
+          onColorPreview={onColorPreview}
           onClearAll={onClearAll}
         />
       </div>
