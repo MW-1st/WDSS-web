@@ -8,6 +8,8 @@ export default function CanvasTools({
   onModeChange,
   onClearAll,
 }) {
+  const [hovered, setHovered] = React.useState(null);
+
   const buttonStyle = {
     border: "1px solid #ccc",
     padding: "8px 16px",
@@ -36,6 +38,27 @@ export default function CanvasTools({
     marginRight: 0,
   };
 
+  const Tooltip = ({ children }) => (
+    <div
+      style={{
+        position: "absolute",
+        left: "70px",
+        top: "40%",
+        transform: "translateY(-50%)",
+        background: "#000",
+        color: "#fff",
+        padding: "6px 8px",
+        borderRadius: 6,
+        fontSize: 12,
+        whiteSpace: "nowrap",
+        zIndex: 9999,
+        boxShadow: "0 2px 6px rgba(0,0,0,.2)",
+      }}
+    >
+      {children}
+    </div>
+  );
+
   return (
     <div style={{ padding: "12px 0" }}>
       <h4 style={{ margin: "0 0 12px 0", fontSize: "16px", fontWeight: 600 }}>
@@ -45,57 +68,98 @@ export default function CanvasTools({
       <div
         style={{
           display: "flex",
-          flexWrap: "wrap",
-          gap: "4px",
           flexDirection: "column",
           gap: "8px",
           marginBottom: "12px",
         }}
       >
-        <button
-          onClick={() => onModeChange("draw")}
-          style={getButtonStyle("draw")}
-          title="펜으로 그리기"
-          aria-label="펜"
+        {/* Draw */}
+        <div
+          style={{ position: "relative", display: "inline-flex", zIndex: 1000 }}
+          onMouseEnter={() => setHovered("draw")}
+          onMouseLeave={() => setHovered(null)}
         >
-          <FaPen />
-        </button>
+          <button
+            onClick={() => onModeChange("draw")}
+            style={getButtonStyle("draw")}
+            aria-label="그리기"
+          >
+            <FaPen />
+          </button>
+          {hovered === "draw" && (
+            <Tooltip>그리기: 자유곡선을 그립니다.</Tooltip>
+          )}
+        </div>
 
-        <button
-          onClick={() => onModeChange("select")}
-          style={getButtonStyle("select")}
-          title="객체 선택"
-          aria-label="선택"
+        {/* Select */}
+        <div
+          style={{ position: "relative", display: "inline-flex", zIndex: 1000 }}
+          onMouseEnter={() => setHovered("select")}
+          onMouseLeave={() => setHovered(null)}
         >
-          <PiSelectionPlusBold />
-        </button>
+          <button
+            onClick={() => onModeChange("select")}
+            style={getButtonStyle("select")}
+            aria-label="선택"
+          >
+            <PiSelectionPlusBold />
+          </button>
+          {hovered === "select" && (
+            <Tooltip>선택: 객체 이동/크기 조절.</Tooltip>
+          )}
+        </div>
 
-        <button
-          onClick={() => onModeChange("brush")}
-          style={getButtonStyle("brush")}
-          title="브러쉬로 점 찍기"
-          aria-label="브러쉬"
+        {/* Brush */}
+        <div
+          style={{ position: "relative", display: "inline-flex", zIndex: 1000 }}
+          onMouseEnter={() => setHovered("brush")}
+          onMouseLeave={() => setHovered(null)}
         >
-          <FaPaintBrush />
-        </button>
+          <button
+            onClick={() => onModeChange("brush")}
+            style={getButtonStyle("brush")}
+            aria-label="브러시"
+          >
+            <FaPaintBrush />
+          </button>
+          {hovered === "brush" && <Tooltip>브러시: 점을 찍습니다.</Tooltip>}
+        </div>
 
-        <button
-          onClick={() => onModeChange("erase")}
-          style={getButtonStyle("erase")}
-          title="선 지우개"
-          aria-label="선 지우개"
+        {/* Erase (line) */}
+        <div
+          style={{ position: "relative", display: "inline-flex", zIndex: 1000 }}
+          onMouseEnter={() => setHovered("erase")}
+          onMouseLeave={() => setHovered(null)}
         >
-          <FaEraser />
-        </button>
+          <button
+            onClick={() => onModeChange("erase")}
+            style={getButtonStyle("erase")}
+            aria-label="지우개"
+          >
+            <FaEraser />
+          </button>
+          {hovered === "erase" && (
+            <Tooltip>지우개: 선과 점을 지웁니다.</Tooltip>
+          )}
+        </div>
 
-        <button
-          onClick={() => onModeChange("pixelErase")}
-          style={getButtonStyle("pixelErase")}
-          title="픽셀 지우개"
-          aria-label="픽셀 지우개"
+        {/* Pixel Erase */}
+        <div
+          style={{ position: "relative", display: "inline-flex", zIndex: 1000 }}
+          onMouseEnter={() => setHovered("pixelErase")}
+          onMouseLeave={() => setHovered(null)}
         >
-          <FaEraser />
-        </button>
+          <button
+            onClick={() => onModeChange("pixelErase")}
+            style={getButtonStyle("pixelErase")}
+            aria-label="픽셀 지우개"
+          >
+            <FaEraser />
+          </button>
+          {hovered === "pixelErase" && (
+            <Tooltip>픽셀 지우개: 배경을 칠합니다.</Tooltip>
+          )}
+        </div>
       </div>
 
       <div style={{ marginBottom: "12px" }}>
@@ -115,13 +179,13 @@ export default function CanvasTools({
           lineHeight: 1.4,
         }}
       >
-        {drawingMode === "draw" && "펜 모드: 자유롭게 선을 그립니다."}
-        {drawingMode === "select" && "선택 모드: 객체를 클릭해 이동/크기 조절."}
-        {drawingMode === "brush" && "브러쉬 모드: 클릭하여 점을 찍습니다."}
+        {drawingMode === "draw" && "모드: 자유곡선을 그립니다."}
+        {drawingMode === "select" && "모드: 객체 클릭 후 이동/크기 조절."}
+        {drawingMode === "brush" && "모드: 브러시로 점을 찍습니다."}
         {drawingMode === "erase" &&
-          `선 지우개: 선과 점을 지웁니다 (크기: ${eraserSize}px).`}
+          `모드: 선/점을 지웁니다 (크기: ${eraserSize}px).`}
         {drawingMode === "pixelErase" &&
-          `픽셀 지우개: 배경을 칠합니다 (크기: ${eraserSize}px).`}
+          `모드: 배경을 칠합니다 (크기: ${eraserSize}px).`}
       </div>
     </div>
   );
