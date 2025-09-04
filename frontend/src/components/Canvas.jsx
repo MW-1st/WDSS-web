@@ -2,11 +2,19 @@ import { useRef, useLayoutEffect, useEffect, useState, useCallback } from "react
 // fabric.js 최적화: 필요한 부분만 import
 import { Canvas as FabricCanvas, Circle, FabricImage, PencilBrush } from "fabric";
 
-export default function Canvas({ width = 800, height = 500, imageUrl = "", stageRef: externalStageRef }) {
+export default function Canvas({ 
+  width = 800, 
+  height = 500, 
+  imageUrl = "", 
+  stageRef: externalStageRef,
+  drawingMode: externalDrawingMode = 'draw',
+  eraserSize: externalEraserSize = 20,
+  onModeChange
+}) {
   const canvasRef = useRef(null);
   const fabricCanvas = useRef(null);
-  const [drawingMode, setDrawingMode] = useState('draw');
-  const [eraserSize, setEraserSize] = useState(20);
+  const [drawingMode, setDrawingMode] = useState(externalDrawingMode);
+  const [eraserSize, setEraserSize] = useState(externalEraserSize);
   const eraseHandlers = useRef({});
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -149,12 +157,27 @@ export default function Canvas({ width = 800, height = 500, imageUrl = "", stage
     }
   }, [imageUrl, width, height]);
 
+  // 외부에서 drawingMode가 변경될 때 반응
+  useEffect(() => {
+    if (externalDrawingMode !== drawingMode) {
+      setDrawingMode(externalDrawingMode);
+      applyDrawingMode(externalDrawingMode);
+    }
+  }, [externalDrawingMode]);
+
+  // 외부에서 eraserSize가 변경될 때 반응
+  useEffect(() => {
+    if (externalEraserSize !== eraserSize) {
+      setEraserSize(externalEraserSize);
+    }
+  }, [externalEraserSize]);
+
   // 지우개 크기가 변경될 때 현재 모드에 따라 업데이트
   useEffect(() => {
     if (!fabricCanvas.current || !drawingMode) return;
     
     // erase 모드일 때만 크기 반영
-    if (drawingMode === 'erase') {
+    if (drawingMode === 'erase' || drawingMode === 'pixelErase') {
       applyDrawingMode(drawingMode);
     }
   }, [eraserSize]);
@@ -405,6 +428,36 @@ export default function Canvas({ width = 800, height = 500, imageUrl = "", stage
       canvas.on('mouse:up', stopErase);
       canvas.on('mouse:wheel', wheelHandler);
       
+    } else if (mode === 'select') {
+      // 선택 모드로 전환
+      canvas.isDrawingMode = false;
+      canvas.selection = true;
+      canvas.skipTargetFind = false; // 선택 모드에서는 대상 찾기 활성화
+      canvas.defaultCursor = 'default';
+      canvas.hoverCursor = 'move';
+      canvas.moveCursor = 'move';
+      
+      // 모든 객체를 선택 가능하게 설정
+      canvas.getObjects().forEach(obj => {
+        if (obj.customType === 'droppedImage') {
+          obj.selectable = true;
+          obj.evented = true;
+          obj.hasControls = true;
+          obj.hasBorders = true;
+        }
+      });
+      
+      // 이전 핸들러들 정리
+      Object.values(eraseHandlers.current).forEach(handler => {
+        if (typeof handler === 'function') {
+          canvas.off('mouse:down', handler);
+          canvas.off('mouse:move', handler);
+          canvas.off('mouse:up', handler);
+          canvas.off('mouse:wheel', handler);
+        }
+      });
+      eraseHandlers.current = {};
+      
     } else if (mode === 'pixelErase') {
       canvas.isDrawingMode = true;
       canvas.selection = false;
@@ -562,50 +615,7 @@ export default function Canvas({ width = 800, height = 500, imageUrl = "", stage
     });
   };
 
-  // 선택 모드 토글
-  const toggleSelectionMode = () => {
-    if (!fabricCanvas.current) return;
-    
-    const canvas = fabricCanvas.current;
-    const isSelectionMode = !canvas.isDrawingMode;
-    
-    if (isSelectionMode) {
-      // 그리기 모드로 전환
-      setDrawingMode('draw');
-      applyDrawingMode('draw');
-    } else {
-      // 선택 모드로 전환
-      canvas.isDrawingMode = false;
-      canvas.selection = true;
-      canvas.skipTargetFind = false; // 선택 모드에서는 대상 찾기 활성화
-      canvas.defaultCursor = 'default';
-      canvas.hoverCursor = 'move';
-      canvas.moveCursor = 'move';
-      
-      // 모든 객체를 선택 가능하게 설정
-      canvas.getObjects().forEach(obj => {
-        if (obj.customType === 'droppedImage') {
-          obj.selectable = true;
-          obj.evented = true;
-          obj.hasControls = true;
-          obj.hasBorders = true;
-        }
-      });
-      
-      setDrawingMode('select');
-      
-      // 이전 핸들러들 정리
-      Object.values(eraseHandlers.current).forEach(handler => {
-        if (typeof handler === 'function') {
-          canvas.off('mouse:down', handler);
-          canvas.off('mouse:move', handler);
-          canvas.off('mouse:up', handler);
-          canvas.off('mouse:wheel', handler);
-        }
-      });
-      eraseHandlers.current = {};
-    }
-  };
+  // toggleSelectionMode는 이제 toggleDrawingMode로 대체됨
 
   // 전체 지우기 핸들러
   const handleClearAll = () => {
@@ -734,104 +744,15 @@ export default function Canvas({ width = 800, height = 500, imageUrl = "", stage
       externalStageRef.current.exportDrawnLinesOnly = exportDrawnLinesOnly;
       externalStageRef.current.hasDrawnContent = hasDrawnContent;
       externalStageRef.current.clear = clearCanvas;
+      externalStageRef.current.applyDrawingMode = applyDrawingMode;
+      externalStageRef.current.setDrawingMode = (mode) => {
+        setDrawingMode(mode);
+        applyDrawingMode(mode);
+      };
     }
   }, [externalStageRef]);
 
   return (
-    <div>
-      <div style={{ marginBottom: '10px' }}>
-        <button 
-          onClick={() => toggleDrawingMode('draw')} 
-          style={{ 
-            marginRight: '10px', 
-            backgroundColor: drawingMode === 'draw' ? '#007bff' : '#f8f9fa',
-            color: drawingMode === 'draw' ? 'white' : 'black',
-            border: '1px solid #ccc',
-            padding: '8px 16px',
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
-        >
-          펜
-        </button>
-        <button 
-          onClick={toggleSelectionMode} 
-          style={{ 
-            marginRight: '10px', 
-            backgroundColor: drawingMode === 'select' ? '#17a2b8' : '#f8f9fa',
-            color: drawingMode === 'select' ? 'white' : 'black',
-            border: '1px solid #ccc',
-            padding: '8px 16px',
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
-        >
-          선택/이동
-        </button>
-        <button 
-          onClick={() => toggleDrawingMode('brush')} 
-          style={{ 
-            marginRight: '10px', 
-            backgroundColor: drawingMode === 'brush' ? '#28a745' : '#f8f9fa',
-            color: drawingMode === 'brush' ? 'white' : 'black',
-            border: '1px solid #ccc',
-            padding: '8px 16px',
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
-        >
-          브러시
-        </button>
-        <button 
-          onClick={() => toggleDrawingMode('erase')} 
-          style={{ 
-            marginRight: '10px', 
-            backgroundColor: drawingMode === 'erase' ? '#dc3545' : '#f8f9fa',
-            color: drawingMode === 'erase' ? 'white' : 'black',
-            border: '1px solid #ccc',
-            padding: '8px 16px',
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
-        >
-          선 지우개
-        </button>
-        <button 
-          onClick={() => toggleDrawingMode('pixelErase')} 
-          style={{ 
-            backgroundColor: drawingMode === 'pixelErase' ? '#fd7e14' : '#f8f9fa',
-            color: drawingMode === 'pixelErase' ? 'white' : 'black',
-            border: '1px solid #ccc',
-            padding: '8px 16px',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            marginRight: '10px'
-          }}
-        >
-          픽셀 지우개
-        </button>
-        <button 
-          onClick={() => handleClearAll()} 
-          style={{ 
-            backgroundColor: '#dc3545',
-            color: 'white',
-            border: '1px solid #dc3545',
-            padding: '8px 16px',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontWeight: 'bold'
-          }}
-        >
-          전체 지우기
-        </button>
-      </div>
-      <p>Fabric.js Canvas: 자유 그리기 및 이미지 표시 ({
-        drawingMode === 'draw' ? '펜 모드' : 
-        drawingMode === 'brush' ? '브러시 모드' : 
-        drawingMode === 'erase' ? `선 지우개 모드 (크기: ${eraserSize}px, 휠로 조절)` :
-        drawingMode === 'select' ? '선택/이동 모드 (이미지를 선택하여 이동, 크기 조정, 회전 가능)' :
-        `픽셀 지우개 모드 (크기: ${eraserSize}px, 휠로 조절)`
-      })</p>
       <div 
         style={{ 
           position: 'relative',
@@ -864,6 +785,5 @@ export default function Canvas({ width = 800, height = 500, imageUrl = "", stage
           </div>
         )}
       </div>
-    </div>
   );
 }

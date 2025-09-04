@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from "react";
-import ImageUpload from "./ImageUpload.jsx";
 import client from "../api/client.js";
 
-export default function ImageGallery({ projectId = 1, sceneId = 1, onImageDragStart }) {
+export default function ImageGallery({ onImageDragStart }) {
   const [uploadedImages, setUploadedImages] = useState([]);
   const [loading, setLoading] = useState(false);
 
   // localStorage에서 이미지 목록 로드
   useEffect(() => {
-    const savedImages = localStorage.getItem(`gallery_images_${projectId}_${sceneId}`);
+    const savedImages = localStorage.getItem('gallery_images');
     if (savedImages) {
       try {
         setUploadedImages(JSON.parse(savedImages));
@@ -16,21 +15,28 @@ export default function ImageGallery({ projectId = 1, sceneId = 1, onImageDragSt
         console.error('이미지 목록 로드 실패:', e);
       }
     }
-  }, [projectId, sceneId]);
+  }, []);
 
   // 이미지 목록이 변경될 때 localStorage에 저장
   useEffect(() => {
     if (uploadedImages.length > 0) {
-      localStorage.setItem(`gallery_images_${projectId}_${sceneId}`, JSON.stringify(uploadedImages));
+      localStorage.setItem('gallery_images', JSON.stringify(uploadedImages));
     }
-  }, [uploadedImages, projectId, sceneId]);
+  }, [uploadedImages]);
 
-  const handleUploaded = (webUrl) => {
-    if (webUrl) {
-      setUploadedImages(prev => {
-        // 중복 방지
-        if (prev.includes(webUrl)) return prev;
-        return [...prev, webUrl];
+  const handleFileUpload = (event) => {
+    const files = event.target.files;
+    if (files) {
+      Array.from(files).forEach(file => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const imageUrl = e.target.result;
+          setUploadedImages(prev => {
+            if (prev.includes(imageUrl)) return prev;
+            return [...prev, imageUrl];
+          });
+        };
+        reader.readAsDataURL(file);
       });
     }
   };
@@ -48,9 +54,9 @@ export default function ImageGallery({ projectId = 1, sceneId = 1, onImageDragSt
       const updated = prev.filter((_, index) => index !== indexToRemove);
       // localStorage 업데이트
       if (updated.length > 0) {
-        localStorage.setItem(`gallery_images_${projectId}_${sceneId}`, JSON.stringify(updated));
+        localStorage.setItem('gallery_images', JSON.stringify(updated));
       } else {
-        localStorage.removeItem(`gallery_images_${projectId}_${sceneId}`);
+        localStorage.removeItem('gallery_images');
       }
       return updated;
     });
@@ -69,7 +75,19 @@ export default function ImageGallery({ projectId = 1, sceneId = 1, onImageDragSt
       
       {/* 이미지 업로드 섹션 */}
       <div style={{ marginBottom: '20px' }}>
-        <ImageUpload onUploaded={handleUploaded} />
+        <input
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={handleFileUpload}
+          style={{
+            width: '100%',
+            padding: '8px',
+            border: '1px solid #ddd',
+            borderRadius: '4px',
+            fontSize: '14px'
+          }}
+        />
       </div>
 
       {/* 업로드된 이미지들 */}
