@@ -721,11 +721,13 @@ export default function Canvas({
     const canvas = fabricCanvas.current;
     const objects = canvas.getObjects();
     
-    // path(펜으로 그린 선), drawnDot(브러시 도트), droppedImage(드래그&드롭 이미지)가 있는지 확인
+    // 변환 가능한 모든 콘텐츠 확인
     return objects.some(obj => 
-      obj.type === 'path' || 
-      obj.customType === 'drawnDot' || 
-      obj.customType === 'droppedImage'
+      obj.type === 'path' ||                    // 펜으로 그린 선
+      obj.customType === 'drawnDot' ||         // 브러시 도트
+      obj.customType === 'droppedImage' ||     // 드래그&드롭 이미지
+      obj.customType === 'svgDot' ||           // SVG 도트들
+      obj.type === 'image'                     // 배경 이미지
     );
   };
 
@@ -738,6 +740,38 @@ export default function Canvas({
     canvas.getObjects().forEach(obj => canvas.remove(obj));
     canvas.backgroundColor = '#fafafa';
     canvas.renderAll();
+  };
+
+  // 원본 캔버스 상태 저장 및 복원 기능
+  const saveOriginalCanvasState = () => {
+    if (!fabricCanvas.current) return null;
+    
+    const canvas = fabricCanvas.current;
+    const state = {
+      objects: canvas.toJSON(),
+      timestamp: Date.now()
+    };
+    
+    console.log("원본 캔버스 상태 저장:", state);
+    return state;
+  };
+
+  const restoreOriginalCanvasState = (state) => {
+    if (!fabricCanvas.current || !state) return false;
+    
+    const canvas = fabricCanvas.current;
+    
+    // 현재 캔버스 초기화
+    canvas.clear();
+    canvas.backgroundColor = '#fafafa';
+    
+    // 저장된 상태에서 복원
+    canvas.loadFromJSON(state.objects, () => {
+      canvas.renderAll();
+      console.log("원본 캔버스 상태 복원 완료");
+    });
+    
+    return true;
   };
 
   // 외부에서 사용할 수 있도록 ref에 함수 등록
@@ -753,6 +787,9 @@ export default function Canvas({
         setDrawingMode(mode);
         applyDrawingMode(mode);
       };
+      // 원본 상태 관리 함수 추가
+      externalStageRef.current.saveOriginalCanvasState = saveOriginalCanvasState;
+      externalStageRef.current.restoreOriginalCanvasState = restoreOriginalCanvasState;
     }
   }, [externalStageRef]);
 

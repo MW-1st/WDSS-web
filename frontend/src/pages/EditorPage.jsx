@@ -37,9 +37,12 @@ export default function EditorPage({ projectId = DUMMY }) {
   const [start, setStart] = useState(0);
 
   // 이미지 변환 관련 상태
-  const [imageUrl, setImageUrl] = useState("");
+  const [imageUrl, setImageUrl] = useState(""); // 현재 표시되는 이미지 (변환된 결과)
   const [processing, setProcessing] = useState(false);
   const [targetDots, setTargetDots] = useState(2000);
+  
+  // 원본 캔버스 상태 관리
+  const [originalCanvasState, setOriginalCanvasState] = useState(null);
   const stageRef = useRef(null);
 
   // 캔버스 관련 상태
@@ -92,11 +95,19 @@ export default function EditorPage({ projectId = DUMMY }) {
         const { data: detail } = await client.get(`/projects/${pid}/scenes/${selectedId}`);
         setScenes((prev) => prev.map((s) => (s.id === selectedId ? { ...s, ...detail } : s)));
 
-        // 씬이 변경될 때 해당 씬의 이미지 URL도 업데이트
+        // 씬이 변경될 때 해당 씬의 이미지 URL과 원본 캔버스 상태 업데이트
         if (detail.imageUrl) {
           setImageUrl(detail.imageUrl);
         } else {
           setImageUrl("");
+        }
+        
+        // 원본 캔버스 상태 로드
+        if (detail.originalCanvasState) {
+          setOriginalCanvasState(detail.originalCanvasState);
+          console.log("씬에서 원본 캔버스 상태 로드:", detail.originalCanvasState);
+        } else {
+          setOriginalCanvasState(null);
         }
       } catch (e) {
         console.error(e);
@@ -105,7 +116,7 @@ export default function EditorPage({ projectId = DUMMY }) {
   }, [selectedId, pid, scenes]);
 
   // 저장(디바운스)
-  const saveDebounced = useDebounced(async (scene_id, drones, preview, imageUrl) => {
+  const saveDebounced = useDebounced(async (scene_id, drones, preview, imageUrl, originalCanvasState) => {
     if (!pid) return;
     try {
       const { data: saved } = await client.put(`/projects/${pid}/scenes/${scene_id}`, {
@@ -113,7 +124,8 @@ export default function EditorPage({ projectId = DUMMY }) {
         scene_id,
         drones,
         preview,
-        imageUrl, // 이미지 URL도 저장
+        imageUrl, // 현재 표시되는 이미지 URL
+        originalCanvasState, // 원본 캔버스 상태 저장
       });
       setScenes((prev) => prev.map((s) => (s.id === scene_id ? { ...s, ...saved } : s)));
     } catch (e) {
@@ -124,8 +136,8 @@ export default function EditorPage({ projectId = DUMMY }) {
   // Canvas → 변경 반영
   const handleSceneChange = React.useCallback((id, patch) => {
     setScenes((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
-    saveDebounced(id, patch.data, patch.preview, imageUrl);
-  }, [saveDebounced, imageUrl, setScenes]);
+    saveDebounced(id, patch.data, patch.preview, imageUrl, originalCanvasState);
+  }, [saveDebounced, imageUrl, originalCanvasState, setScenes]);
 
   // + 생성
   const handleAddScene = async () => {
@@ -148,8 +160,9 @@ export default function EditorPage({ projectId = DUMMY }) {
       const nextTotal = nextScenes.length + 1;
       if (nextTotal > VISIBLE) setStart(nextTotal - VISIBLE);
 
-      // 새 씬으로 전환하면서 이미지 URL 초기화
+      // 새 씬으로 전환하면서 상태 초기화
       setImageUrl("");
+      setOriginalCanvasState(null);
     } catch (e) {
       console.error(e);
       alert("씬 생성 실패");
@@ -179,6 +192,7 @@ export default function EditorPage({ projectId = DUMMY }) {
 
 
 
+
   // 이미지 변환 핸들러
   const handleTransform = async () => {
     // 사전 조건 확인: 씬 선택 및 캔버스 준비 여부
@@ -196,29 +210,49 @@ export default function EditorPage({ projectId = DUMMY }) {
     }
     
     console.log("Transform 시작 - pid:", pid, "selectedId:", selectedId);
-    console.log("selectedScene:", selectedScene);
-    console.log("selectedScene.scene_num:", selectedScene?.scene_num);
+    console.log("originalCanvasState:", originalCanvasState);
 
     try {
       setProcessing(true);
       
-      // 캔버스에 펜으로 그린 내용이 있는지 확인
+      // 캔버스에 내용이 있는지 확인
       const hasContent = stageRef.current.hasDrawnContent && stageRef.current.hasDrawnContent();
       
-      if (hasContent) {
-        console.log("캔버스에 그려진 내용이 있어서 캔버스를 변환합니다");
-        // 현재 캔버스 내용을 이미지로 변환
-        const canvasImage = stageRef.current.exportCanvasAsImage();
-        
-        if (!canvasImage) {
-          alert("캔버스 이미지를 생성할 수 없습니다.");
-          setProcessing(false);
-          return;
+      if (!hasContent) {
+        alert("변환할 내용이 없습니다. 먼저 이미지를 추가하거나 그림을 그려주세요.");
+        setProcessing(false);
+        return;
+      }
+
+      // 첫 번째 변환인지 확인 (원본 상태가 없는 경우)
+      if (!originalCanvasState) {
+        console.log("첫 번째 변환: 현재 캔버스 상태를 원본으로 저장");
+        // 현재 캔버스 상태를 원본으로 저장
+        const currentState = stageRef.current.saveOriginalCanvasState();
+        if (currentState) {
+          setOriginalCanvasState(currentState);
         }
-        
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        const img = new Image();
+      } else {
+        console.log("기존 원본 상태로 복원하여 변환");
+        // 원본 상태로 복원
+        stageRef.current.restoreOriginalCanvasState(originalCanvasState);
+        // 잠시 기다려서 복원 완료 후 진행
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
+      // 현재 캔버스 내용을 이미지로 변환 (원본 상태에서)
+      const canvasImage = stageRef.current.exportCanvasAsImage();
+      
+      if (!canvasImage) {
+        alert("캔버스 이미지를 생성할 수 없습니다.");
+        setProcessing(false);
+        return;
+      }
+      
+      console.log("원본 상태에서 캔버스를 변환합니다");
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
         
         img.onload = async () => {
           canvas.width = img.width;
@@ -301,9 +335,9 @@ export default function EditorPage({ projectId = DUMMY }) {
               console.log("최종 이미지 URL:", finalUrl);
               setImageUrl(finalUrl);
               
-              // 변환된 이미지 URL을 현재 씬에 저장
+              // 변환된 이미지 URL과 원본 캔버스 상태를 현재 씬에 저장
               if (selectedId && pid) {
-                saveDebounced(selectedId, selectedScene?.drones, selectedScene?.preview, finalUrl);
+                saveDebounced(selectedId, selectedScene?.drones, selectedScene?.preview, finalUrl, originalCanvasState);
               }
             } catch (e) {
               console.error("Canvas transform error", e);
@@ -328,12 +362,6 @@ export default function EditorPage({ projectId = DUMMY }) {
         };
         
         img.src = canvasImage;
-      } else {
-        console.log("캔버스에 그려진 내용이 없습니다. 먼저 캔버스에 그림을 그리거나 이미지를 추가해주세요.");
-        alert("캔버스에 그려진 내용이 없습니다. 먼저 펜으로 그림을 그리거나 이미지를 드래그&드롭으로 추가해주세요.");
-        setProcessing(false);
-        return;
-      }
 
       // 변환된 이미지 URL을 현재 씬에 저장은 각 분기에서 처리
     } catch (e) {
