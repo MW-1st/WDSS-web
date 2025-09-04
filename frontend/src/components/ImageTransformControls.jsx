@@ -122,6 +122,7 @@ export default function ImageTransformControls({
         </button>
       </div>
 
+
       <button
         onClick={onTransform}
         disabled={processing || !sceneId}

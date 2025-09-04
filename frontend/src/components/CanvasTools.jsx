@@ -1,9 +1,13 @@
 import React from "react";
+import ColorPicker from "./ColorPicker.jsx";
 
-export default function CanvasTools({ 
+const CanvasTools = React.memo(function CanvasTools({ 
   drawingMode = 'draw', 
   eraserSize = 20,
+  drawingColor = '#222222',
   onModeChange,
+  onColorChange,
+  onColorPreview,
   onClearAll 
 }) {
   
@@ -80,6 +84,18 @@ export default function CanvasTools({
         </button>
       </div>
 
+      {/* 색상 선택 */}
+      <div style={{ marginBottom: '12px' }}>
+        <h5 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600' }}>
+          색상 선택
+        </h5>
+        <ColorPicker
+          color={drawingColor}
+          onChange={onColorChange}
+          onPreview={onColorPreview}
+        />
+      </div>
+
       <div style={{ marginBottom: '12px' }}>
         <button 
           onClick={onClearAll}
@@ -103,4 +119,6 @@ export default function CanvasTools({
       </div>
     </div>
   );
-}
+});
+
+export default CanvasTools;
