@@ -721,8 +721,12 @@ export default function Canvas({
     const canvas = fabricCanvas.current;
     const objects = canvas.getObjects();
     
-    // path(펜으로 그린 선)나 drawnDot(브러시 도트)가 있는지 확인
-    return objects.some(obj => obj.type === 'path' || obj.customType === 'drawnDot');
+    // path(펜으로 그린 선), drawnDot(브러시 도트), droppedImage(드래그&드롭 이미지)가 있는지 확인
+    return objects.some(obj => 
+      obj.type === 'path' || 
+      obj.customType === 'drawnDot' || 
+      obj.customType === 'droppedImage'
+    );
   };
 
   // 캔버스 초기화 (모든 객체 제거)
