@@ -112,10 +112,6 @@ export default function CanvasTools({
 
   return (
     <div style={{ padding: "12px 0" }}>
-      <h4 style={{ margin: "0 0 12px 0", fontSize: "16px", fontWeight: 600 }}>
-        캔버스 도구
-      </h4>
-
       <div
         style={{
           display: "flex",
@@ -206,20 +202,9 @@ export default function CanvasTools({
           style={clearButtonStyle}
           title="캔버스의 모든 내용 지우기"
         >
-          전체 지우기
+          <FaRegTrashAlt />
         </button>
       </div>
-
-      <div style={{ fontSize: "12px", color: "#666", lineHeight: 1.4 }}>
-        {drawingMode === "draw" && "모드: 자유곡선을 그립니다."}
-        {drawingMode === "select" && "모드: 객체 클릭 후 이동/크기 조절."}
-        {drawingMode === "brush" && "모드: 브러시로 점을 찍습니다."}
-        {drawingMode === "erase" &&
-          `모드: 선/점을 지웁니다 (크기: ${eraserSize}px).`}
-        {drawingMode === "pixelErase" &&
-          `모드: 배경을 칠합니다 (크기: ${eraserSize}px).`}
-      </div>
-
       <TooltipPortal />
     </div>
   );
