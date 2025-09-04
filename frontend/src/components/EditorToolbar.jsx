@@ -1,4 +1,5 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import ImageTransformControls from "../components/ImageTransformControls.jsx";
 import UnitySimulatorControls from "../components/UnitySimulatorControls.jsx";
 import ImageGallery from "../components/ImageGallery.jsx";
@@ -24,17 +25,37 @@ export default function EditorToolbar({
   eraserSize,
   onModeChange,
   onClearAll,
-  stageRef, // stageRef prop 추가
+  stageRef, // stageRef prop 異붽?
   layout = "full",
 }) {
   const [showGallery, setShowGallery] = React.useState(true);
+  const wrapperRef = React.useRef(null);
+  const [overlayPos, setOverlayPos] = React.useState({ top: 0, left: 0 });
+
+  const updateOverlayPos = React.useCallback(() => {
+    const aside = document.querySelector('aside');
+    if (!wrapperRef.current || !aside) return;
+    const wrapRect = wrapperRef.current.getBoundingClientRect();
+    const asideRect = aside.getBoundingClientRect();
+    setOverlayPos({ top: Math.round(wrapRect.top), left: Math.round(asideRect.right + 12) });
+  }, []);
+
+  React.useEffect(() => {
+    if (!showGallery) return;
+    updateOverlayPos();
+    window.addEventListener("resize", updateOverlayPos);
+    window.addEventListener("scroll", updateOverlayPos, true);
+    return () => {
+      window.removeEventListener("resize", updateOverlayPos);
+      window.removeEventListener("scroll", updateOverlayPos, true);
+    };
+  }, [showGallery, updateOverlayPos]);
   const Inner = () => (
     <>
-      <div style={{ marginBottom: 16 }}>
+      <div ref={wrapperRef} style={{ marginBottom: 16, position: "relative" }}>
         {layout === "sidebar" && (
           <button
             onClick={() => setShowGallery((v) => !v)}
-            title={showGallery ? "이미지 갤러리 닫기" : "이미지 갤러리 열기"}
             style={{
               border: "1px solid #ccc",
               padding: "8px 12px",
@@ -46,15 +67,27 @@ export default function EditorToolbar({
               background: "#f8f9fa",
               marginBottom: 8,
             }}
-            aria-label="이미지 갤러리 토글"
+            aria-label="Image gallery"
           >
             <FaImage />
-            <span style={{ fontSize: 14 }}>
-              {showGallery ? "갤러리 숨기기" : "갤러리 열기"}
-            </span>
           </button>
         )}
-        {showGallery && <ImageGallery onImageDragStart={onImageDragStart} />}
+        {layout === "sidebar"
+          ? showGallery &&
+            createPortal(
+              <div
+                style={{
+                  position: "fixed",
+                  top: overlayPos.top,
+                  left: overlayPos.left,
+                  zIndex: 10000,
+                }}
+              >
+                <ImageGallery onImageDragStart={onImageDragStart} layout="overlay" />
+              </div>,
+              document.body
+            )
+          : showGallery && <ImageGallery onImageDragStart={onImageDragStart} />}
       </div>
 
       <div style={{ marginBottom: 16 }}>
@@ -114,3 +147,4 @@ export default function EditorToolbar({
     </section>
   );
 }
+

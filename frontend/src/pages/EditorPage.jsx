@@ -506,7 +506,7 @@ export default function EditorPage({ projectId = DUMMY }) {
     >
       <aside
         style={{
-          width: 280,
+          width: 100,
           borderRight: "1px solid #eee",
           padding: 16,
           position: "sticky",
