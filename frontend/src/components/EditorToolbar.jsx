@@ -61,14 +61,17 @@ export default function EditorToolbar({
             onClick={() => setShowGallery((v) => !v)}
             style={{
               border: "1px solid #ccc",
-              padding: "8px 12px",
+              padding: "8px 16px",
               borderRadius: 4,
+              cursor: "pointer",
+              marginBottom: 8,
+              fontSize: 16,
               display: "inline-flex",
               alignItems: "center",
-              gap: 8,
-              cursor: "pointer",
+              justifyContent: "center",
+              gap: 6,
               background: "#f8f9fa",
-              marginBottom: 8,
+              color: "black",
             }}
             aria-label="Image gallery"
           >
