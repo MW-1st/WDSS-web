@@ -1,5 +1,5 @@
 import asyncpg
-from app.db.database import get_conn
+from app.db.database import get_db
 from app.db.project import (
     get_projects_by_user_id,
     create_project,
@@ -26,7 +26,7 @@ router = APIRouter()
 @router.get("", response_model=ProjectListResponse, summary="프로젝트 목록 조회")
 async def list_projects(
     current_user: UserResponse = Depends(get_current_user),
-    conn: asyncpg.Connection = Depends(get_conn),
+    conn: asyncpg.Connection = Depends(get_db),
 ):
     """
     현재 로그인한 사용자의 모든 **프로젝트 목록**을 조회합니다.
@@ -44,7 +44,7 @@ async def list_projects(
 async def create_new_project(
     project: ProjectCreate,
     current_user: UserResponse = Depends(get_current_user),
-    # conn: asyncpg.Connection = Depends(get_conn),
+    conn: asyncpg.Connection = Depends(get_db),
 ):
     """
     새로운 **드론쇼 프로젝트**를 생성합니다.
@@ -56,8 +56,7 @@ async def create_new_project(
     - **max_accel**: 드론의 최대 가속도 (m/s²)
     - **min_separation**: 드론 간 최소 안전 이격 거리 (m)
     """
-    async with get_conn() as conn:
-        new_project_record = await create_project(conn, project, current_user.id)
+    new_project_record = await create_project(conn, project, current_user.id)
     return {"success": True, "project": new_project_record}
 
 
@@ -69,7 +68,7 @@ async def create_new_project(
 async def get_project_details(
     project_id: uuid.UUID,
     current_user: UserResponse = Depends(get_current_user),
-    conn: asyncpg.Connection = Depends(get_conn),
+    conn: asyncpg.Connection = Depends(get_db),
 ):
     """
     특정 **프로젝트의 상세 정보**를 조회합니다. 프로젝트에 포함된 씬 목록도 함께 반환됩니다.
@@ -89,7 +88,7 @@ async def update_existing_project(
     project_id: uuid.UUID,
     project_update: ProjectUpdate,
     current_user: UserResponse = Depends(get_current_user),
-    conn: asyncpg.Connection = Depends(get_conn),
+    conn: asyncpg.Connection = Depends(get_db),
 ):
     """
     특정 **프로젝트의 정보**를 수정합니다. 수정하려는 필드만 요청 본문에 포함하여 전송합니다.
@@ -113,7 +112,7 @@ async def update_existing_project(
 async def delete_existing_project(
     project_id: uuid.UUID,
     current_user: UserResponse = Depends(get_current_user),
-    conn: asyncpg.Connection = Depends(get_conn),
+    conn: asyncpg.Connection = Depends(get_db),
 ):
     """
     특정 **프로젝트를 삭제**합니다.
