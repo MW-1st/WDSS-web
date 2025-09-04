@@ -22,15 +22,16 @@ export default function ProjectOwnerRoute({ children }) {
 
       try {
         // 3. API로 프로젝트 정보 요청
-        const { data: project } = await client.get(`/projects/${project_id}`);
+        const { data : {project} } = await client.get(`/projects/${project_id}`);
 
         // 4. 소유자 ID와 현재 사용자 ID 비교
-        if (project.owner_id === user.id) {
+        if (project.user_id === user.id) {
           setIsAuthorized(true);
         } else {
           setIsAuthorized(false);
         }
       } catch (error) {
+        alert("프로젝트를 찾을 수 없거나 권한 확인에 실패했습니다.");
         console.error("Project not found or permission check failed:", error);
         setIsAuthorized(false); // 프로젝트가 없거나 에러 발생 시 권한 없음
       } finally {

@@ -96,8 +96,7 @@ function AppContent() {
         <Route path="/login" element={<PublicRoute> <LoginPage /> </PublicRoute>}/>
         <Route path="/dashboard" element={<PrivateRoute> <DashboardPage /> </PrivateRoute> }/>
         <Route path="/projects" element={<Navigate to="/dashboard" replace />}/>
-        <Route path="/projects/:project_id" element={ <EditorPage />}/>
-        {/*<Route path="/projects/:project_id" element={<ProjectOwnerRoute> <EditorPage /> </ProjectOwnerRoute>}/>*/}
+        <Route path="/projects/:project_id" element={<ProjectOwnerRoute> <EditorPage /> </ProjectOwnerRoute>}/>
       </Routes>
       <div style={unityOverlayStyle}>
         <div style={unityContainerStyle}>
