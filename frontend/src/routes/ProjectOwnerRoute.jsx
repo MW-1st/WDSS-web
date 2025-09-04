@@ -42,10 +42,6 @@ export default function ProjectOwnerRoute({ children }) {
     checkOwnership();
   }, [project_id, user, isAuthenticated]); // 의존성 배열 설정
 
-  // 5. 권한 확인 중일 때 로딩 화면 표시
-  if (isLoading) {
-    return <div>🔄 권한을 확인하고 있습니다...</div>;
-  }
 
   // 6. 권한에 따라 페이지를 보여주거나 리다이렉트
   return isAuthorized ? children : <Navigate to="/dashboard" replace />;
