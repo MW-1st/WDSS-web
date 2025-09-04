@@ -25,7 +25,7 @@ export default function EditorToolbar({
   eraserSize,
   onModeChange,
   onClearAll,
-  stageRef, // stageRef prop 異붽?
+  stageRef, // stageRef prop
   layout = "full",
 }) {
   const [showGallery, setShowGallery] = React.useState(true);
@@ -33,11 +33,14 @@ export default function EditorToolbar({
   const [overlayPos, setOverlayPos] = React.useState({ top: 0, left: 0 });
 
   const updateOverlayPos = React.useCallback(() => {
-    const aside = document.querySelector('aside');
+    const aside = document.querySelector("aside");
     if (!wrapperRef.current || !aside) return;
     const wrapRect = wrapperRef.current.getBoundingClientRect();
     const asideRect = aside.getBoundingClientRect();
-    setOverlayPos({ top: Math.round(wrapRect.top), left: Math.round(asideRect.right + 12) });
+    setOverlayPos({
+      top: Math.round(wrapRect.top),
+      left: Math.round(asideRect.right + 12),
+    });
   }, []);
 
   React.useEffect(() => {
@@ -83,7 +86,10 @@ export default function EditorToolbar({
                   zIndex: 10000,
                 }}
               >
-                <ImageGallery onImageDragStart={onImageDragStart} layout="overlay" />
+                <ImageGallery
+                  onImageDragStart={onImageDragStart}
+                  layout="overlay"
+                />
               </div>,
               document.body
             )
@@ -147,4 +153,3 @@ export default function EditorToolbar({
     </section>
   );
 }
-

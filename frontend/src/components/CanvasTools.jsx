@@ -1,5 +1,6 @@
-import React from "react";
-import { FaPen, FaPaintBrush, FaEraser } from "react-icons/fa";
+import React, { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { FaPen, FaPaintBrush, FaEraser, FaRegTrashAlt } from "react-icons/fa";
 import { PiSelectionPlusBold } from "react-icons/pi";
 
 export default function CanvasTools({
@@ -8,7 +9,52 @@ export default function CanvasTools({
   onModeChange,
   onClearAll,
 }) {
-  const [hovered, setHovered] = React.useState(null);
+  const [hovered, setHovered] = useState(null);
+  const anchorRefs = {
+    draw: useRef(null),
+    select: useRef(null),
+    brush: useRef(null),
+    erase: useRef(null),
+    pixelErase: useRef(null),
+  };
+  const [tooltipPos, setTooltipPos] = useState({ top: 0, left: 0 });
+
+  const getTooltipText = (mode) => {
+    switch (mode) {
+      case "draw":
+        return "그리기: 자유곡선을 그립니다.";
+      case "select":
+        return "선택: 객체 이동/크기 조절.";
+      case "brush":
+        return "브러시: 점을 찍습니다.";
+      case "erase":
+        return "지우개: 선과 점을 지웁니다.";
+      case "pixelErase":
+        return "픽셀 지우개: 배경을 칠합니다.";
+      default:
+        return "";
+    }
+  };
+
+  useEffect(() => {
+    if (!hovered) return;
+    const el = anchorRefs[hovered]?.current;
+    if (!el) return;
+    const update = () => {
+      const r = el.getBoundingClientRect();
+      setTooltipPos({
+        top: Math.round(r.top + r.height / 2),
+        left: Math.round(r.right + 8),
+      });
+    };
+    update();
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
+  }, [hovered]);
 
   const buttonStyle = {
     border: "1px solid #ccc",
@@ -38,26 +84,31 @@ export default function CanvasTools({
     marginRight: 0,
   };
 
-  const Tooltip = ({ children }) => (
-    <div
-      style={{
-        position: "absolute",
-        left: "70px",
-        top: "40%",
-        transform: "translateY(-50%)",
-        background: "#000",
-        color: "#fff",
-        padding: "6px 8px",
-        borderRadius: 6,
-        fontSize: 12,
-        whiteSpace: "nowrap",
-        zIndex: 9999,
-        boxShadow: "0 2px 6px rgba(0,0,0,.2)",
-      }}
-    >
-      {children}
-    </div>
-  );
+  const TooltipPortal = () =>
+    hovered
+      ? createPortal(
+          <div
+            style={{
+              position: "fixed",
+              top: tooltipPos.top,
+              left: tooltipPos.left,
+              transform: "translateY(-50%)",
+              background: "#000",
+              color: "#fff",
+              padding: "6px 8px",
+              borderRadius: 6,
+              fontSize: 12,
+              whiteSpace: "nowrap",
+              zIndex: 9999,
+              boxShadow: "0 2px 6px rgba(0,0,0,.2)",
+              pointerEvents: "none",
+            }}
+          >
+            {getTooltipText(hovered)}
+          </div>,
+          document.body
+        )
+      : null;
 
   return (
     <div style={{ padding: "12px 0" }}>
@@ -73,8 +124,8 @@ export default function CanvasTools({
           marginBottom: "12px",
         }}
       >
-        {/* Draw */}
         <div
+          ref={anchorRefs.draw}
           style={{ position: "relative", display: "inline-flex", zIndex: 1000 }}
           onMouseEnter={() => setHovered("draw")}
           onMouseLeave={() => setHovered(null)}
@@ -86,13 +137,10 @@ export default function CanvasTools({
           >
             <FaPen />
           </button>
-          {hovered === "draw" && (
-            <Tooltip>그리기: 자유곡선을 그립니다.</Tooltip>
-          )}
         </div>
 
-        {/* Select */}
         <div
+          ref={anchorRefs.select}
           style={{ position: "relative", display: "inline-flex", zIndex: 1000 }}
           onMouseEnter={() => setHovered("select")}
           onMouseLeave={() => setHovered(null)}
@@ -104,13 +152,10 @@ export default function CanvasTools({
           >
             <PiSelectionPlusBold />
           </button>
-          {hovered === "select" && (
-            <Tooltip>선택: 객체 이동/크기 조절.</Tooltip>
-          )}
         </div>
 
-        {/* Brush */}
         <div
+          ref={anchorRefs.brush}
           style={{ position: "relative", display: "inline-flex", zIndex: 1000 }}
           onMouseEnter={() => setHovered("brush")}
           onMouseLeave={() => setHovered(null)}
@@ -122,11 +167,10 @@ export default function CanvasTools({
           >
             <FaPaintBrush />
           </button>
-          {hovered === "brush" && <Tooltip>브러시: 점을 찍습니다.</Tooltip>}
         </div>
 
-        {/* Erase (line) */}
         <div
+          ref={anchorRefs.erase}
           style={{ position: "relative", display: "inline-flex", zIndex: 1000 }}
           onMouseEnter={() => setHovered("erase")}
           onMouseLeave={() => setHovered(null)}
@@ -138,13 +182,10 @@ export default function CanvasTools({
           >
             <FaEraser />
           </button>
-          {hovered === "erase" && (
-            <Tooltip>지우개: 선과 점을 지웁니다.</Tooltip>
-          )}
         </div>
 
-        {/* Pixel Erase */}
         <div
+          ref={anchorRefs.pixelErase}
           style={{ position: "relative", display: "inline-flex", zIndex: 1000 }}
           onMouseEnter={() => setHovered("pixelErase")}
           onMouseLeave={() => setHovered(null)}
@@ -156,9 +197,6 @@ export default function CanvasTools({
           >
             <FaEraser />
           </button>
-          {hovered === "pixelErase" && (
-            <Tooltip>픽셀 지우개: 배경을 칠합니다.</Tooltip>
-          )}
         </div>
       </div>
 
@@ -172,13 +210,7 @@ export default function CanvasTools({
         </button>
       </div>
 
-      <div
-        style={{
-          fontSize: "12px",
-          color: "#666",
-          lineHeight: 1.4,
-        }}
-      >
+      <div style={{ fontSize: "12px", color: "#666", lineHeight: 1.4 }}>
         {drawingMode === "draw" && "모드: 자유곡선을 그립니다."}
         {drawingMode === "select" && "모드: 객체 클릭 후 이동/크기 조절."}
         {drawingMode === "brush" && "모드: 브러시로 점을 찍습니다."}
@@ -187,6 +219,8 @@ export default function CanvasTools({
         {drawingMode === "pixelErase" &&
           `모드: 배경을 칠합니다 (크기: ${eraserSize}px).`}
       </div>
+
+      <TooltipPortal />
     </div>
   );
 }
