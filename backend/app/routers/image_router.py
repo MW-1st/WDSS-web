@@ -17,6 +17,9 @@ async def process_uploaded_image(
     target_dots: int | None = None,
     project_id: int | None = None,
     scene_id: int | None = None,
+    color_r: int | None = None,
+    color_g: int | None = None,
+    color_b: int | None = None,
 ):
     """
     변환은 항상 DB에 저장된 원본 이미지 경로를 기준으로 수행합니다.
@@ -30,14 +33,20 @@ async def process_uploaded_image(
     # 1) scene_id가 있으면 DB에서 원본 경로 조회
     if scene_id is not None:
         async with get_conn() as conn:
-            db_path = await conn.fetchval("SELECT s3_key FROM scene WHERE scene_num = $1", scene_id)
+            db_path = await conn.fetchval(
+                "SELECT s3_key FROM scene WHERE scene_num = $1", scene_id
+            )
         if not db_path:
-            raise HTTPException(status_code=404, detail="Original image not found for the scene")
+            raise HTTPException(
+                status_code=404, detail="Original image not found for the scene"
+            )
         if not os.path.isabs(db_path):
             # 상대 경로로 저장된 경우 백엔드 루트 기준으로 보정
             db_path = os.path.join(backend_root, db_path)
         if not os.path.exists(db_path):
-            raise HTTPException(status_code=404, detail="Original image file does not exist on disk")
+            raise HTTPException(
+                status_code=404, detail="Original image file does not exist on disk"
+            )
         input_path = db_path
 
     # 2) scene_id가 없고 업로드 파일이 오면 임시 파일로 처리
@@ -53,7 +62,12 @@ async def process_uploaded_image(
         raise HTTPException(status_code=400, detail="scene_id or file is required")
 
     try:
-        output_path = process_image(input_path, target_dots=target_dots)
+        # RGB 색상 정보를 process_image 함수에 전달
+        color_rgb = None
+        if color_r is not None and color_g is not None and color_b is not None:
+            color_rgb = (color_r, color_g, color_b)
+        
+        output_path = process_image(input_path, target_dots=target_dots, color_rgb=color_rgb)
     finally:
         # 임시 파일 정리 (scene 경로가 아닌 경우)
         if input_path and os.path.dirname(input_path).endswith(os.path.sep + "tmp"):
@@ -134,6 +148,7 @@ async def svg_to_json_endpoint(
 
         # Save JSON with timestamped filename
         from datetime import datetime
+
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         base = os.path.splitext(os.path.basename(file.filename or "import.svg"))[0]
         safe_base = base or "svg"

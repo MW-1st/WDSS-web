@@ -9,6 +9,7 @@ export default function ImageTransformControls({
   imageUrl,
   sceneId = 1,
   layout = "full",
+  stageRef, // stageRef prop 추가
 }) {
   // Local state for smooth slider drag
   const [localDots, setLocalDots] = React.useState(Number(targetDots) || 2000);
@@ -121,9 +122,17 @@ export default function ImageTransformControls({
         </button>
       </div>
 
+
       <button
         onClick={onTransform}
-        disabled={processing}
+        disabled={processing || !sceneId}
+        title={
+          processing
+            ? "변환 중입니다"
+            : !sceneId
+              ? "먼저 씬을 추가/선택해 주세요"
+              : undefined
+        }
         className={`px-4 py-2 rounded text-white ${
           processing ? "!bg-blue-600" : "!bg-blue-600 hover:!bg-blue-700"
         }`}

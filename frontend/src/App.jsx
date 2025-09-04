@@ -11,13 +11,13 @@ import MainPage from "./pages/MainPage.jsx";
 import EditorPage from "./pages/EditorPage.jsx";
 import LoginModal from "./pages/LoginModal.jsx";
 import DashboardPage from "./pages/DashboardPage.jsx";
-import PrivateRoute from "./components/PrivateRoute.jsx";
 import Navbar from "./components/Navbar";
 import { UnityProvider, useUnity } from "./contexts/UnityContext.jsx";
 import { AuthProvider, useAuth } from "./contexts/AuthContext.jsx";
-//임시
-import ProjectStart from "./pages/ProjectStart";
 
+import PrivateRoute from "./routes/PrivateRoute.jsx";
+import PublicRoute from "./routes/PublicRoute.jsx";
+import ProjectOwnerRoute from "./routes/ProjectOwnerRoute.jsx";
 
 function AppContent() {
   const location = useLocation();
@@ -93,30 +93,23 @@ return (
     {/* 메인에서는 전역 Navbar를 숨기고, 다른 페이지에서만 보이게 */}
     {location.pathname !== "/" && <Navbar />}
 
+      <Navbar />
       <Routes location={background || location}>
-      <Route path="/" element={<MainPage />} />
-      <Route path="/editor" element={<EditorPage />} />
-      <Route path="/" element={<ProjectStart />} />
+        <Route path="/" element={<MainPage />} />
+        <Route path="/dashboard" element={<PrivateRoute> <DashboardPage /> </PrivateRoute> }/>
+        <Route path="/projects" element={<Navigate to="/dashboard" replace />}/>
+        <Route path="/projects/:project_id" element={<ProjectOwnerRoute> <EditorPage /> </ProjectOwnerRoute>}/>
          {!background && (
           <Route
             path="/login"
             element={
-              <>
+              <PublicRoute>
                 <MainPage />
                 <LoginModal />
-              </>
+              </PublicRoute>
             }
           />
         )}
-
-        <Route
-          path="/dashboard"
-          element={
-            <PrivateRoute>
-              <DashboardPage />
-            </PrivateRoute>
-          }
-        />
       </Routes>
       {background && (
         <Routes>
