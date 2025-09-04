@@ -16,6 +16,7 @@ export default function CanvasTools({
     brush: useRef(null),
     erase: useRef(null),
     pixelErase: useRef(null),
+    clear: useRef(null),
   };
   const [tooltipPos, setTooltipPos] = useState({ top: 0, left: 0 });
 
@@ -104,7 +105,9 @@ export default function CanvasTools({
               pointerEvents: "none",
             }}
           >
-            {getTooltipText(hovered)}
+            {hovered === "clear"
+              ? "전체 지우기: 캔버스의 모든 내용 삭제."
+              : getTooltipText(hovered)}
           </div>,
           document.body
         )
@@ -197,9 +200,13 @@ export default function CanvasTools({
       </div>
 
       <div style={{ marginBottom: "12px" }}>
-        <button
+        <button ref={anchorRefs.clear}
           onClick={onClearAll}
           style={clearButtonStyle}
+          aria-label="전체 지우기"
+          title="전체 지우기"
+          onMouseEnter={() => setHovered("clear")}
+          onMouseLeave={() => setHovered(null)}
           title="캔버스의 모든 내용 지우기"
         >
           <FaRegTrashAlt />
