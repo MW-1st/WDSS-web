@@ -33,6 +33,7 @@ export default function EditorPage({ projectId = DUMMY }) {
   const {project_id} = useParams();
   const [pid, setPid] = useState(project_id);
   const [scenes, setScenes] = useState([]);
+  const [projectName, setProjectName] = useState("");
   const [selectedId, setSelectedId] = useState(null);
   const [start, setStart] = useState(0);
 
@@ -64,8 +65,24 @@ export default function EditorPage({ projectId = DUMMY }) {
       user_id: null,
     });
     setPid(data.id);
+    setProjectName("Untitled Project");
     return data.id;
   };
+
+  // 초기: 프로젝트가 있으면 목록 로드
+  useEffect(() => {
+    if (!pid) return;
+    // Load project meta (name)
+    (async () => {
+      try {
+        const { data: proj } = await client.get(`/projects/${pid}`);
+        if (proj?.project_name) setProjectName(proj.project_name);
+      } catch (e) {
+        // Leave default if fetch fails
+        console.warn("Failed to load project info", e?.response?.data || e?.message);
+      }
+    })();
+  }, [pid]);
 
   // 초기: 프로젝트가 있으면 목록 로드
   useEffect(() => {
@@ -373,6 +390,34 @@ export default function EditorPage({ projectId = DUMMY }) {
       }
     }
   };
+
+  // Bridge editor controls to navbar via window for project routes
+  useEffect(() => {
+    window.editorAPI = {
+      // state
+      targetDots,
+      processing,
+      imageUrl,
+      selectedId,
+      projectName,
+      // refs & methods
+      stageRef,
+      setTargetDots,
+      handleTransform,
+    };
+    // notify listeners (e.g., Navbar) that editor state changed
+    window.dispatchEvent(
+      new CustomEvent('editor:updated', {
+        detail: {
+          targetDots,
+          processing,
+          imageUrl,
+          selectedId,
+          projectName,
+        },
+      })
+    );
+  }, [targetDots, processing, imageUrl, selectedId, projectName]);
 
   return (
     <div style={{ width: "100%", background: "#fff", display: 'flex', minHeight: '100vh' }}>

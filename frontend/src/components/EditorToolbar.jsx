@@ -54,24 +54,28 @@ export default function EditorToolbar({
         />
       </div>
 
-      <div style={{ marginTop: 16 }}>
-        <ImageTransformControls
-          targetDots={targetDots}
-          setTargetDots={setTargetDots}
-          processing={processing}
-          onTransform={onTransform}
-          imageUrl={imageUrl}
-          sceneId={selectedId}
-          layout={layout}
-          stageRef={stageRef} // stageRef prop 전달
-        />
-      </div>
+      {layout !== "sidebar" && (
+        <>
+          <div style={{ marginTop: 16 }}>
+            <ImageTransformControls
+              targetDots={targetDots}
+              setTargetDots={setTargetDots}
+              processing={processing}
+              onTransform={onTransform}
+              imageUrl={imageUrl}
+              sceneId={selectedId}
+              layout={layout}
+              stageRef={stageRef}
+            />
+          </div>
 
-      <UnitySimulatorControls
-        isUnityVisible={isUnityVisible}
-        showUnity={showUnity}
-        hideUnity={hideUnity}
-      />
+          <UnitySimulatorControls
+            isUnityVisible={isUnityVisible}
+            showUnity={showUnity}
+            hideUnity={hideUnity}
+          />
+        </>
+      )}
     </>
   );
 
