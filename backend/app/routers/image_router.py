@@ -31,7 +31,7 @@ async def process_uploaded_image(
     if scene_id is not None:
         async with get_conn() as conn:
             db_path = await conn.fetchval(
-                "SELECT s3_key FROM scene WHERE id = $1", scene_id
+                "SELECT s3_key FROM scene WHERE scene_num = $1", scene_id
             )
         if not db_path:
             raise HTTPException(

@@ -5,6 +5,9 @@ function MainCanvasSection({
   imageUrl,
   stageRef,
   onChange,
+  drawingMode,
+  eraserSize,
+  onModeChange,
 }) {
   return (
     <section style={{
@@ -35,6 +38,9 @@ function MainCanvasSection({
               onChange={(patch) => onChange(selectedScene.id, patch)}
               imageUrl={imageUrl}
               stageRef={stageRef}
+              drawingMode={drawingMode}
+              eraserSize={eraserSize}
+              onModeChange={onModeChange}
             />
           ) : (
             <div style={{ color: "#666", fontSize: 14 }}>

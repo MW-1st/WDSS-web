@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import Canvas from "../components/Canvas.jsx";
 import EditorToolbar from "../components/EditorToolbar.jsx";
 import MainCanvasSection from "../components/MainCanvasSection.jsx";
 import SceneCarousel from "../components/SceneCarousel.jsx";
+import ImageGallery from "../components/ImageGallery.jsx";
 import client from "../api/client";
 import { useUnity } from "../contexts/UnityContext.jsx";
 import {useParams} from "react-router-dom";
@@ -39,6 +41,10 @@ export default function EditorPage({ projectId = DUMMY }) {
   const [processing, setProcessing] = useState(false);
   const [targetDots, setTargetDots] = useState(2000);
   const stageRef = useRef(null);
+
+  // 캔버스 관련 상태
+  const [drawingMode, setDrawingMode] = useState('draw');
+  const [eraserSize, setEraserSize] = useState(20);
   // const sceneId = 1; // 현재 에디터의 씬 ID (임시 하드코딩)
 
   // unity 관련 상태
@@ -172,14 +178,6 @@ export default function EditorPage({ projectId = DUMMY }) {
   );
 
 
-  // 업로드 완료 핸들러
-  const handleUploaded = (webUrl) => {
-    setImageUrl(webUrl || "");
-    // 현재 선택된 씬에 이미지 URL 저장
-    if (selectedId && pid) {
-      saveDebounced(selectedId, selectedScene?.drones, selectedScene?.preview, webUrl);
-    }
-  };
 
   // 이미지 변환 핸들러
   const handleTransform = async () => {
@@ -188,36 +186,160 @@ export default function EditorPage({ projectId = DUMMY }) {
       alert("먼저 씬을 추가하거나 선택해 주세요.");
       return;
     }
+    if (!pid) {
+      alert("프로젝트 ID가 없습니다. 페이지를 새로고침해 주세요.");
+      return;
+    }
     if (!stageRef.current) {
       alert("캔버스가 아직 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.");
       return;
     }
+    
+    console.log("Transform 시작 - pid:", pid, "selectedId:", selectedId);
+    console.log("selectedScene:", selectedScene);
+    console.log("selectedScene.scene_num:", selectedScene?.scene_num);
 
     try {
       setProcessing(true);
-      const resp = await client.post(
-        `/image/process?target_dots=${encodeURIComponent(
-          targetDots
-        )}&scene_id=${encodeURIComponent(selectedId)}`
-      );
-
-      let outputUrl = resp.data?.output_url || "";
-      if (outputUrl.startsWith("http")) {
-        setImageUrl(outputUrl);
+      
+      // 캔버스에 펜으로 그린 내용이 있는지 확인
+      const hasContent = stageRef.current.hasDrawnContent && stageRef.current.hasDrawnContent();
+      
+      if (hasContent) {
+        console.log("캔버스에 그려진 내용이 있어서 캔버스를 변환합니다");
+        // 현재 캔버스 내용을 이미지로 변환
+        const canvasImage = stageRef.current.exportCanvasAsImage();
+        
+        if (!canvasImage) {
+          alert("캔버스 이미지를 생성할 수 없습니다.");
+          setProcessing(false);
+          return;
+        }
+        
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const img = new Image();
+        
+        img.onload = async () => {
+          canvas.width = img.width;
+          canvas.height = img.height;
+          ctx.drawImage(img, 0, 0);
+          
+          // 캔버스를 blob으로 변환
+          canvas.toBlob(async (blob) => {
+            console.log("Generated blob:", blob);
+            console.log("Blob size:", blob.size);
+            console.log("Blob type:", blob.type);
+            
+            // File 객체로 변환 (ImageUpload와 동일한 방식)
+            const file = new File([blob], 'canvas_drawing.png', { type: 'image/png' });
+            console.log("Created file:", file);
+            
+            const fd = new FormData();
+            fd.append('image', file);
+            
+            try {
+              // 먼저 캔버스 이미지를 업로드
+              console.log("캔버스 이미지를 업로드합니다");
+              console.log("pid:", pid, "selectedId:", selectedId);
+              console.log("pid type:", typeof pid, "selectedId type:", typeof selectedId);
+              console.log("업로드 URL:", `/projects/${pid}/scenes/${selectedId}/upload-image`);
+              
+              // project_id와 scene_id 모두 UUID로 유지
+              const projectId = pid; // UUID 형식 그대로 사용
+              const sceneId = selectedId; // UUID 형식 그대로 사용
+              console.log("Using - projectId (UUID):", projectId, "sceneId (UUID):", sceneId);
+              const uploadResp = await client.post(`/projects/${projectId}/scenes/${sceneId}/upload-image`, fd);
+              const uploadedImagePath = uploadResp.data?.image_url;
+              
+              if (!uploadedImagePath) {
+                alert("캔버스 이미지 업로드에 실패했습니다.");
+                setProcessing(false);
+                return;
+              }
+              
+              console.log("업로드된 이미지:", uploadedImagePath);
+              
+              // 캔버스 이미지를 직접 변환 API로 전달
+              console.log("캔버스 이미지를 직접 변환 API로 전달");
+              const transformFd = new FormData();
+              transformFd.append('file', file);
+              
+              const resp = await client.post(
+                `/image/process?target_dots=${encodeURIComponent(targetDots)}`,
+                transformFd,
+                {
+                  headers: {
+                    'Content-Type': 'multipart/form-data'
+                  }
+                }
+              );
+              let outputUrl = resp.data?.output_url || "";
+              console.log("변환 완료, 서버 응답:", resp.data);
+              console.log("새로운 SVG URL:", outputUrl);
+              
+              if (!outputUrl) {
+                alert("서버에서 변환된 이미지 URL을 받지 못했습니다.");
+                setProcessing(false);
+                return;
+              }
+              
+              // 먼저 캔버스 초기화 (기존 내용 제거)
+              if (stageRef.current && stageRef.current.clear) {
+                stageRef.current.clear();
+              }
+              
+              let finalUrl;
+              if (outputUrl.startsWith("http")) {
+                finalUrl = outputUrl;
+              } else {
+                const base = client.defaults.baseURL?.replace(/\/$/, "") || "";
+                const path = String(outputUrl).replace(/\\/g, "/");
+                finalUrl = `${base}/${path.replace(/^\//, "")}`;
+              }
+              
+              console.log("최종 이미지 URL:", finalUrl);
+              setImageUrl(finalUrl);
+              
+              // 변환된 이미지 URL을 현재 씬에 저장
+              if (selectedId && pid) {
+                saveDebounced(selectedId, selectedScene?.drones, selectedScene?.preview, finalUrl);
+              }
+            } catch (e) {
+              console.error("Canvas transform error", e);
+              console.error("Full error object:", e);
+              console.error("Error response:", e.response);
+              console.error("Error status:", e.response?.status);
+              console.error("Error data:", e.response?.data);
+              console.error("Error headers:", e.response?.headers);
+              console.error("Request URL:", e.config?.url);
+              console.error("Request method:", e.config?.method);
+              console.error("Request data:", e.config?.data);
+              
+              let errorMsg = e.response?.data?.detail || e.response?.data?.message || e.message;
+              if (typeof errorMsg === 'object') {
+                errorMsg = JSON.stringify(errorMsg);
+              }
+              alert(`캔버스 변환 중 오류가 발생했습니다: ${errorMsg}`);
+            } finally {
+              setProcessing(false);
+            }
+          }, 'image/png');
+        };
+        
+        img.src = canvasImage;
       } else {
-        const base = client.defaults.baseURL?.replace(/\/$/, "") || "";
-        const path = String(outputUrl).replace(/\\/g, "/");
-        setImageUrl(`${base}/${path.replace(/^\//, "")}`);
+        console.log("캔버스에 그려진 내용이 없습니다. 먼저 캔버스에 그림을 그리거나 이미지를 추가해주세요.");
+        alert("캔버스에 그려진 내용이 없습니다. 먼저 펜으로 그림을 그리거나 이미지를 드래그&드롭으로 추가해주세요.");
+        setProcessing(false);
+        return;
       }
 
-      // 변환된 이미지 URL을 현재 씬에 저장
-      if (selectedId && pid) {
-        saveDebounced(selectedId, selectedScene?.drones, selectedScene?.preview, outputUrl);
-      }
+      // 변환된 이미지 URL을 현재 씬에 저장은 각 분기에서 처리
     } catch (e) {
       console.error("Transform error", e);
-      alert("이미지 변환 중 오류가 발생했습니다.");
-    } finally {
+      console.error("Error details:", e.response?.data || e.message);
+      alert(`이미지 변환 중 오류가 발생했습니다: ${e.response?.data?.message || e.message}`);
       setProcessing(false);
     }
   };
@@ -234,6 +356,23 @@ export default function EditorPage({ projectId = DUMMY }) {
   };
   const sendButtonStyle = { ...buttonStyle, backgroundColor: "#28a745" };
   const closeButtonStyle = { ...buttonStyle, backgroundColor: "#dc3545" };
+
+  // 캔버스 핸들러 함수들
+  const handleModeChange = (mode) => {
+    setDrawingMode(mode);
+    if (stageRef.current && stageRef.current.setDrawingMode) {
+      stageRef.current.setDrawingMode(mode);
+    }
+  };
+
+  const handleClearAll = () => {
+    if (stageRef.current && stageRef.current.clear) {
+      if (confirm('캔버스의 모든 내용을 지우시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
+        stageRef.current.clear();
+        console.log('캔버스 전체가 초기화되었습니다');
+      }
+    }
+  };
 
   return (
     <div style={{ width: "100%", background: "#fff", display: 'flex', minHeight: '100vh' }}>
@@ -257,11 +396,15 @@ export default function EditorPage({ projectId = DUMMY }) {
           targetDots={targetDots}
           setTargetDots={setTargetDots}
           processing={processing}
-          onUploaded={handleUploaded}
           onTransform={handleTransform}
           isUnityVisible={isUnityVisible}
           showUnity={showUnity}
           hideUnity={hideUnity}
+          onImageDragStart={(imageUrl) => console.log('Image drag started:', imageUrl)}
+          drawingMode={drawingMode}
+          eraserSize={eraserSize}
+          onModeChange={handleModeChange}
+          onClearAll={handleClearAll}
           layout="sidebar"
         />
       </aside>
@@ -269,13 +412,16 @@ export default function EditorPage({ projectId = DUMMY }) {
       {/* 업로드 및 도구 바 */}
       
 
-      {/* 메인 캔버스 */}
-      <MainCanvasSection
-        selectedScene={selectedScene}
-        imageUrl={imageUrl}
-        stageRef={stageRef}
-        onChange={handleSceneChange}
-      />
+        {/* 메인 캔버스 */}
+        <MainCanvasSection
+          selectedScene={selectedScene}
+          imageUrl={imageUrl}
+          stageRef={stageRef}
+          onChange={handleSceneChange}
+          drawingMode={drawingMode}
+          eraserSize={eraserSize}
+          onModeChange={handleModeChange}
+        />
 
       {/* 씬 캐러셀 */}
       <SceneCarousel

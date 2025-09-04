@@ -1,7 +1,8 @@
 import React from "react";
-import ImageUpload from "../components/ImageUpload.jsx";
 import ImageTransformControls from "../components/ImageTransformControls.jsx";
 import UnitySimulatorControls from "../components/UnitySimulatorControls.jsx";
+import ImageGallery from "../components/ImageGallery.jsx";
+import CanvasTools from "../components/CanvasTools.jsx";
 
 export default function EditorToolbar({
   pid,
@@ -10,12 +11,18 @@ export default function EditorToolbar({
   targetDots,
   setTargetDots,
   processing,
-  onUploaded,
   onTransform,
   // Unity props
   isUnityVisible,
   showUnity,
   hideUnity,
+  // ImageGallery props
+  onImageDragStart,
+  // Canvas props
+  drawingMode,
+  eraserSize,
+  onModeChange,
+  onClearAll,
   layout = "full",
 }) {
   const Inner = () => (
@@ -31,11 +38,20 @@ export default function EditorToolbar({
         프로젝트 이름
       </h2>
 
-      <ImageUpload
-        projectId={pid ?? 1}
-        sceneId={selectedId ?? 1}
-        onUploaded={onUploaded}
-      />
+      <div style={{ marginBottom: 16 }}>
+        <ImageGallery
+          onImageDragStart={onImageDragStart}
+        />
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <CanvasTools
+          drawingMode={drawingMode}
+          eraserSize={eraserSize}
+          onModeChange={onModeChange}
+          onClearAll={onClearAll}
+        />
+      </div>
 
       <div style={{ marginTop: 16 }}>
         <ImageTransformControls
