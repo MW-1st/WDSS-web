@@ -7,6 +7,7 @@ import ImageUpload from "../components/ImageUpload.jsx";
 import ImageGallery from "../components/ImageGallery.jsx";
 import client from "../api/client";
 import { useUnity } from "../contexts/UnityContext.jsx";
+import {useParams} from "react-router-dom";
 
 const VISIBLE = 4;
 const THUMB_W = 200;
@@ -17,15 +18,21 @@ const DUMMY = "11111111-1111-1111-1111-111111111111";
 
 function useDebounced(fn, delay = 400) {
   const t = useRef(null);
-  return (...args) => {
+  const fnRef = useRef(fn);
+  useEffect(() => {
+    fnRef.current = fn;
+  }, [fn]);
+  const debounced = React.useCallback((...args) => {
     if (t.current) clearTimeout(t.current);
-    t.current = setTimeout(() => fn(...args), delay);
-  };
+    t.current = setTimeout(() => fnRef.current(...args), delay);
+  }, [delay]);
+  return debounced;
 }
 
 export default function EditorPage({ projectId = DUMMY }) {
   // 프로젝트 및 씬 관리 상태
-  const [pid, setPid] = useState(projectId && projectId !== DUMMY ? projectId : null);
+  const {project_id} = useParams();
+  const [pid, setPid] = useState(project_id);
   const [scenes, setScenes] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [start, setStart] = useState(0);
@@ -62,7 +69,7 @@ export default function EditorPage({ projectId = DUMMY }) {
     if (!pid) return;
     (async () => {
       try {
-        const list = await client.get(`/projects/${pid}/scenes`);
+        const { data: list } = await client.get(`/projects/${pid}/scenes/`);
         setScenes(list.map((s, i) => ({ ...s, name: s.name || `Scene ${s.scene_num ?? i + 1}` })));
         if (list[0]) setSelectedId(list[0].id);
       } catch (e) {
@@ -79,7 +86,7 @@ export default function EditorPage({ projectId = DUMMY }) {
       const current = scenes.find((s) => s.id === selectedId);
       if (!current || "drones" in current) return;
       try {
-        const detail = await client.get(`/projects/${pid}/scenes/${selectedId}`);
+        const { data: detail } = await client.get(`/projects/${pid}/scenes/${selectedId}`);
         setScenes((prev) => prev.map((s) => (s.id === selectedId ? { ...s, ...detail } : s)));
 
         // 씬이 변경될 때 해당 씬의 이미지 URL도 업데이트
@@ -98,7 +105,7 @@ export default function EditorPage({ projectId = DUMMY }) {
   const saveDebounced = useDebounced(async (scene_id, drones, preview, imageUrl) => {
     if (!pid) return;
     try {
-      const saved = await client.put(`/projects/${pid}/scenes/${scene_id}`, {
+      const { data: saved } = await client.put(`/projects/${pid}/scenes/${scene_id}`, {
         project_id: pid,
         scene_id,
         drones,
@@ -112,17 +119,19 @@ export default function EditorPage({ projectId = DUMMY }) {
   }, 500);
 
   // Canvas → 변경 반영
-  const handleSceneChange = (id, patch) => {
+  const handleSceneChange = React.useCallback((id, patch) => {
     setScenes((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
     saveDebounced(id, patch.data, patch.preview, imageUrl);
-  };
+  }, [saveDebounced, imageUrl, setScenes]);
 
   // + 생성
   const handleAddScene = async () => {
     try {
       const projectIdReady = await ensureProjectId();
+      console.log("확인된 Project ID:", projectIdReady);
       const scene_num = scenes.length + 1;
-      const created = await client.post(`/projects/${projectIdReady}/scenes`, {
+      console.log("확인된 scene_num:", scene_num);
+      const { data: created } = await client.post(`/projects/${projectIdReady}/scenes/`, {
         project_id: projectIdReady,
         scene_num,
       });
@@ -130,6 +139,9 @@ export default function EditorPage({ projectId = DUMMY }) {
       const nextScenes = [...scenes, created];
       setScenes(nextScenes);
       setSelectedId(created.id);
+
+      // console.log(`created ${created}`)
+      // console.log(`setSelectedId ${created.id}`)
       const nextTotal = nextScenes.length + 1;
       if (nextTotal > VISIBLE) setStart(nextTotal - VISIBLE);
 
@@ -174,7 +186,15 @@ export default function EditorPage({ projectId = DUMMY }) {
 
   // 이미지 변환 핸들러
   const handleTransform = async () => {
-    if (!stageRef.current || !selectedId) return;
+    // 사전 조건 확인: 씬 선택 및 캔버스 준비 여부
+    if (!selectedId) {
+      alert("먼저 씬을 추가하거나 선택해 주세요.");
+      return;
+    }
+    if (!stageRef.current) {
+      alert("캔버스가 아직 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.");
+      return;
+    }
 
     try {
       setProcessing(true);
@@ -303,19 +323,20 @@ export default function EditorPage({ projectId = DUMMY }) {
   const closeButtonStyle = { ...buttonStyle, backgroundColor: "#dc3545" };
 
   return (
-    <div style={{ width: "100%", background: "#fff", display: "flex" }}>
-      {/* 이미지 갤러리 사이드바 */}
-      <ImageGallery 
-        projectId={pid} 
-        sceneId={selectedId}
-        onImageDragStart={(imageUrl) => {
-          console.log("Image dragged from gallery:", imageUrl);
+    <div style={{ width: "100%", background: "#fff", display: 'flex', minHeight: '100vh' }}>
+      <aside
+        style={{
+          width: 280,
+          borderRight: '1px solid #eee',
+          padding: 16,
+          position: 'sticky',
+          top: 0,
+          alignSelf: 'flex-start',
+          height: '100vh',
+          overflowY: 'auto',
+          background: '#fff',
         }}
-      />
-
-      {/* 메인 에디터 영역 */}
-      <div style={{ flex: 1 }}>
-        {/* 업로드 및 도구 바 */}
+      >
         <EditorToolbar
           pid={pid}
           selectedId={selectedId}
@@ -328,7 +349,12 @@ export default function EditorPage({ projectId = DUMMY }) {
           isUnityVisible={isUnityVisible}
           showUnity={showUnity}
           hideUnity={hideUnity}
+          layout="sidebar"
         />
+      </aside>
+      <div style={{ flex: 1 }}>
+      {/* 업로드 및 도구 바 */}
+      
 
         {/* 메인 캔버스 */}
         <MainCanvasSection
@@ -338,15 +364,15 @@ export default function EditorPage({ projectId = DUMMY }) {
           onChange={handleSceneChange}
         />
 
-        {/* 씬 캐러셀 */}
-        <SceneCarousel
-          scenes={scenes}
-          selectedId={selectedId}
-          start={start}
-          setStart={setStart}
-          onAddScene={handleAddScene}
-          onSelectScene={handleSelect}
-        />
+      {/* 씬 캐러셀 */}
+      <SceneCarousel
+        scenes={scenes}
+        selectedId={selectedId}
+        start={start}
+        setStart={setStart}
+        onAddScene={handleAddScene}
+        onSelectScene={handleSelect}
+      />
       </div>
     </div>
   );

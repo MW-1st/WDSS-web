@@ -6,7 +6,7 @@ const THUMB_H = 120;
 const GAP = 48;
 const BTN_SIZE = 48;
 
-export default function SceneCarousel({
+function SceneCarousel({
   scenes,
   selectedId,
   start,
@@ -141,3 +141,5 @@ export default function SceneCarousel({
     </section>
   );
 }
+
+export default React.memo(SceneCarousel);
