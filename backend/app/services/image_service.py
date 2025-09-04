@@ -12,6 +12,7 @@ def process_image(
     canny_threshold2: int = 200,
     blur_ksize: int = 5,
     blur_sigma: float = 1.4,
+    color_rgb: tuple[int, int, int] | None = None,
 ) -> str:
     """
     입력 이미지 경로를 받아 엣지 픽셀을 일정 간격으로 점 샘플링한 결과 이미지를 생성합니다.
@@ -79,13 +80,29 @@ def process_image(
     out_name = f"processed_{uuid.uuid4().hex}_{dot_count}.svg"
     output_path = os.path.join(out_dir, out_name)
 
+    # 각 점의 실제 이미지 색상을 분석하여 사용
+    circles = []
+    for (x, y) in points:
+        # 해당 위치의 실제 픽셀 색상 추출
+        if y < img.shape[0] and x < img.shape[1]:
+            # BGR 순서로 저장되어 있으므로 RGB로 변환
+            b, g, r = img[int(y), int(x)]
+            actual_color = f"rgb({int(r)}, {int(g)}, {int(b)})"
+        else:
+            # 범위를 벗어난 경우 기본 색상 사용
+            if color_rgb:
+                r, g, b = color_rgb
+                actual_color = f"rgb({r}, {g}, {b})"
+            else:
+                actual_color = "#000"  # 기본 검은색
+        
+        circles.append(f"<circle cx=\"{x}\" cy=\"{y}\" r=\"2\" fill=\"{actual_color}\" />")
+
     # SVG 저장 (비ASCII 경로 호환)
     svg_header = (
         f"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
         f"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{w}\" height=\"{h}\" viewBox=\"0 0 {w} {h}\">\n"
     )
-    # 원한다면 배경을 추가할 수 있음: <rect width="100%" height="100%" fill="white"/>
-    circles = [f"<circle cx=\"{x}\" cy=\"{y}\" r=\"1\" fill=\"#000\" />" for (x, y) in points]
     svg_footer = "\n</svg>\n"
     svg_content = svg_header + ("\n".join(circles)) + svg_footer
 

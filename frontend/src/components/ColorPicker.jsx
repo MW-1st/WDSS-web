@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 
-const ColorPicker = ({ color, onChange, onPreview }) => {
+const ColorPicker = React.memo(function ColorPicker({ color, onChange, onPreview }) {
   const [isOpen, setIsOpen] = useState(false);
   const [previewColor, setPreviewColor] = useState(color);
   const canvasRef = useRef(null);
@@ -82,6 +82,14 @@ const ColorPicker = ({ color, onChange, onPreview }) => {
     return rgbToHsv(r, g, b);
   });
 
+  // 색상이 변경될 때 HSV와 미리보기 색상 동기화
+  useEffect(() => {
+    const [r, g, b] = hexToRgb(color);
+    const newHsv = rgbToHsv(r, g, b);
+    setCurrentHsv(newHsv);
+    setPreviewColor(color);
+  }, [color]);
+
   // Draw saturation/brightness canvas
   const drawSaturationCanvas = useCallback((hue) => {
     const canvas = canvasRef.current;
@@ -124,9 +132,26 @@ const ColorPicker = ({ color, onChange, onPreview }) => {
 
   // Initialize canvases
   useEffect(() => {
-    drawHueCanvas();
-    drawSaturationCanvas(currentHsv[0]);
+    // 컴포넌트가 마운트된 후 즉시 캔버스를 그리도록 setTimeout 사용
+    const timer = setTimeout(() => {
+      drawHueCanvas();
+      drawSaturationCanvas(currentHsv[0]);
+    }, 100);
+    
+    return () => clearTimeout(timer);
   }, [drawHueCanvas, drawSaturationCanvas, currentHsv]);
+
+  // 팔레트가 열릴 때마다 캔버스를 다시 그리기
+  useEffect(() => {
+    if (isOpen) {
+      const timer = setTimeout(() => {
+        drawHueCanvas();
+        drawSaturationCanvas(currentHsv[0]);
+      }, 50);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, drawHueCanvas, drawSaturationCanvas, currentHsv]);
 
   // Handle saturation/brightness canvas interaction
   const handleSaturationMouseMove = useCallback((e) => {
@@ -177,7 +202,7 @@ const ColorPicker = ({ color, onChange, onPreview }) => {
 
   // Mouse event handlers
   useEffect(() => {
-    const handleMouseUp = () => {
+    const handleMouseUp = (e) => {
       setIsDraggingSaturation(false);
       setIsDraggingHue(false);
       // 마우스를 떼도 onChange는 호출하지 않음 - 적용 버튼으로만 선택
@@ -199,9 +224,12 @@ const ColorPicker = ({ color, onChange, onPreview }) => {
     }
   }, [isDraggingSaturation, isDraggingHue, handleSaturationMouseMove, handleHueMouseMove]);
 
-  // Close picker when clicking outside
+  // 외부 클릭 감지로 팔레트 닫기 (드래그 중일 때는 닫지 않음)
   useEffect(() => {
     const handleClickOutside = (event) => {
+      // 드래그 중이면 팔레트를 닫지 않음
+      if (isDraggingSaturation || isDraggingHue) return;
+      
       if (containerRef.current && !containerRef.current.contains(event.target)) {
         setIsOpen(false);
       }
@@ -209,9 +237,13 @@ const ColorPicker = ({ color, onChange, onPreview }) => {
 
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
     }
-  }, [isOpen]);
+  }, [isOpen, isDraggingSaturation, isDraggingHue]);
+
+  
 
   return (
     <div ref={containerRef} style={{ position: 'relative', display: 'inline-block' }}>
@@ -241,17 +273,19 @@ const ColorPicker = ({ color, onChange, onPreview }) => {
 
       {/* Color picker popup */}
       {isOpen && (
-        <div style={{
-          position: 'absolute',
-          top: '35px',
-          left: '0',
-          zIndex: 1000,
-          backgroundColor: 'white',
-          border: '1px solid #ccc',
-          borderRadius: '8px',
-          padding: '12px',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
-        }}>
+        <div 
+          style={{
+            position: 'absolute',
+            top: '35px',
+            left: '0',
+            zIndex: 1000,
+            backgroundColor: 'white',
+            border: '1px solid #ccc',
+            borderRadius: '8px',
+            padding: '12px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+          }}
+        >
           <div style={{ display: 'flex', gap: '8px' }}>
             {/* Saturation/Brightness canvas */}
             <canvas
@@ -263,6 +297,7 @@ const ColorPicker = ({ color, onChange, onPreview }) => {
                 border: '1px solid #ddd'
               }}
               onMouseDown={(e) => {
+                e.stopPropagation();
                 setIsDraggingSaturation(true);
                 handleSaturationMouseMove(e);
               }}
@@ -278,6 +313,7 @@ const ColorPicker = ({ color, onChange, onPreview }) => {
                 border: '1px solid #ddd'
               }}
               onMouseDown={(e) => {
+                e.stopPropagation();
                 setIsDraggingHue(true);
                 handleHueMouseMove(e);
               }}
@@ -357,6 +393,6 @@ const ColorPicker = ({ color, onChange, onPreview }) => {
       )}
     </div>
   );
-};
+});
 
 export default ColorPicker;

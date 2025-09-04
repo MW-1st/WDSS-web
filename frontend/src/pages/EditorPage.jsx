@@ -49,6 +49,13 @@ export default function EditorPage({ projectId = DUMMY }) {
   const [drawingMode, setDrawingMode] = useState('draw');
   const [eraserSize, setEraserSize] = useState(20);
   const [drawingColor, setDrawingColor] = useState('#222222');
+  
+  // 색상이 변경될 때 즉시 캔버스에 반영
+  useEffect(() => {
+    if (stageRef.current && stageRef.current.setDrawingColor) {
+      stageRef.current.setDrawingColor(drawingColor);
+    }
+  }, [drawingColor]);
   // const sceneId = 1; // 현재 에디터의 씬 ID (임시 하드코딩)
 
   // unity 관련 상태
@@ -300,8 +307,24 @@ export default function EditorPage({ projectId = DUMMY }) {
               const transformFd = new FormData();
               transformFd.append('file', file);
               
+              // RGB 색상으로 변환
+              const hexToRgb = (hex) => {
+                const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+                if (result) {
+                  return {
+                    r: parseInt(result[1], 16),
+                    g: parseInt(result[2], 16),
+                    b: parseInt(result[3], 16)
+                  };
+                }
+                return { r: 0, g: 0, b: 0 };
+              };
+              
+              const rgbColor = hexToRgb(drawingColor);
+              console.log("전송할 색상 정보:", rgbColor);
+              
               const resp = await client.post(
-                `/image/process?target_dots=${encodeURIComponent(targetDots)}`,
+                `/image/process?target_dots=${encodeURIComponent(targetDots)}&color_r=${rgbColor.r}&color_g=${rgbColor.g}&color_b=${rgbColor.b}`,
                 transformFd,
                 {
                   headers: {
@@ -329,7 +352,7 @@ export default function EditorPage({ projectId = DUMMY }) {
                 finalUrl = outputUrl;
               } else {
                 const base = client.defaults.baseURL?.replace(/\/$/, "") || "";
-                const path = String(outputUrl).replace(/\\/g, "/");
+                const path = String(outputUrl).replace(/\\\\/g, "/");
                 finalUrl = `${base}/${path.replace(/^\//, "")}`;
               }
               
@@ -387,35 +410,42 @@ export default function EditorPage({ projectId = DUMMY }) {
   const closeButtonStyle = { ...buttonStyle, backgroundColor: "#dc3545" };
 
   // 캔버스 핸들러 함수들
-  const handleModeChange = (mode) => {
+  const handleModeChange = React.useCallback((mode) => {
     setDrawingMode(mode);
     if (stageRef.current && stageRef.current.setDrawingMode) {
       stageRef.current.setDrawingMode(mode);
+      // 모드 변경 후 현재 색상을 다시 설정하여 유지
+      setTimeout(() => {
+        if (stageRef.current && stageRef.current.setDrawingColor) {
+          stageRef.current.setDrawingColor(drawingColor);
+        }
+      }, 20); 
     }
-  };
+  }, [drawingColor]);
 
-  const handleClearAll = () => {
+  const handleClearAll = React.useCallback(() => {
     if (stageRef.current && stageRef.current.clear) {
       if (confirm('캔버스의 모든 내용을 지우시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
         stageRef.current.clear();
         console.log('캔버스 전체가 초기화되었습니다');
       }
     }
-  };
+  }, []);
 
-  const handleColorChange = (color) => {
+  const handleColorChange = React.useCallback((color) => {
     setDrawingColor(color);
     if (stageRef.current && stageRef.current.setDrawingColor) {
       stageRef.current.setDrawingColor(color);
     }
-  };
+  }, []);
 
-  const handleColorPreview = (color) => {
-    // 미리보기용 - 실제 상태는 변경하지 않고 캔버스에만 적용
+  const handleColorPreview = React.useCallback((color) => {
+    // 미리보기 시에도 실제 상태를 변경하여 도구 전환 시에도 색상 유지
+    setDrawingColor(color);
     if (stageRef.current && stageRef.current.setDrawingColor) {
       stageRef.current.setDrawingColor(color);
     }
-  };
+  }, []);
 
   return (
     <div style={{ width: "100%", background: "#fff", display: 'flex', minHeight: '100vh' }}>

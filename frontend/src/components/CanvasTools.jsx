@@ -1,7 +1,7 @@
 import React from "react";
 import ColorPicker from "./ColorPicker.jsx";
 
-export default function CanvasTools({ 
+const CanvasTools = React.memo(function CanvasTools({ 
   drawingMode = 'draw', 
   eraserSize = 20,
   drawingColor = '#222222',
@@ -119,4 +119,6 @@ export default function CanvasTools({
       </div>
     </div>
   );
-}
+});
+
+export default CanvasTools;
