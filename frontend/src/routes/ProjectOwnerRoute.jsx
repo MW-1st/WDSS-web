@@ -22,15 +22,16 @@ export default function ProjectOwnerRoute({ children }) {
 
       try {
         // 3. API로 프로젝트 정보 요청
-        const { data: project } = await client.get(`/projects/${project_id}`);
+        const { data : {project} } = await client.get(`/projects/${project_id}`);
 
         // 4. 소유자 ID와 현재 사용자 ID 비교
-        if (project.owner_id === user.id) {
+        if (project.user_id === user.id) {
           setIsAuthorized(true);
         } else {
           setIsAuthorized(false);
         }
       } catch (error) {
+        alert("프로젝트를 찾을 수 없거나 권한 확인에 실패했습니다.");
         console.error("Project not found or permission check failed:", error);
         setIsAuthorized(false); // 프로젝트가 없거나 에러 발생 시 권한 없음
       } finally {
@@ -41,10 +42,6 @@ export default function ProjectOwnerRoute({ children }) {
     checkOwnership();
   }, [project_id, user, isAuthenticated]); // 의존성 배열 설정
 
-  // 5. 권한 확인 중일 때 로딩 화면 표시
-  if (isLoading) {
-    return <div>🔄 권한을 확인하고 있습니다...</div>;
-  }
 
   // 6. 권한에 따라 페이지를 보여주거나 리다이렉트
   return isAuthorized ? children : <Navigate to="/dashboard" replace />;
