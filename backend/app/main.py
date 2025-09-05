@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from app.routers import auth, image, scenes, websocket, project, image_router
+from app.routers import auth, image, scene, websocket, project, image_router
 from app.db.database import init_db, close_db
 
 app = FastAPI()
@@ -22,7 +22,7 @@ app.include_router(
     image.router, prefix="/projects/{project_id}/scenes/{scene_id}", tags=["image"]
 )
 app.include_router(
-    scenes.router, prefix="/projects/{project_id}/scenes", tags=["scenes"]
+    scene.router, prefix="/projects/{project_id}/scenes", tags=["scenes"]
 )
 
 app.include_router(image_router.router)
