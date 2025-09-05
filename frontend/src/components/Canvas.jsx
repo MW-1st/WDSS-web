@@ -11,6 +11,7 @@ import {
   Circle,
   FabricImage,
   PencilBrush,
+  Rect,
 } from "fabric";
 
 export default function Canvas({
@@ -47,6 +48,16 @@ export default function Canvas({
       perPixelTargetFind: false, // 픽셀 단위 대상 찾기 비활성화
       enableRetinaScaling: false, // 레티나 스케일링 비활성화로 성능 향상
     });
+
+    // 그리기 영역을 캔버스 경계로 제한
+    const clipPath = new Rect({
+      left: 0,
+      top: 0,
+      width: width,
+      height: height,
+      absolutePositioned: true
+    });
+    canvas.clipPath = clipPath;
 
     // 그리기 모드 설정 (성능 최적화)
     canvas.isDrawingMode = true;
@@ -87,7 +98,30 @@ export default function Canvas({
       }
     };
 
+    // 캔버스 경계 표시 (실제 변환될 영역)
+    const addCanvasBoundary = () => {
+      const boundary = new Rect({
+        left: 0,
+        top: 0,
+        width: width,
+        height: height,
+        fill: 'transparent',
+        stroke: '#999',
+        strokeWidth: 1,
+        strokeDashArray: [5, 5],
+        selectable: false,
+        evented: false,
+        excludeFromExport: true,
+        name: 'canvasBoundary'
+      });
+      canvas.add(boundary);
+      canvas.sendObjectToBack(boundary);
+    };
+
     canvas.on('mouse:wheel', handleCanvasZoom);
+    
+    // 캔버스 경계 추가
+    addCanvasBoundary();
 
     return () => {
       canvas.off('mouse:wheel', handleCanvasZoom);
