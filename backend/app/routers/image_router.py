@@ -1,6 +1,6 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from app.services.image_service import process_image
-from app.services.svg_service import svg_to_coords, coords_to_json, get_svg_size
+from app.services.svg_service import svg_to_coords, coords_to_json, get_svg_size, svg_to_coords_with_colors, coords_with_colors_to_json
 import shutil
 import os
 import uuid
@@ -122,10 +122,10 @@ async def svg_to_json_endpoint(
         shutil.copyfileobj(file.file, buffer)
 
     try:
-        coords = svg_to_coords(temp_path)
+        coords_with_colors = svg_to_coords_with_colors(temp_path)
         scene_w, scene_h, scene_z = get_svg_size(temp_path)
-        data = coords_to_json(
-            coords,
+        data = coords_with_colors_to_json(
+            coords_with_colors,
             show_name=show_name,
             max_scene=max_scene,
             max_drone=max_drone,
@@ -140,7 +140,6 @@ async def svg_to_json_endpoint(
             offset_y=offset_y,
             offset_z=offset_z,
             led_intensity=led_intensity,
-            led_rgb=(led_r, led_g, led_b),
             max_speed=max_speed,
             max_accel=max_accel,
             min_separation=min_separation,

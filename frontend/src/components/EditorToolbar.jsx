@@ -1,81 +1,195 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import ImageTransformControls from "../components/ImageTransformControls.jsx";
 import UnitySimulatorControls from "../components/UnitySimulatorControls.jsx";
 import ImageGallery from "../components/ImageGallery.jsx";
 import CanvasTools from "../components/CanvasTools.jsx";
+import { FaImage } from "react-icons/fa";
 
-// Inner 컴포넌트를 EditorToolbar 밖으로 분리하여 불필요한 리렌더링 방지
-const Inner = ({ 
-  onImageDragStart, 
-  drawingMode, 
-  eraserSize, 
-  drawingColor, 
-  onModeChange, 
-  onColorChange, 
-  onColorPreview, 
-  onClearAll, 
-  targetDots, 
-  setTargetDots, 
-  processing, 
-  onTransform, 
-  imageUrl, 
-  selectedId, 
-  layout, 
+// Inner 컴포넌트 분리 + overlay/tooltip 기능 포함
+const Inner = ({
+  onImageDragStart,
+  drawingMode,
+  eraserSize,
+  drawingColor,
+  onModeChange,
+  onColorChange,
+  onColorPreview,
+  onClearAll,
+  targetDots,
+  setTargetDots,
+  processing,
+  onTransform,
+  imageUrl,
+  selectedId,
+  layout,
   stageRef,
   isUnityVisible,
   showUnity,
-  hideUnity
-}) => (
-  <>
-    <h2
-      style={{
-        margin: 0,
-        fontSize: 20,
-        fontWeight: 700,
-        marginBottom: 12,
-      }}
-    >
-      프로젝트 이름
-    </h2>
+  hideUnity,
+}) => {
+  const [showGallery, setShowGallery] = React.useState(true);
+  const wrapperRef = React.useRef(null);
+  const [overlayPos, setOverlayPos] = React.useState({ top: 0, left: 0 });
+  const galleryBtnRef = React.useRef(null);
+  const [galleryHovered, setGalleryHovered] = React.useState(false);
+  const [galleryTooltipPos, setGalleryTooltipPos] = React.useState({
+    top: 0,
+    left: 0,
+  });
 
-    <div style={{ marginBottom: 16 }}>
-      <ImageGallery
-        onImageDragStart={onImageDragStart}
-      />
-    </div>
+  const updateOverlayPos = React.useCallback(() => {
+    const aside = document.querySelector("aside");
+    if (!wrapperRef.current || !aside) return;
+    const wrapRect = wrapperRef.current.getBoundingClientRect();
+    const asideRect = aside.getBoundingClientRect();
+    setOverlayPos({
+      top: Math.round(wrapRect.top),
+      left: Math.round(asideRect.right + 12),
+    });
+  }, []);
 
-    <div style={{ marginBottom: 16 }}>
-      <CanvasTools
-        drawingMode={drawingMode}
-        eraserSize={eraserSize}
-        drawingColor={drawingColor}
-        onModeChange={onModeChange}
-        onColorChange={onColorChange}
-        onColorPreview={onColorPreview}
-        onClearAll={onClearAll}
-      />
-    </div>
+  React.useEffect(() => {
+    if (!showGallery) return;
+    updateOverlayPos();
+    window.addEventListener("resize", updateOverlayPos);
+    window.addEventListener("scroll", updateOverlayPos, true);
+    return () => {
+      window.removeEventListener("resize", updateOverlayPos);
+      window.removeEventListener("scroll", updateOverlayPos, true);
+    };
+  }, [showGallery, updateOverlayPos]);
 
-    <div style={{ marginTop: 16 }}>
-      <ImageTransformControls
-        targetDots={targetDots}
-        setTargetDots={setTargetDots}
-        processing={processing}
-        onTransform={onTransform}
-        imageUrl={imageUrl}
-        sceneId={selectedId}
-        layout={layout}
-        stageRef={stageRef} // stageRef prop 전달
-      />
-    </div>
+  React.useEffect(() => {
+    if (!galleryHovered) return;
+    const el = galleryBtnRef.current;
+    if (!el) return;
+    const update = () => {
+      const r = el.getBoundingClientRect();
+      setGalleryTooltipPos({
+        top: Math.round(r.top + r.height / 2),
+        left: Math.round(r.right + 8),
+      });
+    };
+    update();
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
+  }, [galleryHovered]);
 
-    <UnitySimulatorControls
-      isUnityVisible={isUnityVisible}
-      showUnity={showUnity}
-      hideUnity={hideUnity}
-    />
-  </>
-);
+  const GalleryTooltipPortal = () =>
+    galleryHovered
+      ? createPortal(
+          <div
+            style={{
+              position: "fixed",
+              top: galleryTooltipPos.top,
+              left: galleryTooltipPos.left,
+              transform: "translateY(-50%)",
+              background: "#000",
+              color: "#fff",
+              padding: "6px 8px",
+              borderRadius: 6,
+              fontSize: 12,
+              whiteSpace: "nowrap",
+              zIndex: 9999,
+              boxShadow: "0 2px 6px rgba(0,0,0,.2)",
+              pointerEvents: "none",
+            }}
+          >
+            Image gallery
+          </div>,
+          document.body
+        )
+      : null;
+
+  return (
+    <>
+      <div ref={wrapperRef} style={{ marginBottom: 16, position: "relative" }}>
+        {layout === "sidebar" && (
+          <button
+            ref={galleryBtnRef}
+            onClick={() => setShowGallery((v) => !v)}
+            style={{
+              border: "1px solid #ccc",
+              padding: "8px 16px",
+              borderRadius: 4,
+              cursor: "pointer",
+              marginBottom: 8,
+              fontSize: 16,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              background: "#f8f9fa",
+              color: "black",
+            }}
+            onMouseEnter={() => setGalleryHovered(true)}
+            onMouseLeave={() => setGalleryHovered(false)}
+            aria-label="Image gallery"
+          >
+            <FaImage />
+          </button>
+        )}
+        <GalleryTooltipPortal />
+        {layout === "sidebar"
+          ? showGallery &&
+            createPortal(
+              <div
+                style={{
+                  position: "fixed",
+                  top: overlayPos.top,
+                  left: overlayPos.left,
+                  zIndex: 8000,
+                }}
+              >
+                <ImageGallery onImageDragStart={onImageDragStart} layout="overlay" />
+              </div>,
+              document.body
+            )
+          : showGallery && <ImageGallery onImageDragStart={onImageDragStart} />}
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <CanvasTools
+          drawingMode={drawingMode}
+          eraserSize={eraserSize}
+          drawingColor={drawingColor}
+          onModeChange={onModeChange}
+          onColorChange={onColorChange}
+          onColorPreview={onColorPreview}
+          onClearAll={onClearAll}
+        />
+      </div>
+
+      {layout !== "sidebar" && (
+        <>
+          <div style={{ marginTop: 16 }}>
+            <ImageTransformControls
+              targetDots={targetDots}
+              setTargetDots={setTargetDots}
+              processing={processing}
+              onTransform={onTransform}
+              imageUrl={imageUrl}
+              sceneId={selectedId}
+              layout={layout}
+              stageRef={stageRef}
+            />
+          </div>
+
+          <UnitySimulatorControls
+            isUnityVisible={isUnityVisible}
+            showUnity={showUnity}
+            hideUnity={hideUnity}
+          />
+        </>
+      )}
+    </>
+  );
+};
 
 const EditorToolbar = React.memo(function EditorToolbar(props) {
   const { layout = "full" } = props;
