@@ -6,32 +6,31 @@ import ImageGallery from "../components/ImageGallery.jsx";
 import CanvasTools from "../components/CanvasTools.jsx";
 import { FaImage } from "react-icons/fa";
 
-export default function EditorToolbar({
-  pid,
-  selectedId,
-  imageUrl,
+// Inner 컴포넌트 분리 + overlay/tooltip 기능 포함
+const Inner = ({
+  onImageDragStart,
+  drawingMode,
+  eraserSize,
+  drawingColor,
+  onModeChange,
+  onColorChange,
+  onColorPreview,
+  onClearAll,
   targetDots,
   setTargetDots,
   processing,
   onTransform,
-  // Unity props
+  imageUrl,
+  selectedId,
+  layout,
+  stageRef,
   isUnityVisible,
   showUnity,
   hideUnity,
-  // ImageGallery props
-  onImageDragStart,
-  // Canvas props
-  drawingMode,
-  eraserSize,
-  onModeChange,
-  onClearAll,
-  stageRef, // stageRef prop
-  layout = "full",
-}) {
+}) => {
   const [showGallery, setShowGallery] = React.useState(true);
   const wrapperRef = React.useRef(null);
   const [overlayPos, setOverlayPos] = React.useState({ top: 0, left: 0 });
-  // Gallery tooltip state
   const galleryBtnRef = React.useRef(null);
   const [galleryHovered, setGalleryHovered] = React.useState(false);
   const [galleryTooltipPos, setGalleryTooltipPos] = React.useState({
@@ -61,7 +60,6 @@ export default function EditorToolbar({
     };
   }, [showGallery, updateOverlayPos]);
 
-  // Tooltip position updater for Image Gallery button (match CanvasTools)
   React.useEffect(() => {
     if (!galleryHovered) return;
     const el = galleryBtnRef.current;
@@ -107,7 +105,8 @@ export default function EditorToolbar({
           document.body
         )
       : null;
-  const Inner = () => (
+
+  return (
     <>
       <div ref={wrapperRef} style={{ marginBottom: 16, position: "relative" }}>
         {layout === "sidebar" && (
@@ -147,10 +146,7 @@ export default function EditorToolbar({
                   zIndex: 8000,
                 }}
               >
-                <ImageGallery
-                  onImageDragStart={onImageDragStart}
-                  layout="overlay"
-                />
+                <ImageGallery onImageDragStart={onImageDragStart} layout="overlay" />
               </div>,
               document.body
             )
@@ -161,7 +157,10 @@ export default function EditorToolbar({
         <CanvasTools
           drawingMode={drawingMode}
           eraserSize={eraserSize}
+          drawingColor={drawingColor}
           onModeChange={onModeChange}
+          onColorChange={onColorChange}
+          onColorPreview={onColorPreview}
           onClearAll={onClearAll}
         />
       </div>
@@ -190,11 +189,15 @@ export default function EditorToolbar({
       )}
     </>
   );
+};
+
+const EditorToolbar = React.memo(function EditorToolbar(props) {
+  const { layout = "full" } = props;
 
   if (layout === "sidebar") {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <Inner />
+        <Inner {...props} />
       </div>
     );
   }
@@ -209,8 +212,10 @@ export default function EditorToolbar({
       }}
     >
       <div style={{ width: "70%", maxWidth: 980 }}>
-        <Inner />
+        <Inner {...props} />
       </div>
     </section>
   );
-}
+});
+
+export default EditorToolbar;

@@ -56,6 +56,12 @@ async def get_conn() -> AsyncIterator[asyncpg.Connection]:
         await _pool.release(conn)
 
 
+async def get_db() -> AsyncIterator[asyncpg.Connection]:
+    """Depends가 사용할 수 있도록 get_conn을 감싸는 래퍼 함수"""
+    async with get_conn() as conn:
+        yield conn
+
+
 async def _ensure_schema(conn: asyncpg.Connection) -> None:
     global _schema_ready
     if _schema_ready:

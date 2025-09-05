@@ -1,13 +1,18 @@
+
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { FaPen, FaPaintBrush, FaEraser, FaRegTrashAlt } from "react-icons/fa";
 import { PiSelectionPlusBold } from "react-icons/pi";
+import ColorPicker from "./ColorPicker.jsx";
+const CanvasTools = React.memo(function CanvasTools({ 
+  drawingMode = 'draw', 
 
-export default function CanvasTools({
-  drawingMode = "draw",
   eraserSize = 20,
+  drawingColor = '#222222',
   onModeChange,
   onClearAll,
+  onColorChange,
+  onColorPreview,
 }) {
   const [hovered, setHovered] = useState(null);
   const anchorRefs = {
@@ -199,6 +204,19 @@ export default function CanvasTools({
         </div>
       </div>
 
+      {/* 색상 선택 */}
+      <div style={{ marginBottom: '12px' }}>
+        <h5 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600' }}>
+          색상 선택
+        </h5>
+        <ColorPicker
+          color={drawingColor}
+          onChange={onColorChange}
+          onPreview={onColorPreview}
+        />
+      </div>
+
+      {/* 전체 지우기 버튼 */}
       <div style={{ marginBottom: "12px" }}>
         <button
           ref={anchorRefs.clear}
@@ -216,3 +234,6 @@ export default function CanvasTools({
     </div>
   );
 }
+
+export default CanvasTools;
+
