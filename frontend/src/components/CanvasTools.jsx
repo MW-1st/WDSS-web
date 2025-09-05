@@ -233,7 +233,7 @@ const CanvasTools = React.memo(function CanvasTools({
       <TooltipPortal />
     </div>
   );
-}
+});
 
 export default CanvasTools;
 
