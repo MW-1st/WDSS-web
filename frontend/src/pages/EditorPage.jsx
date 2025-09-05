@@ -4,6 +4,7 @@ import EditorToolbar from "../components/EditorToolbar.jsx";
 import MainCanvasSection from "../components/MainCanvasSection.jsx";
 import SceneCarousel from "../components/SceneCarousel.jsx";
 import ImageGallery from "../components/ImageGallery.jsx";
+import LayerPanel from "../components/LayerPanel.jsx";
 import client from "../api/client";
 import { useUnity } from "../contexts/UnityContext.jsx";
 import { useParams } from "react-router-dom";
@@ -54,12 +55,73 @@ export default function EditorPage({ projectId = DUMMY }) {
   const [eraserSize, setEraserSize] = useState(20);
   const [drawingColor, setDrawingColor] = useState('#222222');
   
+  // 레이어 관련 상태
+  const [canvasReady, setCanvasReady] = useState(false);
+  const [layersState, setLayersState] = useState([]);
+  const [activeLayerIdState, setActiveLayerIdState] = useState(null);
+  const [selectedObjectLayerId, setSelectedObjectLayerId] = useState(null);
+  
+  // 레이어 상태를 업데이트하는 함수
+  const updateLayerState = React.useCallback(() => {
+    if (stageRef.current && stageRef.current.layers) {
+      try {
+        const layers = stageRef.current.layers.getLayers() || [];
+        const activeId = stageRef.current.layers.getActiveLayerId();
+        setLayersState([...layers]); // 새로운 배열로 복사하여 리렌더링 보장
+        setActiveLayerIdState(activeId);
+      } catch (error) {
+        console.warn('Error updating layer state:', error);
+      }
+    }
+  }, []);
+
   // 색상이 변경될 때 즉시 캔버스에 반영
   useEffect(() => {
     if (stageRef.current && stageRef.current.setDrawingColor) {
       stageRef.current.setDrawingColor(drawingColor);
     }
   }, [drawingColor]);
+
+  // Canvas 준비 상태 확인
+  useEffect(() => {
+    const checkCanvasReady = () => {
+      if (stageRef.current && stageRef.current.layers) {
+        setCanvasReady(true);
+        updateLayerState();
+        
+        // 캔버스 선택 이벤트 리스너 추가
+        const canvas = stageRef.current;
+        const handleSelectionChanged = () => {
+          // 선택된 객체의 레이어 ID 가져오기
+          const activeObject = canvas.getActiveObject();
+          if (activeObject && activeObject.layerId) {
+            setSelectedObjectLayerId(activeObject.layerId);
+          } else {
+            setSelectedObjectLayerId(null);
+          }
+        };
+        
+        canvas.on('selection:created', handleSelectionChanged);
+        canvas.on('selection:updated', handleSelectionChanged);
+        canvas.on('selection:cleared', () => setSelectedObjectLayerId(null));
+        
+        // cleanup 함수 반환
+        return () => {
+          if (canvas) {
+            canvas.off('selection:created', handleSelectionChanged);
+            canvas.off('selection:updated', handleSelectionChanged);
+            canvas.off('selection:cleared');
+          }
+        };
+      } else {
+        // Canvas가 준비되지 않았으면 잠시 후 다시 확인
+        setTimeout(checkCanvasReady, 100);
+      }
+    };
+    
+    const cleanup = checkCanvasReady();
+    return cleanup;
+  }, [updateLayerState]);
   // const sceneId = 1; // 현재 에디터의 씬 ID (임시 하드코딩)
 
   // unity 관련 상태
@@ -519,6 +581,74 @@ export default function EditorPage({ projectId = DUMMY }) {
     }
   }, []);
 
+  // 레이어 관련 핸들러들
+  const handleLayerSelect = React.useCallback((layerId) => {
+    if (stageRef.current && stageRef.current.layers) {
+      stageRef.current.layers.setActiveLayer(layerId);
+      updateLayerState();
+    }
+  }, [updateLayerState]);
+
+  const handleCreateLayer = React.useCallback(() => {
+    if (stageRef.current && stageRef.current.layers) {
+      const layerName = prompt('새 레이어 이름을 입력하세요:', `레이어 ${Date.now().toString().slice(-4)}`);
+      if (layerName) {
+        stageRef.current.layers.createLayer(layerName);
+        updateLayerState();
+      }
+    }
+  }, [updateLayerState]);
+
+  const handleDeleteLayer = React.useCallback((layerId) => {
+    if (stageRef.current && stageRef.current.layers) {
+      stageRef.current.layers.deleteLayer(layerId);
+      updateLayerState();
+    }
+  }, [updateLayerState]);
+
+  const handleToggleVisibility = React.useCallback((layerId) => {
+    if (stageRef.current && stageRef.current.layers) {
+      stageRef.current.layers.toggleVisibility(layerId);
+      updateLayerState();
+    }
+  }, [updateLayerState]);
+
+  const handleToggleLock = React.useCallback((layerId) => {
+    if (stageRef.current && stageRef.current.layers) {
+      stageRef.current.layers.toggleLock(layerId);
+      updateLayerState();
+    }
+  }, [updateLayerState]);
+
+  const handleRenameLayer = React.useCallback((layerId, newName) => {
+    if (stageRef.current && stageRef.current.layers) {
+      stageRef.current.layers.renameLayer(layerId, newName);
+      updateLayerState();
+    }
+  }, [updateLayerState]);
+
+  const handleMoveLayer = React.useCallback((layerId, direction) => {
+    if (stageRef.current && stageRef.current.layers) {
+      stageRef.current.layers.moveLayer(layerId, direction);
+      updateLayerState();
+    }
+  }, [updateLayerState]);
+
+  const handleBringToFront = React.useCallback((layerId) => {
+    if (stageRef.current && stageRef.current.layers) {
+      stageRef.current.layers.bringToFront(layerId);
+      updateLayerState();
+    }
+  }, [updateLayerState]);
+
+  const handleSendToBack = React.useCallback((layerId) => {
+    if (stageRef.current && stageRef.current.layers) {
+      stageRef.current.layers.sendToBack(layerId);
+      updateLayerState();
+    }
+  }, [updateLayerState]);
+
+
   // Bridge editor controls to navbar via window for project routes
   useEffect(() => {
     window.editorAPI = {
@@ -619,6 +749,40 @@ export default function EditorPage({ projectId = DUMMY }) {
           onSelectScene={handleSelect}
         />
       </div>
+      <aside
+        style={{
+          width: 300,
+          borderLeft: "1px solid #eee",
+          padding: 16,
+          position: "sticky",
+          top: 0,
+          alignSelf: "flex-start",
+          height: "100vh",
+          overflowY: "auto",
+          background: "#fff",
+        }}
+      >
+        {canvasReady ? (
+          <LayerPanel
+            layers={layersState}
+            activeLayerId={activeLayerIdState}
+            selectedObjectLayerId={selectedObjectLayerId}
+            onLayerSelect={handleLayerSelect}
+            onCreateLayer={handleCreateLayer}
+            onDeleteLayer={handleDeleteLayer}
+            onToggleVisibility={handleToggleVisibility}
+            onToggleLock={handleToggleLock}
+            onRenameLayer={handleRenameLayer}
+            onMoveLayer={handleMoveLayer}
+            onBringToFront={handleBringToFront}
+            onSendToBack={handleSendToBack}
+          />
+        ) : (
+          <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+            캔버스 준비 중...
+          </div>
+        )}
+      </aside>
     </div>
   );
 }

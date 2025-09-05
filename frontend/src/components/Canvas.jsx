@@ -13,6 +13,8 @@ import {
   PencilBrush,
   Rect,
 } from "fabric";
+import useLayers from "../hooks/useLayers";
+import * as fabricLayerUtils from "../utils/fabricLayerUtils";
 
 export default function Canvas({
   width = 800,
@@ -32,6 +34,24 @@ export default function Canvas({
   const [drawingColor, setDrawingColor] = useState(externalDrawingColor);
   const eraseHandlers = useRef({});
   const [isDragOver, setIsDragOver] = useState(false);
+
+  // 레이어 관리 훅
+  const {
+    layers,
+    activeLayerId,
+    setActiveLayerId,
+    createLayer,
+    deleteLayer,
+    toggleLayerVisibility,
+    toggleLayerLock,
+    renameLayer,
+    moveLayer,
+    bringToFront,
+    sendToBack,
+    getActiveLayer,
+    getLayer,
+    getSortedLayers
+  } = useLayers();
 
   // Use useLayoutEffect to initialize the canvas
   useLayoutEffect(() => {
@@ -227,11 +247,23 @@ export default function Canvas({
       }
     };
 
+    // 패스 생성 이벤트 리스너 (그리기 모드에서 레이어 정보 할당)
+    const handlePathCreated = (e) => {
+      const path = e.path;
+      if (path) {
+        const activeLayer = getActiveLayer();
+        if (activeLayer) {
+          fabricLayerUtils.assignObjectToLayer(path, activeLayer.id, activeLayer.name);
+        }
+      }
+    };
+
     // 이벤트 리스너 등록
     canvas.on('mouse:wheel', handleCanvasZoom);
     canvas.on('mouse:down', handleMouseDown);
     canvas.on('mouse:move', handleMouseMove);
     canvas.on('mouse:up', handleMouseUp);
+    canvas.on('path:created', handlePathCreated);
     
     document.addEventListener('keydown', handleKeyDown, { capture: true });
     document.addEventListener('keyup', handleKeyUp, { capture: true });
@@ -244,6 +276,7 @@ export default function Canvas({
       canvas.off('mouse:down', handleMouseDown);
       canvas.off('mouse:move', handleMouseMove);
       canvas.off('mouse:up', handleMouseUp);
+      canvas.off('path:created', handlePathCreated);
       document.removeEventListener('keydown', handleKeyDown, { capture: true });
       document.removeEventListener('keyup', handleKeyUp, { capture: true });
       canvas.dispose();
@@ -315,6 +348,12 @@ export default function Canvas({
               hoverCursor: 'crosshair',
               moveCursor: 'crosshair'
             });
+
+            // SVG 도트는 배경 레이어에 할당
+            const backgroundLayer = getLayer('background');
+            if (backgroundLayer) {
+              fabricLayerUtils.assignObjectToLayer(fabricCircle, backgroundLayer.id, backgroundLayer.name);
+            }
 
             canvas.add(fabricCircle);
             addedCount++;
@@ -488,6 +527,7 @@ export default function Canvas({
 
       const drawDotAtPoint = (e) => {
         const pointer = canvas.getPointer(e.e);
+        const activeLayer = getActiveLayer();
 
         // 새로운 도트 생성 (SVG circle과 같은 크기 2px 사용)
         const dotRadius = 1;
@@ -503,6 +543,11 @@ export default function Canvas({
           hoverCursor: 'crosshair',
           moveCursor: 'crosshair'
         });
+
+        // 레이어 정보 할당
+        if (activeLayer) {
+          fabricLayerUtils.assignObjectToLayer(newDot, activeLayer.id, activeLayer.name);
+        }
 
         canvas.add(newDot);
         canvas.renderAll();
@@ -862,6 +907,12 @@ export default function Canvas({
           centeredRotation: true,
         });
 
+        // 드롭된 이미지는 활성 레이어에 할당
+        const activeLayer = getActiveLayer();
+        if (activeLayer) {
+          fabricLayerUtils.assignObjectToLayer(img, activeLayer.id, activeLayer.name);
+        }
+
         canvas.add(img);
         canvas.setActiveObject(img);
         canvas.renderAll();
@@ -1067,6 +1118,55 @@ export default function Canvas({
   };
 
 
+  // 레이어 가시성 제어 함수
+  const handleLayerVisibilityChange = useCallback((layerId) => {
+    if (fabricCanvas.current) {
+      const layer = getLayer(layerId);
+      if (layer) {
+        fabricLayerUtils.setLayerVisibility(fabricCanvas.current, layerId, !layer.visible);
+        toggleLayerVisibility(layerId);
+      }
+    }
+  }, [getLayer, toggleLayerVisibility]);
+
+  // 레이어 잠금 제어 함수
+  const handleLayerLockChange = useCallback((layerId) => {
+    if (fabricCanvas.current) {
+      const layer = getLayer(layerId);
+      if (layer) {
+        fabricLayerUtils.setLayerLock(fabricCanvas.current, layerId, !layer.locked);
+        toggleLayerLock(layerId);
+      }
+    }
+  }, [getLayer, toggleLayerLock]);
+
+  // 레이어 순서 변경 함수
+  const handleLayerMove = useCallback((layerId, direction) => {
+    if (fabricCanvas.current) {
+      if (direction === 'up') {
+        fabricLayerUtils.bringLayerForward(fabricCanvas.current, layerId);
+      } else {
+        fabricLayerUtils.sendLayerBackwards(fabricCanvas.current, layerId);
+      }
+      moveLayer(layerId, direction);
+    }
+  }, [moveLayer]);
+
+  // 레이어를 맨 앞/뒤로 이동
+  const handleBringToFront = useCallback((layerId) => {
+    if (fabricCanvas.current) {
+      fabricLayerUtils.bringLayerToFront(fabricCanvas.current, layerId);
+      bringToFront(layerId);
+    }
+  }, [bringToFront]);
+
+  const handleSendToBack = useCallback((layerId) => {
+    if (fabricCanvas.current) {
+      fabricLayerUtils.sendLayerToBack(fabricCanvas.current, layerId);
+      sendToBack(layerId);
+    }
+  }, [sendToBack]);
+
   // 외부에서 사용할 수 있도록 ref에 함수 등록
   useEffect(() => {
     if (externalStageRef && externalStageRef.current) {
@@ -1095,8 +1195,25 @@ export default function Canvas({
       // 원본 상태 관리 함수 추가
       externalStageRef.current.saveOriginalCanvasState = saveOriginalCanvasState;
       externalStageRef.current.restoreOriginalCanvasState = restoreOriginalCanvasState;
+      
+      // 레이어 관리 함수들 추가
+      externalStageRef.current.layers = {
+        getLayers: getSortedLayers,
+        getActiveLayerId: () => activeLayerId,
+        setActiveLayer: setActiveLayerId,
+        createLayer,
+        deleteLayer,
+        renameLayer,
+        toggleVisibility: handleLayerVisibilityChange,
+        toggleLock: handleLayerLockChange,
+        moveLayer: handleLayerMove,
+        bringToFront: handleBringToFront,
+        sendToBack: handleSendToBack
+      };
     }
-  }, [externalStageRef]); // drawingColor는 의존성에서 제거하여 무한 루프 방지
+  }, [externalStageRef, getSortedLayers, activeLayerId, setActiveLayerId, createLayer, 
+      deleteLayer, renameLayer, handleLayerVisibilityChange, handleLayerLockChange, 
+      handleLayerMove, handleBringToFront, handleSendToBack]); // drawingColor는 의존성에서 제거하여 무한 루프 방지
 
   return (
     <div

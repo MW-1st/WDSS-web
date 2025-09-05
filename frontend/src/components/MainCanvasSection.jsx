@@ -32,7 +32,6 @@ function MainCanvasSection({
         >
           {selectedScene ? (
             <Canvas
-              key={selectedScene.id}
               scene={selectedScene}
               width={1200}
               height={675}
