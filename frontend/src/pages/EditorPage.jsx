@@ -4,6 +4,7 @@ import EditorToolbar from "../components/EditorToolbar.jsx";
 import MainCanvasSection from "../components/MainCanvasSection.jsx";
 import SceneCarousel from "../components/SceneCarousel.jsx";
 import ImageGallery from "../components/ImageGallery.jsx";
+import ObjectPropertiesPanel from "../components/ObjectPropertiesPanel.jsx";
 import client from "../api/client";
 import { useUnity } from "../contexts/UnityContext.jsx";
 import { useParams } from "react-router-dom";
@@ -53,6 +54,7 @@ export default function EditorPage({ projectId = DUMMY }) {
   const [drawingMode, setDrawingMode] = useState("draw");
   const [eraserSize, setEraserSize] = useState(20);
   const [drawingColor, setDrawingColor] = useState('#222222');
+  const [selectedObject, setSelectedObject] = useState(null);
   
   // 색상이 변경될 때 즉시 캔버스에 반영
   useEffect(() => {
@@ -519,6 +521,20 @@ export default function EditorPage({ projectId = DUMMY }) {
     }
   }, []);
 
+  // Change selected circle fill color
+  const handleSelectedFillChange = React.useCallback((hex) => {
+    const canvas = stageRef.current;
+    if (!canvas) return;
+    const active = canvas.getActiveObject && canvas.getActiveObject();
+    if (!active) return;
+    if (active.customType === 'svgDot' || active.customType === 'drawnDot' || active.type === 'circle') {
+      active.set({ fill: hex, originalFill: hex });
+      canvas.renderAll && canvas.renderAll();
+      // reflect to panel state
+      setSelectedObject((prev) => prev ? { ...prev, fill: hex } : prev);
+    }
+  }, []);
+
   // Bridge editor controls to navbar via window for project routes
   useEffect(() => {
     window.editorAPI = {
@@ -607,6 +623,7 @@ export default function EditorPage({ projectId = DUMMY }) {
           eraserSize={eraserSize}
           drawingColor={drawingColor}
           onModeChange={handleModeChange}
+          onSelectionChange={setSelectedObject}
         />
 
         {/* 씬 캐러셀 */}
@@ -619,6 +636,24 @@ export default function EditorPage({ projectId = DUMMY }) {
           onSelectScene={handleSelect}
         />
       </div>
+      <aside
+        style={{
+          width: 260,
+          borderLeft: "1px solid #eee",
+          padding: 16,
+          position: "sticky",
+          top: 0,
+          alignSelf: "flex-start",
+          height: "100vh",
+          overflowY: "auto",
+          background: "#fff",
+        }}
+      >
+        <ObjectPropertiesPanel
+          selection={selectedObject}
+          onChangeFill={handleSelectedFillChange}
+        />
+      </aside>
     </div>
   );
 }
