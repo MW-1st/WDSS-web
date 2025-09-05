@@ -200,11 +200,11 @@ export default function CanvasTools({
       </div>
 
       <div style={{ marginBottom: "12px" }}>
-        <button ref={anchorRefs.clear}
+        <button
+          ref={anchorRefs.clear}
           onClick={onClearAll}
           style={clearButtonStyle}
           aria-label="전체 지우기"
-          title="전체 지우기"
           onMouseEnter={() => setHovered("clear")}
           onMouseLeave={() => setHovered(null)}
           title="캔버스의 모든 내용 지우기"

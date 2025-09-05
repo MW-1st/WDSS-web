@@ -34,7 +34,10 @@ export default function EditorToolbar({
   // Gallery tooltip state
   const galleryBtnRef = React.useRef(null);
   const [galleryHovered, setGalleryHovered] = React.useState(false);
-  const [galleryTooltipPos, setGalleryTooltipPos] = React.useState({ top: 0, left: 0 });
+  const [galleryTooltipPos, setGalleryTooltipPos] = React.useState({
+    top: 0,
+    left: 0,
+  });
 
   const updateOverlayPos = React.useCallback(() => {
     const aside = document.querySelector("aside");
@@ -141,7 +144,7 @@ export default function EditorToolbar({
                   position: "fixed",
                   top: overlayPos.top,
                   left: overlayPos.left,
-                  zIndex: 10000,
+                  zIndex: 8000,
                 }}
               >
                 <ImageGallery
