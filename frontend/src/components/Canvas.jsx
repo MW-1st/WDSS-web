@@ -118,13 +118,134 @@ export default function Canvas({
       canvas.sendObjectToBack(boundary);
     };
 
+    // 팬 모드 구현 (안전하게)
+    let isPanMode = false;
+    let isPanning = false;
+    let lastPosX, lastPosY;
+    let originalDrawingMode = false;
+    let originalSelection = false;
+
+    const enterPanMode = () => {
+      if (isPanMode) return;
+      
+      // 현재 상태 저장
+      originalDrawingMode = canvas.isDrawingMode;
+      originalSelection = canvas.selection;
+      
+      // 팬 모드로 전환
+      isPanMode = true;
+      canvas.isDrawingMode = false;
+      canvas.selection = false;
+      canvas.defaultCursor = 'grab';
+      canvas.hoverCursor = 'grab';
+      canvas.moveCursor = 'grab';
+      canvas.setCursor('grab');
+      
+      // 모든 객체를 선택 불가능하게 설정
+      canvas.getObjects().forEach(obj => {
+        obj.selectable = false;
+        obj.evented = false;
+      });
+    };
+
+    const exitPanMode = () => {
+      if (!isPanMode) return;
+      
+      isPanMode = false;
+      isPanning = false;
+      
+      // 원래 상태 복원
+      canvas.isDrawingMode = originalDrawingMode;
+      canvas.selection = originalSelection;
+      canvas.defaultCursor = 'default';
+      canvas.hoverCursor = 'move';
+      canvas.moveCursor = 'move';
+      canvas.setCursor('default');
+      
+      // 객체들을 다시 활성화 (드롭된 이미지만)
+      canvas.getObjects().forEach(obj => {
+        if (obj.customType === 'droppedImage') {
+          obj.selectable = true;
+          obj.evented = true;
+        }
+      });
+    };
+
+    const handleKeyDown = (e) => {
+      if (e.code === 'Space') {
+        e.preventDefault(); // 브라우저 기본 스크롤 방지
+        e.stopPropagation(); // 이벤트 전파 중단
+        
+        if (!isPanMode) {
+          enterPanMode();
+        }
+      }
+    };
+
+    const handleKeyUp = (e) => {
+      if (e.code === 'Space') {
+        e.preventDefault(); // 브라우저 기본 스크롤 방지
+        e.stopPropagation(); // 이벤트 전파 중단
+        
+        if (isPanMode) {
+          exitPanMode();
+        }
+      }
+    };
+
+    const handleMouseDown = (opt) => {
+      if (isPanMode && !isPanning) {
+        isPanning = true;
+        lastPosX = opt.e.clientX;
+        lastPosY = opt.e.clientY;
+        canvas.setCursor('grabbing');
+        opt.e.preventDefault();
+        opt.e.stopImmediatePropagation();
+      }
+    };
+
+    const handleMouseMove = (opt) => {
+      if (isPanMode && isPanning) {
+        const e = opt.e;
+        const vpt = canvas.viewportTransform;
+        vpt[4] += e.clientX - lastPosX;
+        vpt[5] += e.clientY - lastPosY;
+        canvas.requestRenderAll();
+        lastPosX = e.clientX;
+        lastPosY = e.clientY;
+        opt.e.preventDefault();
+        opt.e.stopImmediatePropagation();
+      }
+    };
+
+    const handleMouseUp = (opt) => {
+      if (isPanMode && isPanning) {
+        isPanning = false;
+        canvas.setCursor('grab');
+        opt.e.preventDefault();
+        opt.e.stopImmediatePropagation();
+      }
+    };
+
+    // 이벤트 리스너 등록
     canvas.on('mouse:wheel', handleCanvasZoom);
+    canvas.on('mouse:down', handleMouseDown);
+    canvas.on('mouse:move', handleMouseMove);
+    canvas.on('mouse:up', handleMouseUp);
+    
+    document.addEventListener('keydown', handleKeyDown, { capture: true });
+    document.addEventListener('keyup', handleKeyUp, { capture: true });
     
     // 캔버스 경계 추가
     addCanvasBoundary();
 
     return () => {
       canvas.off('mouse:wheel', handleCanvasZoom);
+      canvas.off('mouse:down', handleMouseDown);
+      canvas.off('mouse:move', handleMouseMove);
+      canvas.off('mouse:up', handleMouseUp);
+      document.removeEventListener('keydown', handleKeyDown, { capture: true });
+      document.removeEventListener('keyup', handleKeyUp, { capture: true });
       canvas.dispose();
     };
   }, [width, height, externalStageRef]);
