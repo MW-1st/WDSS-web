@@ -1,7 +1,7 @@
 import datetime
 import uuid
 from pydantic import BaseModel, EmailStr, Field
-from typing import Optional, List
+from typing import Optional, List, Any
 
 
 class Token(BaseModel):
@@ -152,3 +152,26 @@ class ProjectDetailDataResponse(SuccessResponse):
     """상세 프로젝트 데이터를 포함하는 성공 응답 모델"""
 
     project: ProjectDetailResponse
+
+
+class SceneBrief(BaseModel):
+    id: str
+    scene_num: Optional[int] = None
+    name: Optional[str] = None
+    preview: Optional[str] = None  # base64 썸네일(선택)
+
+
+class SceneDetail(BaseModel):
+    id: str
+    scene_num: Optional[int] = None
+    drones: List[Any] = Field(default_factory=list)  # ✅ 가변 기본값 방지
+    preview: Optional[str] = None
+
+
+class SceneCreateReq(BaseModel):
+    scene_num: int  # ✅ project_id는 경로 파라미터로 받음
+
+
+class SceneSaveReq(BaseModel):
+    drones: List[Any] = Field(default_factory=list)  # ✅
+    preview: Optional[str] = None
