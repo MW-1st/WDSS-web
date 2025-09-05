@@ -118,7 +118,7 @@ class SceneResponse(BaseModel):
 
     id: uuid.UUID = Field(..., description="씬 고유 ID")
     scene_num: int = Field(..., description="씬 번호")
-    s3_key: str = Field(..., description="S3에 저장된 씬 파일의 키")
+    s3_key: str | None = Field(None, description="S3에 저장된 씬 파일의 키")
 
     class Config:
         orm_mode = True
