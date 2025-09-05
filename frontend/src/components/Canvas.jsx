@@ -66,7 +66,31 @@ export default function Canvas({
     canvas.renderOnAddRemove = true;
     canvas.renderAll();
 
+    // 간단한 줌 기능 추가
+    const handleCanvasZoom = (opt) => {
+      const e = opt.e;
+      
+      // Ctrl키와 함께 휠 이벤트가 발생한 경우에만 처리
+      if (e.ctrlKey) {
+        e.preventDefault(); // 브라우저 기본 줌 방지
+        
+        const delta = e.deltaY;
+        let zoom = canvas.getZoom();
+        zoom *= 0.999 ** delta;
+        
+        // 줌 범위 제한
+        if (zoom > 20) zoom = 20;
+        if (zoom < 0.01) zoom = 0.01;
+        
+        // 마우스 포인터 중심으로 줌
+        canvas.zoomToPoint({ x: opt.e.offsetX, y: opt.e.offsetY }, zoom);
+      }
+    };
+
+    canvas.on('mouse:wheel', handleCanvasZoom);
+
     return () => {
+      canvas.off('mouse:wheel', handleCanvasZoom);
       canvas.dispose();
     };
   }, [width, height, externalStageRef]);
@@ -886,6 +910,7 @@ export default function Canvas({
     
     return true;
   };
+
 
   // 외부에서 사용할 수 있도록 ref에 함수 등록
   useEffect(() => {
