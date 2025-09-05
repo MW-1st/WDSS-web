@@ -515,6 +515,16 @@ export default function Canvas({
         }
       });
 
+      // Also enable selection for svg/drawn dots
+      canvas.getObjects().forEach((obj) => {
+        if (obj.customType === "svgDot" || obj.customType === "drawnDot") {
+          obj.selectable = true;
+          obj.evented = true;
+          obj.hasControls = false;
+          obj.hasBorders = true;
+        }
+      });
+
       // 이전 핸들러들 정리
       Object.values(eraseHandlers.current).forEach((handler) => {
         if (typeof handler === "function") {
