@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import client from "../api/client.js";
 import { useNavigate } from "react-router-dom";
-import "../DashboardPage.css"; // 스타일 import
+import "../styles/DashboardPage.css"; // 스타일 import
 
 // 아이콘 컴포넌트
 const PlusIcon = () => (

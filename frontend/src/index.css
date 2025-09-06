@@ -179,3 +179,31 @@
 /* .button {
   background-color: #646cff;
 } */
+/* ── 갤러리 스크롤 가터 제거 ─────────────────────────── */
+.galleryPane {
+  scrollbar-gutter: auto !important; /* 전역 stable both-edges 무력화 */
+  /* 보기 좋은 기본 값들 */
+  scrollbar-width: thin; /* Firefox */
+}
+
+/* WebKit (Chromium) 크기 통일 */
+.galleryPane::-webkit-scrollbar {
+  width: 14px;
+}
+.galleryPane::-webkit-scrollbar-track {
+  background: transparent;
+}
+.galleryPane::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 8px;
+}
+
+/* ── Fallback: 여전히 가터가 남는 환경 보정 ─────────────
+   스크롤이 실제로 생긴 경우에만(자바스크립트로 data-scroll-y 부여) 
+   오른쪽 "예약 공간"을 음수 마진으로 상쇄하고 동일 크기만큼 내부 패딩을 줘서
+   콘텐츠가 잘리지 않게 합니다.  */
+.galleryPane[data-scroll-y="1"] {
+  --gutter-w: 14px; /* 위의 ::-webkit-scrollbar width와 맞춤 */
+  margin-right: calc(-1 * var(--gutter-w));
+  padding-right: var(--gutter-w);
+}
