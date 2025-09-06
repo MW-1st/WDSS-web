@@ -1,14 +1,13 @@
-
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { FaPen, FaPaintBrush, FaEraser, FaRegTrashAlt } from "react-icons/fa";
 import { PiSelectionPlusBold } from "react-icons/pi";
 import ColorPicker from "./ColorPicker.jsx";
-const CanvasTools = React.memo(function CanvasTools({ 
-  drawingMode = 'draw', 
+const CanvasTools = React.memo(function CanvasTools({
+  drawingMode = "draw",
 
   eraserSize = 20,
-  drawingColor = '#222222',
+  drawingColor = "#222222",
   onModeChange,
   onClearAll,
   onColorChange,
@@ -28,13 +27,13 @@ const CanvasTools = React.memo(function CanvasTools({
   const getTooltipText = (mode) => {
     switch (mode) {
       case "draw":
-        return "그리기: 자유곡선을 그립니다.";
+        return "그리기(P): 자유곡선을 그립니다.";
       case "select":
-        return "선택: 객체 이동/크기 조절.";
+        return "선택(V): 객체 이동/크기 조절.";
       case "brush":
-        return "브러시: 점을 찍습니다.";
+        return "브러시(B): 점을 찍습니다.";
       case "erase":
-        return "지우개: 선과 점을 지웁니다.";
+        return "지우개(E): 선과 점을 지웁니다.";
       case "pixelErase":
         return "픽셀 지우개: 배경을 칠합니다.";
       default:
@@ -205,8 +204,10 @@ const CanvasTools = React.memo(function CanvasTools({
       </div>
 
       {/* 색상 선택 */}
-      <div style={{ marginBottom: '12px' }}>
-        <h5 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600' }}>
+      <div style={{ marginBottom: "12px" }}>
+        <h5
+          style={{ margin: "0 0 8px 0", fontSize: "14px", fontWeight: "600" }}
+        >
           색상 선택
         </h5>
         <ColorPicker
@@ -236,4 +237,3 @@ const CanvasTools = React.memo(function CanvasTools({
 });
 
 export default CanvasTools;
-
