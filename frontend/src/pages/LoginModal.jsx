@@ -140,7 +140,7 @@ export default function LoginModal() {
                     onChange={(e) => setUsername(e.target.value)}
                     placeholder="Enter username"
                     required
-                    className="w-full rounded border border-gray-300 px-3 py-2"
+                    className="w-full rounded border border-gray-200 px-3 py-2"
                   />
                 </label>
                 <label className="block">
@@ -151,13 +151,13 @@ export default function LoginModal() {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter password"
                     required
-                    className="w-full rounded border border-gray-300 px-3 py-2"
+                    className="w-full rounded border border-gray-200 px-3 py-2"
                   />
                 </label>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full mt-1.5 rounded bg-[#646cff] hover:bg-[#5c64ed] text-white py-2 font-yuniverse transition font-bold"
+                  className="w-full mt-1.5 rounded bg-[#646cff] hover:bg-[#5c64ed] text-white py-1.5 font-yuniverse transition font-bold text-lg"
                 >
                   {loading ? "Logging in..." : "Login"}
                 </button>
@@ -165,23 +165,23 @@ export default function LoginModal() {
             </>
           ) : (
             <>
-              <h2 className="mt-3 mb-3 text-xl font-bold font-yuniverse text-gray-900">
+              <h2 className="mt-3 mb-3 text-3xl font-bold font-yuniverse text-gray-900">
                 Register
               </h2>
               <form onSubmit={handleRegister} className="space-y-3">
                 <label className="block">
-                  <div className="mb-1 text-sm font-bold">Email</div>
+                  <div className="mb-1 text-lg font-bold">Email</div>
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="Enter email"
                     required
-                    className="w-full rounded border border-gray-300 px-3 py-2"
+                    className="w-full rounded border border-gray-200 px-3 py-2"
                   />
                 </label>
                 <label className="block">
-                  <div className="mb-1 text-sm font-bold">Username</div>
+                  <div className="mb-1 text-lg font-bold">Username</div>
                   <input
                     type="text"
                     value={username}
@@ -190,11 +190,11 @@ export default function LoginModal() {
                     required
                     minLength={3}
                     maxLength={32}
-                    className="w-full rounded border border-gray-300 px-3 py-2"
+                    className="w-full rounded border border-gray-200 px-3 py-2"
                   />
                 </label>
                 <label className="block">
-                  <div className="mb-1 text-sm font-bold">Password</div>
+                  <div className="mb-1 text-lg font-bold">Password</div>
                   <input
                     type="password"
                     value={password}
@@ -203,13 +203,13 @@ export default function LoginModal() {
                     required
                     minLength={8}
                     maxLength={128}
-                    className="w-full rounded border border-gray-300 px-3 py-2"
+                    className="w-full rounded border border-gray-200 px-3 py-2"
                   />
                 </label>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full mt-1.5 rounded bg-[#646cff] hover:bg-[#5c64ed] text-white py-2 font-yuniverse transition font-bold"
+                  className="w-full mt-1.5 rounded bg-[#646cff] hover:bg-[#5c64ed] text-white py-1.5 font-yuniverse transition font-bold text-lg"
                 >
                   {loading ? "Registering..." : "Create Account"}
                 </button>
