@@ -161,5 +161,7 @@ venv
 .vscode
 __pycache__/
 .env
-backend/uploaded_images/
+backend/uploads/
+backend/processsed/
+backend/originals/
 backend/svg_json/
