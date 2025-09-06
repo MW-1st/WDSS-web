@@ -2,9 +2,10 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import client from "../api/client.js";
 import { useNavigate } from "react-router-dom";
-import "../DashboardPage.css"; // 스타일 import
+import "../DashboardPage.css";
+import { CiMenuBurger } from "react-icons/ci";
+import ProjectSettingsModal from "../components/ProjectSettingsModal";
 
-// 아이콘 컴포넌트
 const PlusIcon = () => (
   <svg
     width="20"
@@ -45,6 +46,7 @@ export default function DashboardPage() {
 
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [editingProject, setEditingProject] = useState(null);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -66,7 +68,7 @@ export default function DashboardPage() {
   const handleCreateProject = async () => {
     try {
       const newProjectData = {
-        project_name: "새로운 프로젝트",
+        project_name: "새 프로젝트",
         format: "dsj",
         max_scene: 15,
         max_speed: 6.0,
@@ -85,6 +87,17 @@ export default function DashboardPage() {
     navigate(`/projects/${projectId}`);
   };
 
+  const openSettings = (e, project) => {
+    e.stopPropagation();
+    setEditingProject(project);
+  };
+
+  const closeSettings = () => setEditingProject(null);
+
+  const handleSaved = (updated) => {
+    setProjects((prev) => prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)));
+  };
+
   const formatDate = (dateString) => {
     const options = { year: "numeric", month: "long", day: "numeric" };
     return new Date(dateString).toLocaleDateString("ko-KR", options);
@@ -99,63 +112,77 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="dashboard-container">
-      {/* 상단 영역: 환영 + 버튼 */}
-      <header className="dashboard-header">
-        <h2 className="welcome-message">{user.username}님, 안녕하세요!</h2>
-        <p className="welcome-sub-message">
-          새로운 작업을 시작하거나 기존 프로젝트를 확인하세요.
-        </p>
+    <>
+      <div className="dashboard-container">
+        <header className="dashboard-header">
+          <h2 className="welcome-message">{user.username}님 안녕하세요</h2>
+          <p className="welcome-sub-message">새 작업을 시작하거나 기존 프로젝트를 확인하세요.</p>
 
-        <div className="dashboard-actions">
-          <button onClick={handleCreateProject} className="create-button">
-            <PlusIcon />
-            <span>새 프로젝트 생성</span>
-          </button>
-        </div>
-      </header>
+          <div className="dashboard-actions">
+            <button onClick={handleCreateProject} className="create-button">
+              <PlusIcon />
+              <span>새 프로젝트 생성</span>
+            </button>
+          </div>
+        </header>
 
-      {/* 아래 영역: 내 워크스페이스 (구분선으로 분리) */}
-      <main className="dashboard-main">
-        <section className="section">
-          <h3 className="section-title">내 워크스페이스</h3>
+        <main className="dashboard-main">
+          <section className="section">
+            <h3 className="section-title">내 워크스페이스</h3>
 
-          {loading ? (
-            <p>프로젝트를 불러오는 중입니다...</p>
-          ) : projects.length > 0 ? (
-            <div className="project-grid">
-              {projects.map((project) => (
-                <div
-                  key={project.id}
-                  className="project-card"
-                  onClick={() => handleProjectClick(project.id)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) =>
-                    (e.key === "Enter" || e.key === " ") &&
-                    handleProjectClick(project.id)
-                  }
-                >
-                  <div className="card-thumbnail">
-                    <ProjectIcon />
+            {loading ? (
+              <p>프로젝트를 불러오는 중입니다...</p>
+            ) : projects.length > 0 ? (
+              <div className="project-grid">
+                {projects.map((project) => (
+                  <div
+                    key={project.id}
+                    className="project-card"
+                    onClick={() => handleProjectClick(project.id)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) =>
+                      (e.key === "Enter" || e.key === " ") && handleProjectClick(project.id)
+                    }
+                  >
+                    <div className="card-thumbnail">
+                      <ProjectIcon />
+                    </div>
+                    <div className="card-body">
+                      <div className="flex items-start justify-between gap-2">
+                        <h4 className="card-title">{project.project_name}</h4>
+                        <button
+                          className="shrink-0 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded p-1"
+                          title="프로젝트 설정"
+                          onClick={(e) => openSettings(e, project)}
+                          aria-label={`설정: ${project.project_name}`}
+                        >
+                          <CiMenuBurger size={18} />
+                        </button>
+                      </div>
+                      <p className="card-date">생성일 {formatDate(project.created_at)}</p>
+                    </div>
                   </div>
-                  <div className="card-body">
-                    <h4 className="card-title">{project.project_name}</h4>
-                    <p className="card-date">
-                      생성일: {formatDate(project.created_at)}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="empty-state">
-              <p>아직 생성된 프로젝트가 없네요.</p>
-              <p>'새 프로젝트 생성' 버튼을 눌러 첫 프로젝트를 시작해보세요!</p>
-            </div>
-          )}
-        </section>
-      </main>
-    </div>
+                ))}
+              </div>
+            ) : (
+              <div className="empty-state">
+                <p>아직 생성된 프로젝트가 없네요.</p>
+                <p>'새 프로젝트 생성' 버튼을 눌러 프로젝트를 시작해보세요!</p>
+              </div>
+            )}
+          </section>
+        </main>
+      </div>
+
+      {editingProject && (
+        <ProjectSettingsModal
+          project={editingProject}
+          onClose={closeSettings}
+          onSaved={handleSaved}
+        />
+      )}
+    </>
   );
 }
+

@@ -76,7 +76,8 @@ async def update_project_by_id(
         # 수정할 내용이 없으면 기존 프로젝트 정보 반환
         return await get_project_by_id(conn, project_id, user_id)
 
-    set_clauses = [f"{key} = ${i+2}" for i, key in enumerate(update_data.keys())]
+    # Placeholders: $1=id, $2=user_id, update fields start at $3
+    set_clauses = [f"{key} = ${i+3}" for i, key in enumerate(update_data.keys())]
     query = f"""
         UPDATE project
         SET {', '.join(set_clauses)}, updated_at = NOW()
