@@ -5,6 +5,7 @@ import {
   useState,
   useCallback,
 } from "react";
+import { MdDelete } from "react-icons/md";
 // fabric.js 최적화: 필요한 부분만 import
 import {
   Canvas as FabricCanvas,
@@ -35,6 +36,7 @@ export default function Canvas({
   const onSelectionChangeRef = useRef(onSelectionChange);
   useEffect(() => { onSelectionChangeRef.current = onSelectionChange; }, [onSelectionChange]);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [deleteIconPos, setDeleteIconPos] = useState(null);
 
   // Use useLayoutEffect to initialize the canvas
   useLayoutEffect(() => {
@@ -89,9 +91,29 @@ export default function Canvas({
       });
     };
 
-    const handleCreated = () => notifySelection();
-    const handleUpdated = () => notifySelection();
-    const handleCleared = () => { const cb = onSelectionChangeRef.current; if (cb) cb(null); };
+    const updateDeleteIconPosition = () => {
+      const active = canvas.getActiveObject();
+      if (!active) {
+        setDeleteIconPos(null);
+        return;
+      }
+      try {
+        const rect = active.getBoundingRect(true, true);
+        if (rect && typeof rect.left === 'number' && typeof rect.top === 'number') {
+          const left = Math.max(0, Math.min(rect.left + rect.width - 24, canvas.getWidth() - 24));
+          const top = Math.max(0, rect.top - 8);
+          setDeleteIconPos({ left, top });
+        } else {
+          setDeleteIconPos(null);
+        }
+      } catch (e) {
+        setDeleteIconPos(null);
+      }
+    };
+
+    const handleCreated = () => { notifySelection(); updateDeleteIconPosition(); };
+    const handleUpdated = () => { notifySelection(); updateDeleteIconPosition(); };
+    const handleCleared = () => { const cb = onSelectionChangeRef.current; if (cb) cb(null); setDeleteIconPos(null); };
 
     canvas.on('selection:created', handleCreated);
     canvas.on('selection:updated', handleUpdated);
@@ -105,6 +127,26 @@ export default function Canvas({
       canvas.dispose();
     };
   }, [width, height, externalStageRef]);
+
+  // Delete key to remove current selection in select mode
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (drawingMode !== 'select') return;
+      if (!fabricCanvas.current) return;
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+      const canvas = fabricCanvas.current;
+      const activeObjects = canvas.getActiveObjects();
+      if (!activeObjects || activeObjects.length === 0) return;
+      e.preventDefault();
+      activeObjects.forEach((obj) => canvas.remove(obj));
+      canvas.discardActiveObject();
+      canvas.requestRenderAll();
+      setDeleteIconPos(null);
+      const cb = onSelectionChangeRef.current; if (cb) cb(null);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [drawingMode]);
 
   // Effect for loading the background image
   useEffect(() => {
@@ -977,6 +1019,43 @@ export default function Canvas({
       onDrop={handleDrop}
     >
       <canvas ref={canvasRef} />
+      {deleteIconPos && drawingMode === 'select' && (
+        <button
+          type="button"
+          onClick={() => {
+            if (!fabricCanvas.current) return;
+            const canvas = fabricCanvas.current;
+            const activeObjects = canvas.getActiveObjects();
+            if (!activeObjects || activeObjects.length === 0) return;
+            activeObjects.forEach((obj) => canvas.remove(obj));
+            canvas.discardActiveObject();
+            canvas.requestRenderAll();
+            setDeleteIconPos(null);
+            const cb = onSelectionChangeRef.current; if (cb) cb(null);
+          }}
+          style={{
+            position: 'absolute',
+            left: deleteIconPos.left,
+            top: deleteIconPos.top,
+            background: '#dc3545',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 16,
+            width: 28,
+            height: 28,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 2px 6px rgba(0,0,0,.25)',
+            cursor: 'pointer',
+            zIndex: 5000,
+          }}
+          title="선택 영역 삭제"
+          aria-label="선택 영역 삭제"
+        >
+          <MdDelete size={18} />
+        </button>
+      )}
       {isDragOver && (
         <div
           style={{
