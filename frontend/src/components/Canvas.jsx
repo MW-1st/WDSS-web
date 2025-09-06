@@ -22,7 +22,8 @@ export default function Canvas({
   eraserSize: externalEraserSize = 20,
 
   drawingColor: externalDrawingColor = '#222222',
-  onModeChange
+  onModeChange,
+  onSelectionChange
 }) {
   const canvasRef = useRef(null);
   const fabricCanvas = useRef(null);
@@ -30,6 +31,9 @@ export default function Canvas({
   const [eraserSize, setEraserSize] = useState(externalEraserSize);
   const [drawingColor, setDrawingColor] = useState(externalDrawingColor);
   const eraseHandlers = useRef({});
+  const selectionHandlers = useRef({});
+  const onSelectionChangeRef = useRef(onSelectionChange);
+  useEffect(() => { onSelectionChangeRef.current = onSelectionChange; }, [onSelectionChange]);
   const [isDragOver, setIsDragOver] = useState(false);
 
   // Use useLayoutEffect to initialize the canvas
@@ -66,7 +70,38 @@ export default function Canvas({
     canvas.renderOnAddRemove = true;
     canvas.renderAll();
 
+    // Selection change handlers
+    const notifySelection = () => {
+      const cb = onSelectionChangeRef.current;
+      if (!cb) return;
+      const active = canvas.getActiveObject();
+      if (!active) {
+        cb(null);
+        return;
+      }
+      cb({
+        type: active.type || null,
+        customType: active.customType || null,
+        fill: active.fill || null,
+        radius: typeof active.radius === 'number' ? active.radius : null,
+        left: active.left ?? null,
+        top: active.top ?? null,
+      });
+    };
+
+    const handleCreated = () => notifySelection();
+    const handleUpdated = () => notifySelection();
+    const handleCleared = () => { const cb = onSelectionChangeRef.current; if (cb) cb(null); };
+
+    canvas.on('selection:created', handleCreated);
+    canvas.on('selection:updated', handleUpdated);
+    canvas.on('selection:cleared', handleCleared);
+    selectionHandlers.current = { handleCreated, handleUpdated, handleCleared };
+
     return () => {
+      if (selectionHandlers.current.handleCreated) canvas.off('selection:created', selectionHandlers.current.handleCreated);
+      if (selectionHandlers.current.handleUpdated) canvas.off('selection:updated', selectionHandlers.current.handleUpdated);
+      if (selectionHandlers.current.handleCleared) canvas.off('selection:cleared', selectionHandlers.current.handleCleared);
       canvas.dispose();
     };
   }, [width, height, externalStageRef]);
@@ -511,6 +546,16 @@ export default function Canvas({
           obj.selectable = true;
           obj.evented = true;
           obj.hasControls = true;
+          obj.hasBorders = true;
+        }
+      });
+
+      // Also enable selection for svg/drawn dots
+      canvas.getObjects().forEach((obj) => {
+        if (obj.customType === "svgDot" || obj.customType === "drawnDot") {
+          obj.selectable = true;
+          obj.evented = true;
+          obj.hasControls = false;
           obj.hasBorders = true;
         }
       });
