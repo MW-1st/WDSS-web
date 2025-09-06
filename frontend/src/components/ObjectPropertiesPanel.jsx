@@ -6,7 +6,9 @@ function normalizeColorToHex(color) {
   if (typeof color === "string") {
     const hexMatch = color.match(/^#([0-9a-fA-F]{6})$/);
     if (hexMatch) return `#${hexMatch[1]}`.toUpperCase();
-    const rgbMatch = color.match(/^rgb\s*\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$/);
+    const rgbMatch = color.match(
+      /^rgb\s*\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$/
+    );
     if (rgbMatch) {
       const r = Math.max(0, Math.min(255, parseInt(rgbMatch[1], 10)));
       const g = Math.max(0, Math.min(255, parseInt(rgbMatch[2], 10)));
@@ -19,8 +21,18 @@ function normalizeColorToHex(color) {
 }
 
 export default function ObjectPropertiesPanel({ selection, onChangeFill }) {
-  const isDot = selection && (selection.customType === "svgDot" || selection.customType === "drawnDot" || selection.type === "circle");
-  const currentFill = useMemo(() => normalizeColorToHex(selection?.fill), [selection]);
+  const isMulti = selection?.type === "activeSelection";
+  const isDotOrCircle =
+    selection &&
+    (selection.customType === "svgDot" ||
+      selection.customType === "drawnDot" ||
+      selection.type === "circle");
+  // Allow ColorPicker for multi-selection or supported single objects
+  // (per request: use selection?.type check inline)
+  const currentFill = useMemo(
+    () => normalizeColorToHex(selection?.fill),
+    [selection]
+  );
 
   return (
     <div style={{ padding: 16 }}>
@@ -33,12 +45,17 @@ export default function ObjectPropertiesPanel({ selection, onChangeFill }) {
       {selection && (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div style={{ fontSize: 12, color: "#555" }}>
-            타입: {selection.customType || selection.type || "-"}
+            Type: {selection.customType || selection.type || "-"}
           </div>
 
-          {isDot ? (
+          {(selection?.type &&
+            selection.type.toLowerCase() === "activeselection") ||
+          selection?.multiple ||
+          isDotOrCircle ? (
             <div>
-              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>색상</div>
+              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>
+                Fill Color{isMulti ? " (multi)" : ""}
+              </div>
               <ColorPicker
                 color={currentFill}
                 onChange={(hex) => onChangeFill && onChangeFill(hex)}
@@ -46,11 +63,12 @@ export default function ObjectPropertiesPanel({ selection, onChangeFill }) {
               />
             </div>
           ) : (
-            <div style={{ color: "#777", fontSize: 12 }}>이 개체는 현재 색상 편집을 지원하지 않습니다.</div>
+            <div style={{ color: "#777", fontSize: 12 }}>
+              이 오브젝트는 채우기 색상을 지원하지 않습니다.
+            </div>
           )}
         </div>
       )}
     </div>
   );
 }
-
