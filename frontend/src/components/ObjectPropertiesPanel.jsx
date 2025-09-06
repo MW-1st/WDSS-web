@@ -21,12 +21,14 @@ function normalizeColorToHex(color) {
 }
 
 export default function ObjectPropertiesPanel({ selection, onChangeFill }) {
-  const isDot =
+  const isMulti = selection?.type === "activeSelection";
+  const isDotOrCircle =
     selection &&
     (selection.customType === "svgDot" ||
       selection.customType === "drawnDot" ||
-      selection.type === "circle" ||
-      selection.type === "activeSelection");
+      selection.type === "circle");
+  // Allow ColorPicker for multi-selection or supported single objects
+  // (per request: use selection?.type check inline)
   const currentFill = useMemo(
     () => normalizeColorToHex(selection?.fill),
     [selection]
@@ -43,13 +45,16 @@ export default function ObjectPropertiesPanel({ selection, onChangeFill }) {
       {selection && (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div style={{ fontSize: 12, color: "#555" }}>
-            타입: {selection.customType || selection.type || "-"}
+            Type: {selection.customType || selection.type || "-"}
           </div>
 
-          {isDot ? (
+          {(selection?.type &&
+            selection.type.toLowerCase() === "activeselection") ||
+          selection?.multiple ||
+          isDotOrCircle ? (
             <div>
               <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>
-                색상
+                Fill Color{isMulti ? " (multi)" : ""}
               </div>
               <ColorPicker
                 color={currentFill}
@@ -59,7 +64,7 @@ export default function ObjectPropertiesPanel({ selection, onChangeFill }) {
             </div>
           ) : (
             <div style={{ color: "#777", fontSize: 12 }}>
-              이 개체는 현재 색상 편집을 지원하지 않습니다.
+              이 오브젝트는 채우기 색상을 지원하지 않습니다.
             </div>
           )}
         </div>
