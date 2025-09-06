@@ -80,6 +80,37 @@ const Inner = ({
     };
   }, [galleryHovered]);
 
+  // Keyboard shortcuts for tool switching: P(draw), E(erase), B(brush), V(select)
+  React.useEffect(() => {
+    const handler = (e) => {
+      // Ignore when typing into inputs/textareas/contenteditables
+      const target = e.target;
+      const isTyping =
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable);
+      if (isTyping) return;
+
+      const key = e.key?.toLowerCase();
+      if (key === "p") {
+        e.preventDefault();
+        onModeChange && onModeChange("draw");
+      } else if (key === "e") {
+        e.preventDefault();
+        onModeChange && onModeChange("erase");
+      } else if (key === "b") {
+        e.preventDefault();
+        onModeChange && onModeChange("brush");
+      } else if (key === "v") {
+        e.preventDefault();
+        onModeChange && onModeChange("select");
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onModeChange]);
+
   const GalleryTooltipPortal = () =>
     galleryHovered
       ? createPortal(
