@@ -8,9 +8,9 @@ def process_image(
     input_path: str,
     step: int = 3,
     target_dots: int | None = None,
-    canny_threshold1: int = 80,   # 강한 엣지만 검출
+    canny_threshold1: int = 80,  # 강한 엣지만 검출
     canny_threshold2: int = 200,  # 더 높은 임계값으로 선명한 윤곽선만
-    blur_ksize: int = 5,          # 더 강한 블러로 노이즈 제거
+    blur_ksize: int = 5,  # 더 강한 블러로 노이즈 제거
     blur_sigma: float = 1.2,
     color_rgb: tuple[int, int, int] | None = None,
 ) -> str:
@@ -36,14 +36,14 @@ def process_image(
 
     # 간단하고 빠른 엣지 검출
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    
+
     # 기본 블러 + Canny 엣지
     k = max(3, blur_ksize | 1)
     blur = cv2.GaussianBlur(gray, (k, k), blur_sigma)
     edges = cv2.Canny(blur, canny_threshold1, canny_threshold2)
-    
+
     # 최소한의 모폴로지 연산
-    kernel = np.ones((2,2), np.uint8)
+    kernel = np.ones((2, 2), np.uint8)
     edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)  # 끊어진 선만 연결
 
     # step 자동 계산 (target_dots 지정 시 우선)
