@@ -1,10 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import Canvas from "../components/Canvas.jsx";
 import EditorToolbar from "../components/EditorToolbar.jsx";
 import MainCanvasSection from "../components/MainCanvasSection.jsx";
 import SceneCarousel from "../components/SceneCarousel.jsx";
-import ImageGallery from "../components/ImageGallery.jsx";
 import client from "../api/client";
+import { getImageUrl } from '../utils/imageUtils';
 import { useUnity } from "../contexts/UnityContext.jsx";
 import { useParams } from "react-router-dom";
 
@@ -41,18 +40,27 @@ export default function EditorPage({ projectId = DUMMY }) {
   const [start, setStart] = useState(0);
 
   // 이미지 변환 관련 상태
-  const [imageUrl, setImageUrl] = useState(""); // 현재 표시되는 이미지 (변환된 결과)
+  // const [imageUrl, setImageUrl] = useState(""); // 현재 표시되는 이미지 (변환된 결과)
   const [processing, setProcessing] = useState(false);
   const [targetDots, setTargetDots] = useState(2000);
   
   // 원본 캔버스 상태 관리
-  const [originalCanvasState, setOriginalCanvasState] = useState(null);
+  // const [originalCanvasState, setOriginalCanvasState] = useState(null);
   const stageRef = useRef(null);
 
   // 캔버스 관련 상태
   const [drawingMode, setDrawingMode] = useState("draw");
   const [eraserSize, setEraserSize] = useState(20);
   const [drawingColor, setDrawingColor] = useState('#222222');
+
+  const selectedScene = useMemo(
+  () => scenes.find((s) => s.id === selectedId) || null,
+  [scenes, selectedId]
+);
+
+  // 방금 삭제한 상태들 대신, 아래 두 줄로 정보를 파생시킵니다.
+  const imageUrl = selectedScene ? getImageUrl(selectedScene.s3_key) : "";
+  const originalCanvasState = selectedScene ? selectedScene.originalCanvasState : null;
   
   // 색상이 변경될 때 즉시 캔버스에 반영
   useEffect(() => {
@@ -111,11 +119,13 @@ export default function EditorPage({ projectId = DUMMY }) {
     if (!pid) return;
     (async () => {
       try {
-        const { data: list } = await client.get(`/projects/${pid}/scenes/`);
+        const { data } = await client.get(`/projects/${pid}/scenes/`);
+        const list = data.scenes || [];
         setScenes(
           list.map((s, i) => ({
             ...s,
             name: s.name || `Scene ${s.scene_num ?? i + 1}`,
+            imageUrl: getImageUrl(s.s3_key),
           }))
         );
         if (list[0]) setSelectedId(list[0].id);
@@ -127,52 +137,50 @@ export default function EditorPage({ projectId = DUMMY }) {
 
   // 씬 선택 → 상세 로드
   useEffect(() => {
-    if (!pid) return;
-    (async () => {
-      if (!selectedId) return;
-      const current = scenes.find((s) => s.id === selectedId);
-      if (!current || "drones" in current) return;
-      try {
-        const { data: detail } = await client.get(
-          `/projects/${pid}/scenes/${selectedId}`
-        );
-        setScenes((prev) =>
-          prev.map((s) => (s.id === selectedId ? { ...s, ...detail } : s))
-        );
+    if (!pid || !selectedId) {
+      // setImageUrl("");
+      // setOriginalCanvasState(null);
+      return;
+    }
 
-        // 씬이 변경될 때 해당 씬의 이미지 URL과 원본 캔버스 상태 업데이트
-        if (detail.imageUrl) {
-          setImageUrl(detail.imageUrl);
-        } else {
-          setImageUrl("");
+    const current = scenes.find((s) => s.id === selectedId);
+    if (!current) return;
+
+    const imageUrl = getImageUrl(current.s3_key);
+    // setImageUrl(imageUrl || ""); // s3_key가 없으면 빈 문자열로 초기화
+    // setOriginalCanvasState(current.originalCanvasState || null);
+
+    if (!("s3_key" in current)) {
+      (async () => {
+        try {
+          const {data} = await client.get(
+              `/projects/${pid}/scenes/${selectedId}`
+          );
+          const detail = data.scene || {};
+          setScenes((prev) =>
+              prev.map((s) => (s.id === selectedId ? {...s, ...detail} : s))
+          );
+
+          // 여기서 이미지 URL을 다시 설정할 필요는 없지만, 만일을 위해 유지할 수 있습니다.
+          const fetchedImageUrl = getImageUrl(detail.s3_key);
+          // setImageUrl(fetchedImageUrl || "");
+          // setOriginalCanvasState(detail.originalCanvasState || null);
+        } catch (e) {
+          console.error(e);
         }
-        
-        // 원본 캔버스 상태 로드
-        if (detail.originalCanvasState) {
-          setOriginalCanvasState(detail.originalCanvasState);
-          console.log("씬에서 원본 캔버스 상태 로드:", detail.originalCanvasState);
-        } else {
-          setOriginalCanvasState(null);
-        }
-      } catch (e) {
-        console.error(e);
-      }
-    })();
-  }, [selectedId, pid, scenes]);
+      })();
+    }
+  }, [selectedId, pid]);
 
   // 저장(디바운스)
 
   const saveDebounced = useDebounced(async (scene_id, drones, preview, imageUrl, originalCanvasState) => {
     if (!pid) return;
     try {
-      const { data: saved } = await client.put(`/projects/${pid}/scenes/${scene_id}`, {
-        project_id: pid,
-        scene_id,
-        drones,
-        preview,
-        imageUrl, // 현재 표시되는 이미지 URL
-        originalCanvasState, // 원본 캔버스 상태 저장
+      const { data } = await client.put(`/projects/${pid}/scenes/${scene_id}`, {
+       s3_key: imageUrl
       });
+      const saved = data.scene || {};
       setScenes((prev) => prev.map((s) => (s.id === scene_id ? { ...s, ...saved } : s)));
     } catch (e) {
       console.error(e);
@@ -193,14 +201,13 @@ export default function EditorPage({ projectId = DUMMY }) {
       console.log("확인된 Project ID:", projectIdReady);
       const scene_num = scenes.length + 1;
       console.log("확인된 scene_num:", scene_num);
-      const { data: created } = await client.post(
+      const { data } = await client.post(
         `/projects/${projectIdReady}/scenes/`,
         {
-          project_id: projectIdReady,
           scene_num,
         }
       );
-
+      const created = data.scene || {};
       const nextScenes = [...scenes, created];
       setScenes(nextScenes);
       setSelectedId(created.id);
@@ -211,8 +218,8 @@ export default function EditorPage({ projectId = DUMMY }) {
       if (nextTotal > VISIBLE) setStart(nextTotal - VISIBLE);
 
       // 새 씬으로 전환하면서 상태 초기화
-      setImageUrl("");
-      setOriginalCanvasState(null);
+      // setImageUrl("");
+      // setOriginalCanvasState(null);
     } catch (e) {
       console.error(e);
       alert("씬 생성 실패");
@@ -237,11 +244,6 @@ export default function EditorPage({ projectId = DUMMY }) {
   const canSlide = total > VISIBLE;
   const end = Math.min(start + VISIBLE, total);
   const visibleItems = items.slice(start, end);
-
-  const selectedScene = useMemo(
-    () => scenes.find((s) => s.id === selectedId) || null,
-    [scenes, selectedId]
-  );
 
   // 이미지 변환 핸들러
   const handleTransform = async () => {
@@ -280,7 +282,7 @@ export default function EditorPage({ projectId = DUMMY }) {
         // 현재 캔버스 상태를 원본으로 저장
         const currentState = stageRef.current.saveOriginalCanvasState();
         if (currentState) {
-          setOriginalCanvasState(currentState);
+          // setOriginalCanvasState(currentState);
         }
       } else {
         console.log("기존 원본 상태로 복원하여 변환");
@@ -336,7 +338,7 @@ export default function EditorPage({ projectId = DUMMY }) {
               );
               console.log(
                 "업로드 URL:",
-                `/projects/${pid}/scenes/${selectedId}/upload-image`
+                `/image/upload`
               );
 
               // project_id와 scene_id 모두 UUID로 유지
@@ -349,7 +351,7 @@ export default function EditorPage({ projectId = DUMMY }) {
                 sceneId
               );
               const uploadResp = await client.post(
-                `/projects/${projectId}/scenes/${sceneId}/upload-image`,
+                `/image/upload`,
                 fd
               );
               const uploadedImagePath = uploadResp.data?.image_url;
@@ -417,7 +419,7 @@ export default function EditorPage({ projectId = DUMMY }) {
               }
 
               console.log("최종 이미지 URL:", finalUrl);
-              setImageUrl(finalUrl);
+              // setImageUrl(finalUrl);
 
               
               // 변환된 이미지 URL과 원본 캔버스 상태를 현재 씬에 저장
