@@ -282,6 +282,13 @@ export default function Canvas({
           
           // 할당 후 확인
           console.log('📝 Path after assignment - layerId:', path.layerId, 'layerName:', path.layerName);
+          
+          // 레이어 순서에 맞게 캔버스 객체 재정렬
+          setTimeout(() => {
+            const sortedLayers = getSortedLayers();
+            fabricLayerUtils.reorderObjectsByLayers(canvas, sortedLayers);
+            console.log('🔄 Canvas objects reordered after path creation');
+          }, 10);
         } else {
           console.warn('❌ No active layer found - using fallback');
           const fallbackLayer = currentLayers.find(l => l.type === 'drawing');
@@ -307,6 +314,13 @@ export default function Canvas({
         if (activeLayer) {
           fabricLayerUtils.assignObjectToLayer(obj, activeLayer.id, activeLayer.name);
           console.log('Layer assigned to object:', activeLayer.id, activeLayer.name);
+          
+          // 레이어 순서에 맞게 캔버스 객체 재정렬
+          setTimeout(() => {
+            const sortedLayers = getSortedLayers();
+            fabricLayerUtils.reorderObjectsByLayers(canvas, sortedLayers);
+            console.log('🔄 Canvas objects reordered after object added');
+          }, 10);
         }
       }
     };
@@ -979,6 +993,14 @@ export default function Canvas({
 
         canvas.add(img);
         canvas.setActiveObject(img);
+        
+        // 레이어 순서에 맞게 캔버스 객체 재정렬
+        setTimeout(() => {
+          const sortedLayers = getSortedLayers();
+          fabricLayerUtils.reorderObjectsByLayers(canvas, sortedLayers);
+          console.log('🔄 Canvas objects reordered after image added');
+        }, 10);
+        
         canvas.renderAll();
       })
       .catch((err) => {
