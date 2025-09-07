@@ -8,6 +8,7 @@ function MainCanvasSection({
   drawingMode,
   eraserSize,
   drawingColor,
+  activeLayerId,
   onModeChange,
 }) {
   return (
@@ -41,6 +42,7 @@ function MainCanvasSection({
               drawingMode={drawingMode}
               eraserSize={eraserSize}
               drawingColor={drawingColor}
+              activeLayerId={activeLayerId}
               onModeChange={onModeChange}
             />
           ) : (

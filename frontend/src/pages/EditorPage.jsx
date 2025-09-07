@@ -67,11 +67,37 @@ export default function EditorPage({ projectId = DUMMY }) {
       try {
         const layers = stageRef.current.layers.getLayers() || [];
         const activeId = stageRef.current.layers.getActiveLayerId();
-        setLayersState([...layers]); // 새로운 배열로 복사하여 리렌더링 보장
-        setActiveLayerIdState(activeId);
+        
+        setLayersState(prevLayers => {
+          // 레이어가 실제로 변경되었는지 확인
+          const layersChanged = JSON.stringify(prevLayers.map(l => ({id: l.id, zIndex: l.zIndex, name: l.name, visible: l.visible, locked: l.locked}))) !== 
+                               JSON.stringify(layers.map(l => ({id: l.id, zIndex: l.zIndex, name: l.name, visible: l.visible, locked: l.locked})));
+          
+          if (layersChanged) {
+            console.log('Layers changed, updating state');
+            console.log('Previous layers:', prevLayers);
+            console.log('New layers:', layers);
+            return [...layers];
+          } else {
+            console.log('Layers unchanged, keeping previous state');
+            return prevLayers;
+          }
+        });
+        
+        setActiveLayerIdState(prevActiveId => {
+          if (prevActiveId !== activeId) {
+            console.log('Active layer changed:', prevActiveId, '->', activeId);
+            return activeId;
+          } else {
+            return prevActiveId;
+          }
+        });
+        
       } catch (error) {
         console.warn('Error updating layer state:', error);
       }
+    } else {
+      console.warn('stageRef.current or stageRef.current.layers not available');
     }
   }, []);
 
@@ -84,7 +110,12 @@ export default function EditorPage({ projectId = DUMMY }) {
 
   // Canvas 준비 상태 확인
   useEffect(() => {
+    let timeoutId = null;
+    let isCleanedUp = false;
+    
     const checkCanvasReady = () => {
+      if (isCleanedUp) return;
+      
       if (stageRef.current && stageRef.current.layers) {
         setCanvasReady(true);
         updateLayerState();
@@ -105,7 +136,7 @@ export default function EditorPage({ projectId = DUMMY }) {
         canvas.on('selection:updated', handleSelectionChanged);
         canvas.on('selection:cleared', () => setSelectedObjectLayerId(null));
         
-        // cleanup 함수 반환
+        // cleanup 함수 설정
         return () => {
           if (canvas) {
             canvas.off('selection:created', handleSelectionChanged);
@@ -115,13 +146,18 @@ export default function EditorPage({ projectId = DUMMY }) {
         };
       } else {
         // Canvas가 준비되지 않았으면 잠시 후 다시 확인
-        setTimeout(checkCanvasReady, 100);
+        timeoutId = setTimeout(checkCanvasReady, 100);
       }
     };
     
     const cleanup = checkCanvasReady();
-    return cleanup;
-  }, [updateLayerState]);
+    
+    return () => {
+      isCleanedUp = true;
+      if (timeoutId) clearTimeout(timeoutId);
+      if (cleanup) cleanup();
+    };
+  }, []); // updateLayerState 의존성 제거
   // const sceneId = 1; // 현재 에디터의 씬 ID (임시 하드코딩)
 
   // unity 관련 상태
@@ -583,68 +619,132 @@ export default function EditorPage({ projectId = DUMMY }) {
 
   // 레이어 관련 핸들러들
   const handleLayerSelect = React.useCallback((layerId) => {
-    if (stageRef.current && stageRef.current.layers) {
-      stageRef.current.layers.setActiveLayer(layerId);
-      updateLayerState();
+    console.log('EditorPage handleLayerSelect called:', layerId);
+    console.log('Current activeLayerIdState:', activeLayerIdState);
+    console.log('stageRef.current exists:', !!stageRef.current);
+    console.log('stageRef.current.layers exists:', !!stageRef.current?.layers);
+    console.log('setActiveLayer exists:', !!stageRef.current?.layers?.setActiveLayer);
+    
+    if (stageRef.current && stageRef.current.layers && stageRef.current.layers.setActiveLayer) {
+      try {
+        console.log('Calling setActiveLayer with:', layerId);
+        stageRef.current.layers.setActiveLayer(layerId);
+        console.log('setActiveLayer called, now calling updateLayerState');
+        
+        // 즉시 상태 업데이트
+        updateLayerState();
+        
+        // 추가로 짧은 지연 후에도 한 번 더
+        setTimeout(() => {
+          console.log('Delayed updateLayerState call');
+          updateLayerState();
+        }, 50);
+      } catch (error) {
+        console.error('Error selecting layer:', error);
+      }
+    } else {
+      console.warn('Canvas layers not ready');
     }
-  }, [updateLayerState]);
+  }, [updateLayerState, activeLayerIdState]);
 
   const handleCreateLayer = React.useCallback(() => {
-    if (stageRef.current && stageRef.current.layers) {
-      const layerName = prompt('새 레이어 이름을 입력하세요:', `레이어 ${Date.now().toString().slice(-4)}`);
-      if (layerName) {
-        stageRef.current.layers.createLayer(layerName);
-        updateLayerState();
+    console.log('Create layer called');
+    if (stageRef.current && stageRef.current.layers && stageRef.current.layers.createLayer) {
+      // 현재 레이어 목록을 가져와서 기본 이름 계산
+      const currentLayers = stageRef.current.layers.getLayers() || [];
+      const drawingLayers = currentLayers.filter(layer => layer.type === 'drawing');
+      let layerNumber = drawingLayers.length + 1;
+      
+      // 기본 이름이 이미 있는지 확인하고 중복되지 않는 번호 찾기
+      while (currentLayers.some(layer => layer.name === `레이어 ${layerNumber}`)) {
+        layerNumber++;
+      }
+      
+      const defaultName = `레이어 ${layerNumber}`;
+      const layerName = prompt('새 레이어 이름을 입력하세요:', defaultName);
+      
+      // 사용자가 취소하지 않았다면 레이어 생성
+      if (layerName !== null) {
+        try {
+          // 빈 문자열이거나 기본값과 같으면 자동 이름 생성, 그렇지 않으면 사용자 입력 사용
+          const finalName = (layerName.trim() === '' || layerName.trim() === defaultName) 
+            ? null 
+            : layerName.trim();
+          stageRef.current.layers.createLayer(finalName);
+          console.log('Layer created successfully');
+          setTimeout(updateLayerState, 10);
+        } catch (error) {
+          console.error('Error creating layer:', error);
+        }
       }
     }
   }, [updateLayerState]);
 
   const handleDeleteLayer = React.useCallback((layerId) => {
-    if (stageRef.current && stageRef.current.layers) {
-      stageRef.current.layers.deleteLayer(layerId);
-      updateLayerState();
+    console.log('Delete layer called:', layerId);
+    if (stageRef.current && stageRef.current.layers && stageRef.current.layers.deleteLayer) {
+      try {
+        stageRef.current.layers.deleteLayer(layerId);
+        console.log('Layer deleted successfully');
+        setTimeout(updateLayerState, 10);
+      } catch (error) {
+        console.error('Error deleting layer:', error);
+      }
     }
   }, [updateLayerState]);
 
   const handleToggleVisibility = React.useCallback((layerId) => {
-    if (stageRef.current && stageRef.current.layers) {
-      stageRef.current.layers.toggleVisibility(layerId);
-      updateLayerState();
+    console.log('Toggle visibility called:', layerId);
+    if (stageRef.current && stageRef.current.layers && stageRef.current.layers.toggleVisibility) {
+      try {
+        stageRef.current.layers.toggleVisibility(layerId);
+        console.log('Visibility toggled successfully');
+        setTimeout(updateLayerState, 10);
+      } catch (error) {
+        console.error('Error toggling visibility:', error);
+      }
     }
   }, [updateLayerState]);
 
   const handleToggleLock = React.useCallback((layerId) => {
-    if (stageRef.current && stageRef.current.layers) {
-      stageRef.current.layers.toggleLock(layerId);
-      updateLayerState();
+    console.log('Toggle lock called:', layerId);
+    if (stageRef.current && stageRef.current.layers && stageRef.current.layers.toggleLock) {
+      try {
+        stageRef.current.layers.toggleLock(layerId);
+        console.log('Lock toggled successfully');
+        setTimeout(updateLayerState, 10);
+      } catch (error) {
+        console.error('Error toggling lock:', error);
+      }
     }
   }, [updateLayerState]);
 
   const handleRenameLayer = React.useCallback((layerId, newName) => {
-    if (stageRef.current && stageRef.current.layers) {
-      stageRef.current.layers.renameLayer(layerId, newName);
-      updateLayerState();
+    console.log('Rename layer called:', layerId, newName);
+    if (stageRef.current && stageRef.current.layers && stageRef.current.layers.renameLayer) {
+      try {
+        stageRef.current.layers.renameLayer(layerId, newName);
+        console.log('Layer renamed successfully');
+        setTimeout(updateLayerState, 10);
+      } catch (error) {
+        console.error('Error renaming layer:', error);
+      }
     }
   }, [updateLayerState]);
 
-  const handleMoveLayer = React.useCallback((layerId, direction) => {
-    if (stageRef.current && stageRef.current.layers) {
-      stageRef.current.layers.moveLayer(layerId, direction);
-      updateLayerState();
-    }
-  }, [updateLayerState]);
-
-  const handleBringToFront = React.useCallback((layerId) => {
-    if (stageRef.current && stageRef.current.layers) {
-      stageRef.current.layers.bringToFront(layerId);
-      updateLayerState();
-    }
-  }, [updateLayerState]);
-
-  const handleSendToBack = React.useCallback((layerId) => {
-    if (stageRef.current && stageRef.current.layers) {
-      stageRef.current.layers.sendToBack(layerId);
-      updateLayerState();
+  const handleLayerReorder = React.useCallback((draggedLayerId, targetLayerId) => {
+    console.log('Layer reorder called:', draggedLayerId, 'to position of', targetLayerId);
+    if (stageRef.current && stageRef.current.layers && stageRef.current.layers.reorderLayers) {
+      try {
+        stageRef.current.layers.reorderLayers(draggedLayerId, targetLayerId);
+        console.log('Layers reordered successfully');
+        setTimeout(() => {
+          console.log('Calling updateLayerState after reorder');
+          updateLayerState();
+        }, 10);
+      } catch (error) {
+        console.error('Error reordering layers:', error);
+      }
     }
   }, [updateLayerState]);
 
@@ -736,6 +836,7 @@ export default function EditorPage({ projectId = DUMMY }) {
           drawingMode={drawingMode}
           eraserSize={eraserSize}
           drawingColor={drawingColor}
+          activeLayerId={activeLayerIdState}
           onModeChange={handleModeChange}
         />
 
@@ -773,9 +874,7 @@ export default function EditorPage({ projectId = DUMMY }) {
             onToggleVisibility={handleToggleVisibility}
             onToggleLock={handleToggleLock}
             onRenameLayer={handleRenameLayer}
-            onMoveLayer={handleMoveLayer}
-            onBringToFront={handleBringToFront}
-            onSendToBack={handleSendToBack}
+            onLayerReorder={handleLayerReorder}
           />
         ) : (
           <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>

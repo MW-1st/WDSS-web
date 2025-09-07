@@ -80,8 +80,9 @@ export const sendToBack = (canvas, object) => {
   canvas.sendToBack(object);
 };
 
+
 /**
- * 특정 레이어의 모든 객체를 앞으로 이동
+ * 특정 레이어의 모든 객체를 한 단계 앞으로 이동
  * @param {fabric.Canvas} canvas - Fabric.js 캔버스 인스턴스
  * @param {string} layerId - 레이어 ID
  */
@@ -90,22 +91,24 @@ export const bringLayerForward = (canvas, layerId) => {
   const layerObjects = objects.filter(obj => obj.layerId === layerId);
   
   layerObjects.forEach(obj => {
-    bringForward(canvas, obj);
+    canvas.bringForward(obj);
   });
+  canvas.renderAll();
 };
 
 /**
- * 특정 레이어의 모든 객체를 뒤로 이동
+ * 특정 레이어의 모든 객체를 한 단계 뒤로 이동
  * @param {fabric.Canvas} canvas - Fabric.js 캔버스 인스턴스
  * @param {string} layerId - 레이어 ID
  */
 export const sendLayerBackwards = (canvas, layerId) => {
   const objects = canvas.getObjects();
-  const layerObjects = objects.filter(obj => obj.layerId === layerId).reverse(); // 역순으로 처리
+  const layerObjects = objects.filter(obj => obj.layerId === layerId);
   
   layerObjects.forEach(obj => {
-    sendBackwards(canvas, obj);
+    canvas.sendBackwards(obj);
   });
+  canvas.renderAll();
 };
 
 /**
@@ -120,6 +123,7 @@ export const bringLayerToFront = (canvas, layerId) => {
   layerObjects.forEach(obj => {
     canvas.bringToFront(obj);
   });
+  canvas.renderAll();
 };
 
 /**
@@ -134,6 +138,7 @@ export const sendLayerToBack = (canvas, layerId) => {
   layerObjects.forEach(obj => {
     canvas.sendToBack(obj);
   });
+  canvas.renderAll();
 };
 
 /**
@@ -209,17 +214,46 @@ export const getLayerObjects = (canvas, layerId) => {
 };
 
 /**
+ * 특정 레이어의 모든 객체 삭제
+ * @param {fabric.Canvas} canvas - Fabric.js 캔버스 인스턴스
+ * @param {string} layerId - 레이어 ID
+ */
+export const deleteLayerObjects = (canvas, layerId) => {
+  const objects = canvas.getObjects();
+  const layerObjects = objects.filter(obj => obj.layerId === layerId);
+  
+  layerObjects.forEach(obj => {
+    canvas.remove(obj);
+  });
+  
+  canvas.renderAll();
+};
+
+/**
  * 레이어 순서에 따라 모든 객체 재정렬
  * @param {fabric.Canvas} canvas - Fabric.js 캔버스 인스턴스
  * @param {Array} layerOrder - zIndex 순으로 정렬된 레이어 배열
  */
 export const reorderObjectsByLayers = (canvas, layerOrder) => {
+  console.log('=== reorderObjectsByLayers DEBUG ===');
+  console.log('Input layerOrder:', layerOrder.map(l => ({ id: l.id, name: l.name, zIndex: l.zIndex })));
+  
   const allObjects = canvas.getObjects();
+  console.log('Current canvas objects:', allObjects.map(obj => ({ 
+    layerId: obj.layerId, 
+    layerName: obj.layerName,
+    type: obj.type 
+  })));
+  
   const orderedObjects = [];
   
-  // 레이어 순서대로 객체들을 정렬
-  layerOrder.forEach(layer => {
+  // 레이어 순서를 역순으로 처리 (UI에서 위에 있는 레이어가 Canvas에서도 위에 오도록)
+  const reversedOrder = [...layerOrder].reverse();
+  console.log('Reversed layerOrder:', reversedOrder.map(l => ({ id: l.id, name: l.name, zIndex: l.zIndex })));
+  
+  reversedOrder.forEach(layer => {
     const layerObjects = allObjects.filter(obj => obj.layerId === layer.id);
+    console.log(`Layer ${layer.name} has ${layerObjects.length} objects`);
     orderedObjects.push(...layerObjects);
   });
   
@@ -231,9 +265,22 @@ export const reorderObjectsByLayers = (canvas, layerOrder) => {
   canvas.clear();
   
   // 순서대로 다시 추가
+  console.log('Final ordered objects:', orderedObjects.map(obj => ({ 
+    layerId: obj.layerId, 
+    layerName: obj.layerName,
+    type: obj.type 
+  })));
+  
   orderedObjects.forEach(obj => {
     canvas.add(obj);
   });
+  
+  console.log('After reordering - canvas objects:', canvas.getObjects().map(obj => ({ 
+    layerId: obj.layerId, 
+    layerName: obj.layerName,
+    type: obj.type 
+  })));
+  console.log('=== reorderObjectsByLayers DEBUG END ===');
   
   canvas.renderAll();
 };

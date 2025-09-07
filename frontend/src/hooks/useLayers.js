@@ -21,11 +21,32 @@ const useLayers = () => {
   ]);
   
   const [activeLayerId, setActiveLayerId] = useState('layer-1');
+  
+  // setActiveLayerId를 래핑해서 로그 추가
+  const setActiveLayerIdWithLog = useCallback((newLayerId) => {
+    console.log('=== ACTIVE LAYER CHANGE DEBUG ===');
+    console.log('Previous activeLayerId:', activeLayerId);
+    console.log('New activeLayerId:', newLayerId);
+    console.log('All layers:', layers.map(l => ({ id: l.id, name: l.name })));
+    setActiveLayerId(newLayerId);
+    console.log('setActiveLayerId completed');
+    console.log('=== ACTIVE LAYER CHANGE DEBUG END ===');
+  }, [activeLayerId, layers]);
 
   // 새 레이어 생성
   const createLayer = useCallback((name = null) => {
     const layerId = `layer-${Date.now()}`;
-    const layerName = name || `레이어 ${layers.length}`;
+    
+    // 그리기 레이어만 카운트해서 순차적 번호 생성
+    const drawingLayers = layers.filter(layer => layer.type === 'drawing');
+    let layerNumber = drawingLayers.length + 1;
+    
+    // 기본 이름이 이미 있는지 확인하고 중복되지 않는 번호 찾기
+    while (layers.some(layer => layer.name === `레이어 ${layerNumber}`)) {
+      layerNumber++;
+    }
+    
+    const layerName = name || `레이어 ${layerNumber}`;
     const maxZIndex = Math.max(...layers.map(layer => layer.zIndex));
     
     const newLayer = {
@@ -90,66 +111,6 @@ const useLayers = () => {
     );
   }, []);
 
-  // 레이어 순서 변경
-  const moveLayer = useCallback((layerId, direction) => {
-    setLayers(prev => {
-      const sortedLayers = [...prev].sort((a, b) => a.zIndex - b.zIndex);
-      const currentIndex = sortedLayers.findIndex(layer => layer.id === layerId);
-      
-      if (currentIndex === -1) return prev;
-      
-      let newIndex;
-      if (direction === 'up') {
-        newIndex = Math.min(currentIndex + 1, sortedLayers.length - 1);
-      } else {
-        newIndex = Math.max(currentIndex - 1, 0);
-      }
-      
-      if (newIndex === currentIndex) return prev;
-      
-      // zIndex 재계산
-      const newLayers = [...prev];
-      const targetLayer = newLayers.find(layer => layer.id === layerId);
-      const swapLayer = sortedLayers[newIndex];
-      
-      if (targetLayer && swapLayer) {
-        const tempZIndex = targetLayer.zIndex;
-        targetLayer.zIndex = swapLayer.zIndex;
-        const swapLayerInNew = newLayers.find(layer => layer.id === swapLayer.id);
-        if (swapLayerInNew) {
-          swapLayerInNew.zIndex = tempZIndex;
-        }
-      }
-      
-      return newLayers;
-    });
-  }, []);
-
-  // 레이어를 맨 위로
-  const bringToFront = useCallback((layerId) => {
-    setLayers(prev => {
-      const maxZIndex = Math.max(...prev.map(layer => layer.zIndex));
-      return prev.map(layer => 
-        layer.id === layerId 
-          ? { ...layer, zIndex: maxZIndex + 1 }
-          : layer
-      );
-    });
-  }, []);
-
-  // 레이어를 맨 아래로
-  const sendToBack = useCallback((layerId) => {
-    if (layerId === 'background') return; // 배경은 항상 맨 아래
-    
-    setLayers(prev => {
-      const minZIndex = Math.min(...prev.filter(layer => layer.id !== 'background').map(layer => layer.zIndex));
-      return prev.map(layer => 
-        layer.id === layerId 
-          ? { ...layer, zIndex: minZIndex - 1 }
-          : layer
-      );
-    });
-  }, []);
 
   // 활성 레이어 정보 가져오기
   const getActiveLayer = useCallback(() => {
@@ -166,18 +127,71 @@ const useLayers = () => {
     return [...layers].sort((a, b) => b.zIndex - a.zIndex); // 높은 zIndex부터 (UI에서 위에 표시)
   }, [layers]);
 
+  // 드래그 앤 드롭으로 레이어 순서 변경
+  const reorderLayers = useCallback((draggedLayerId, targetLayerId) => {
+    console.log('useLayers reorderLayers called:', draggedLayerId, 'to', targetLayerId);
+    setLayers(prev => {
+      console.log('Previous layers:', prev.map(l => ({ id: l.id, name: l.name, zIndex: l.zIndex })));
+      
+      // UI 표시 순서와 동일하게 정렬 (높은 zIndex가 위에, 낮은 zIndex가 아래)
+      const sortedLayers = [...prev].sort((a, b) => b.zIndex - a.zIndex);
+      const draggedIndex = sortedLayers.findIndex(layer => layer.id === draggedLayerId);
+      const targetIndex = sortedLayers.findIndex(layer => layer.id === targetLayerId);
+      
+      console.log('Sorted layers:', sortedLayers.map(l => ({ id: l.id, name: l.name, zIndex: l.zIndex })));
+      console.log('Dragged index:', draggedIndex, 'Target index:', targetIndex);
+      
+      if (draggedIndex === -1 || targetIndex === -1) {
+        console.log('Layer not found - draggedIndex:', draggedIndex, 'targetIndex:', targetIndex);
+        return prev;
+      }
+      
+      if (draggedIndex === targetIndex) {
+        console.log('Same position, no change needed');
+        return prev;
+      }
+      
+      // 드래그된 레이어를 배열에서 제거
+      const draggedLayer = sortedLayers[draggedIndex];
+      const newOrder = [...sortedLayers];
+      newOrder.splice(draggedIndex, 1); // 드래그된 레이어 제거
+      
+      // 타겟 레이어의 위치를 찾기
+      const targetLayerInNewOrder = newOrder.find(layer => layer.id === targetLayerId);
+      const targetLayerNewIndex = newOrder.indexOf(targetLayerInNewOrder);
+      
+      // 드래그된 레이어를 타겟 레이어의 자리에 삽입 (방향 관계없이 동일하게)
+      newOrder.splice(targetLayerNewIndex, 0, draggedLayer);
+      
+      console.log('New order:', newOrder.map(l => ({ id: l.id, name: l.name })));
+      
+      // zIndex 재할당 - UI 표시 순서와 일치하도록
+      const newLayers = [...prev];
+      newOrder.forEach((layer, index) => {
+        const layerInNew = newLayers.find(l => l.id === layer.id);
+        if (layerInNew) {
+          // 첫 번째 레이어(UI 맨 위)가 가장 높은 zIndex를 가지도록
+          const newZIndex = newOrder.length - 1 - index;
+          console.log(`Setting ${layer.name} zIndex from ${layerInNew.zIndex} to ${newZIndex} (UI index: ${index})`);
+          layerInNew.zIndex = newZIndex;
+        }
+      });
+      
+      console.log('Final new layers:', newLayers.map(l => ({ id: l.id, name: l.name, zIndex: l.zIndex })));
+      return newLayers;
+    });
+  }, []);
+
   return {
     layers,
     activeLayerId,
-    setActiveLayerId,
+    setActiveLayerId: setActiveLayerIdWithLog,
     createLayer,
     deleteLayer,
     toggleLayerVisibility,
     toggleLayerLock,
     renameLayer,
-    moveLayer,
-    bringToFront,
-    sendToBack,
+    reorderLayers,
     getActiveLayer,
     getLayer,
     getSortedLayers

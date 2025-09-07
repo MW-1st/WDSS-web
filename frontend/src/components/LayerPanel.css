@@ -41,6 +41,11 @@
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
+  pointer-events: auto;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
 }
 
 .create-layer-btn:hover {
@@ -67,6 +72,23 @@
   cursor: pointer;
   transition: all 0.2s ease;
   min-height: 40px;
+  user-select: none;
+}
+
+.layer-item[draggable="true"] {
+  cursor: grab;
+}
+
+.layer-item.dragging {
+  opacity: 0.5;
+  cursor: grabbing;
+  transform: rotate(2deg);
+}
+
+.layer-item.drag-over {
+  border-color: #007bff;
+  background: #e7f3ff;
+  transform: scale(1.02);
 }
 
 .layer-item:hover {
@@ -95,6 +117,32 @@
 .layer-controls {
   display: flex;
   gap: 4px;
+  align-items: center;
+}
+
+.drag-handle {
+  width: 16px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  color: #6c757d;
+  font-size: 12px;
+  font-weight: bold;
+  line-height: 1;
+  border-radius: 3px;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.drag-handle:hover {
+  background: #f8f9fa;
+  color: #495057;
+}
+
+.layer-item.dragging .drag-handle {
+  cursor: grabbing;
 }
 
 .visibility-btn,
@@ -110,6 +158,11 @@
   align-items: center;
   justify-content: center;
   transition: background 0.2s ease;
+  pointer-events: auto;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
 }
 
 .visibility-btn:hover,
@@ -125,9 +178,17 @@
   opacity: 0.8;
 }
 
-.layer-name {
+.layer-name-area {
   flex: 1;
   min-width: 0;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 3px;
+  transition: background-color 0.2s ease;
+}
+
+.layer-name-area:hover {
+  background-color: rgba(0, 123, 255, 0.1);
 }
 
 .layer-name-text {
@@ -178,6 +239,11 @@
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
+  pointer-events: auto;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
 }
 
 .order-btn:hover,

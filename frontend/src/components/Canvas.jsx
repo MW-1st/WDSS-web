@@ -23,8 +23,8 @@ export default function Canvas({
   stageRef: externalStageRef,
   drawingMode: externalDrawingMode = "draw",
   eraserSize: externalEraserSize = 20,
-
   drawingColor: externalDrawingColor = '#222222',
+  activeLayerId: externalActiveLayerId,
   onModeChange
 }) {
   const canvasRef = useRef(null);
@@ -45,9 +45,7 @@ export default function Canvas({
     toggleLayerVisibility,
     toggleLayerLock,
     renameLayer,
-    moveLayer,
-    bringToFront,
-    sendToBack,
+    reorderLayers,
     getActiveLayer,
     getLayer,
     getSortedLayers
@@ -249,11 +247,66 @@ export default function Canvas({
 
     // 패스 생성 이벤트 리스너 (그리기 모드에서 레이어 정보 할당)
     const handlePathCreated = (e) => {
+      console.log('🎨 PATH CREATED EVENT FIRED! 🎨');
+      
       const path = e.path;
       if (path) {
-        const activeLayer = getActiveLayer();
+        // 클로저 문제 해결: 최신 상태를 externalStageRef에서 가져오기
+        let currentActiveLayerId = null;
+        let currentLayers = [];
+        
+        if (externalStageRef?.current?.layers) {
+          try {
+            currentActiveLayerId = externalStageRef.current.layers.getActiveLayerId();
+            currentLayers = externalStageRef.current.layers.getLayers();
+            console.log('🔄 Latest from stageRef - activeLayerId:', currentActiveLayerId);
+            console.log('🔄 Latest from stageRef - layers:', currentLayers.map(l => ({ id: l.id, name: l.name })));
+          } catch (error) {
+            console.warn('Error getting latest state from stageRef:', error);
+          }
+        }
+        
+        // 폴백: 클로저 상태 사용
+        if (!currentActiveLayerId) {
+          currentActiveLayerId = activeLayerId;
+          currentLayers = layers;
+          console.log('📦 Using closure state - activeLayerId:', currentActiveLayerId);
+        }
+        
+        const activeLayer = currentLayers.find(layer => layer.id === currentActiveLayerId);
+        console.log('🎯 Active layer found:', activeLayer);
+        
         if (activeLayer) {
+          console.log('✅ Assigning path to layer:', activeLayer.id, activeLayer.name);
           fabricLayerUtils.assignObjectToLayer(path, activeLayer.id, activeLayer.name);
+          
+          // 할당 후 확인
+          console.log('📝 Path after assignment - layerId:', path.layerId, 'layerName:', path.layerName);
+        } else {
+          console.warn('❌ No active layer found - using fallback');
+          const fallbackLayer = currentLayers.find(l => l.type === 'drawing');
+          if (fallbackLayer) {
+            fabricLayerUtils.assignObjectToLayer(path, fallbackLayer.id, fallbackLayer.name);
+            console.log('🔄 Fallback layer assigned:', fallbackLayer.id, fallbackLayer.name);
+          }
+        }
+      } else {
+        console.warn('❌ No path in path:created event');
+      }
+      console.log('🏁 PATH CREATED DEBUG END');
+    };
+
+    // 객체 추가 이벤트 리스너 (모든 객체에 대해 레이어 할당)
+    const handleObjectAdded = (e) => {
+      console.log('Object added event:', e);
+      const obj = e.target;
+      if (obj && !obj.layerId) { // 레이어 정보가 없는 객체만 처리
+        // 이미지와 동일한 로직: getActiveLayer() 사용
+        const activeLayer = getActiveLayer();
+        console.log('Active layer for object:', activeLayer);
+        if (activeLayer) {
+          fabricLayerUtils.assignObjectToLayer(obj, activeLayer.id, activeLayer.name);
+          console.log('Layer assigned to object:', activeLayer.id, activeLayer.name);
         }
       }
     };
@@ -264,6 +317,7 @@ export default function Canvas({
     canvas.on('mouse:move', handleMouseMove);
     canvas.on('mouse:up', handleMouseUp);
     canvas.on('path:created', handlePathCreated);
+    canvas.on('object:added', handleObjectAdded);
     
     document.addEventListener('keydown', handleKeyDown, { capture: true });
     document.addEventListener('keyup', handleKeyUp, { capture: true });
@@ -277,6 +331,7 @@ export default function Canvas({
       canvas.off('mouse:move', handleMouseMove);
       canvas.off('mouse:up', handleMouseUp);
       canvas.off('path:created', handlePathCreated);
+      canvas.off('object:added', handleObjectAdded);
       document.removeEventListener('keydown', handleKeyDown, { capture: true });
       document.removeEventListener('keyup', handleKeyUp, { capture: true });
       canvas.dispose();
@@ -426,6 +481,15 @@ export default function Canvas({
       updateBrushColor(externalDrawingColor);
     }
   }, [externalDrawingColor]);
+
+  // 외부에서 activeLayerId가 변경될 때 반응
+  useEffect(() => {
+    console.log('🔄 외부 activeLayerId 변경:', externalActiveLayerId, '현재 내부 activeLayerId:', activeLayerId);
+    if (externalActiveLayerId && externalActiveLayerId !== activeLayerId) {
+      console.log('✅ Canvas activeLayerId 업데이트:', activeLayerId, '->', externalActiveLayerId);
+      setActiveLayerId(externalActiveLayerId);
+    }
+  }, [externalActiveLayerId]);
 
   // 지우개 크기가 변경될 때 현재 모드에 따라 업데이트
   useEffect(() => {
@@ -1140,32 +1204,16 @@ export default function Canvas({
     }
   }, [getLayer, toggleLayerLock]);
 
-  // 레이어 순서 변경 함수
-  const handleLayerMove = useCallback((layerId, direction) => {
-    if (fabricCanvas.current) {
-      if (direction === 'up') {
-        fabricLayerUtils.bringLayerForward(fabricCanvas.current, layerId);
-      } else {
-        fabricLayerUtils.sendLayerBackwards(fabricCanvas.current, layerId);
-      }
-      moveLayer(layerId, direction);
-    }
-  }, [moveLayer]);
 
-  // 레이어를 맨 앞/뒤로 이동
-  const handleBringToFront = useCallback((layerId) => {
+  // 레이어 삭제 (캔버스 객체도 함께 삭제)
+  const handleDeleteLayer = useCallback((layerId) => {
     if (fabricCanvas.current) {
-      fabricLayerUtils.bringLayerToFront(fabricCanvas.current, layerId);
-      bringToFront(layerId);
+      // 먼저 캔버스에서 해당 레이어의 모든 객체 삭제
+      fabricLayerUtils.deleteLayerObjects(fabricCanvas.current, layerId);
+      // 그다음 레이어 상태에서 삭제
+      deleteLayer(layerId);
     }
-  }, [bringToFront]);
-
-  const handleSendToBack = useCallback((layerId) => {
-    if (fabricCanvas.current) {
-      fabricLayerUtils.sendLayerToBack(fabricCanvas.current, layerId);
-      sendToBack(layerId);
-    }
-  }, [sendToBack]);
+  }, [deleteLayer]);
 
   // 외부에서 사용할 수 있도록 ref에 함수 등록
   useEffect(() => {
@@ -1202,18 +1250,25 @@ export default function Canvas({
         getActiveLayerId: () => activeLayerId,
         setActiveLayer: setActiveLayerId,
         createLayer,
-        deleteLayer,
+        deleteLayer: handleDeleteLayer, // 캔버스 객체도 함께 삭제하는 핸들러 사용
         renameLayer,
         toggleVisibility: handleLayerVisibilityChange,
         toggleLock: handleLayerLockChange,
-        moveLayer: handleLayerMove,
-        bringToFront: handleBringToFront,
-        sendToBack: handleSendToBack
+        reorderLayers: (draggedLayerId, targetLayerId) => {
+          console.log('Canvas reorderLayers called:', draggedLayerId, targetLayerId);
+          reorderLayers(draggedLayerId, targetLayerId);
+          
+          // 레이어 순서가 변경되면 캔버스 객체도 재정렬
+          if (fabricCanvas.current) {
+            const sortedLayers = getSortedLayers();
+            fabricLayerUtils.reorderObjectsByLayers(fabricCanvas.current, sortedLayers);
+          }
+        }
       };
     }
   }, [externalStageRef, getSortedLayers, activeLayerId, setActiveLayerId, createLayer, 
-      deleteLayer, renameLayer, handleLayerVisibilityChange, handleLayerLockChange, 
-      handleLayerMove, handleBringToFront, handleSendToBack]); // drawingColor는 의존성에서 제거하여 무한 루프 방지
+      handleDeleteLayer, renameLayer, handleLayerVisibilityChange, handleLayerLockChange, 
+      reorderLayers]); // 드래그 앤 드롭 레이어 순서 변경 함수 추가
 
   return (
     <div
