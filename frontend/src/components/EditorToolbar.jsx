@@ -1,12 +1,10 @@
 import React from "react";
-import { createPortal } from "react-dom";
+import { createPortal } from "react-dom"; // 툴팁만 사용
 import ImageTransformControls from "../components/ImageTransformControls.jsx";
 import UnitySimulatorControls from "../components/UnitySimulatorControls.jsx";
-import ImageGallery from "../components/ImageGallery.jsx";
 import CanvasTools from "../components/CanvasTools.jsx";
 import { FaImage } from "react-icons/fa";
-
-// Inner 컴포넌트 분리 + overlay/tooltip 기능 포함
+import PortalPopover from "./PortalPopover.jsx"; 
 const Inner = ({
   onImageDragStart,
   drawingMode,
@@ -27,49 +25,24 @@ const Inner = ({
   isUnityVisible,
   showUnity,
   hideUnity,
+  onGalleryStateChange, // 부모에서 상태 관리
 }) => {
-  const [showGallery, setShowGallery] = React.useState(true);
-  const wrapperRef = React.useRef(null);
-  const [overlayPos, setOverlayPos] = React.useState({ top: 0, left: 0 });
-  const galleryBtnRef = React.useRef(null);
+  // 🔸 로컬에서 열림여부를 갖지 않고, 부모에게 토글만 알림
   const [galleryHovered, setGalleryHovered] = React.useState(false);
-  const [galleryTooltipPos, setGalleryTooltipPos] = React.useState({
-    top: 0,
-    left: 0,
-  });
+  const [tooltipPos, setTooltipPos] = React.useState({ top: 0, left: 0 });
+  const btnRef = React.useRef(null);
 
-  const updateOverlayPos = React.useCallback(() => {
-    const aside = document.querySelector("aside");
-    if (!wrapperRef.current || !aside) return;
-    const wrapRect = wrapperRef.current.getBoundingClientRect();
-    const asideRect = aside.getBoundingClientRect();
-    setOverlayPos({
-      top: Math.round(wrapRect.top),
-      left: Math.round(asideRect.right + 12),
-    });
-  }, []);
-
-  React.useEffect(() => {
-    if (!showGallery) return;
-    updateOverlayPos();
-    window.addEventListener("resize", updateOverlayPos);
-    window.addEventListener("scroll", updateOverlayPos, true);
-    return () => {
-      window.removeEventListener("resize", updateOverlayPos);
-      window.removeEventListener("scroll", updateOverlayPos, true);
-    };
-  }, [showGallery, updateOverlayPos]);
+  const toggleGallery = () => {
+    // 부모가 상태를 소유하므로 이전값을 받아 토글
+    onGalleryStateChange?.((prev) => !prev);
+  };
 
   React.useEffect(() => {
     if (!galleryHovered) return;
-    const el = galleryBtnRef.current;
-    if (!el) return;
+    const el = btnRef.current; if (!el) return;
     const update = () => {
       const r = el.getBoundingClientRect();
-      setGalleryTooltipPos({
-        top: Math.round(r.top + r.height / 2),
-        left: Math.round(r.right + 8),
-      });
+      setTooltipPos({ top: Math.round(r.top + r.height / 2), left: Math.round(r.right + 8) });
     };
     update();
     window.addEventListener("scroll", update, true);
@@ -79,7 +52,6 @@ const Inner = ({
       window.removeEventListener("resize", update);
     };
   }, [galleryHovered]);
-
   // Keyboard shortcuts for tool switching: P(draw), E(erase), B(brush), V(select)
   React.useEffect(() => {
     const handler = (e) => {
@@ -111,14 +83,14 @@ const Inner = ({
     return () => window.removeEventListener("keydown", handler);
   }, [onModeChange]);
 
-  const GalleryTooltipPortal = () =>
+  const Tooltip = () =>
     galleryHovered
       ? createPortal(
           <div
             style={{
               position: "fixed",
-              top: galleryTooltipPos.top,
-              left: galleryTooltipPos.left,
+              top: tooltipPos.top,
+              left: tooltipPos.left,
               transform: "translateY(-50%)",
               background: "#000",
               color: "#fff",
@@ -127,8 +99,8 @@ const Inner = ({
               fontSize: 12,
               whiteSpace: "nowrap",
               zIndex: 9999,
-              boxShadow: "0 2px 6px rgba(0,0,0,.2)",
               pointerEvents: "none",
+              boxShadow: "0 2px 6px rgba(0,0,0,.2)",
             }}
           >
             Image gallery
@@ -139,50 +111,32 @@ const Inner = ({
 
   return (
     <>
-      <div ref={wrapperRef} style={{ marginBottom: 16, position: "relative" }}>
-        {layout === "sidebar" && (
+      {layout === "sidebar" && (
+        <div style={{ marginBottom: 8 }}>
           <button
-            ref={galleryBtnRef}
-            onClick={() => setShowGallery((v) => !v)}
+            ref={btnRef}
+            onClick={toggleGallery}
+            aria-label="Image gallery"
+            onMouseEnter={() => setGalleryHovered(true)}
+            onMouseLeave={() => setGalleryHovered(false)}
             style={{
               border: "1px solid #ccc",
               padding: "8px 16px",
               borderRadius: 4,
               cursor: "pointer",
-              marginBottom: 8,
               fontSize: 16,
               display: "inline-flex",
               alignItems: "center",
-              justifyContent: "center",
               gap: 6,
               background: "#f8f9fa",
-              color: "black",
             }}
-            onMouseEnter={() => setGalleryHovered(true)}
-            onMouseLeave={() => setGalleryHovered(false)}
-            aria-label="Image gallery"
+
           >
             <FaImage />
           </button>
-        )}
-        <GalleryTooltipPortal />
-        {layout === "sidebar"
-          ? showGallery &&
-            createPortal(
-              <div
-                style={{
-                  position: "fixed",
-                  top: overlayPos.top,
-                  left: overlayPos.left,
-                  zIndex: 8000,
-                }}
-              >
-                <ImageGallery onImageDragStart={onImageDragStart} layout="overlay" />
-              </div>,
-              document.body
-            )
-          : showGallery && <ImageGallery onImageDragStart={onImageDragStart} />}
-      </div>
+          <Tooltip />
+        </div>
+      )}
 
       <div style={{ marginBottom: 16 }}>
         <CanvasTools
@@ -224,15 +178,13 @@ const Inner = ({
 
 const EditorToolbar = React.memo(function EditorToolbar(props) {
   const { layout = "full" } = props;
-
   if (layout === "sidebar") {
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div className="editor-sidebar" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <Inner {...props} />
       </div>
     );
   }
-
   return (
     <section
       style={{

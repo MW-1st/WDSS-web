@@ -2,9 +2,11 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import client from "../api/client.js";
 import { useNavigate } from "react-router-dom";
+import "../styles/DashboardPage.css"; // 스타일 import
 import "../DashboardPage.css";
 import { CiMenuBurger } from "react-icons/ci";
 import ProjectSettingsModal from "../components/ProjectSettingsModal";
+
 
 const PlusIcon = () => (
   <svg

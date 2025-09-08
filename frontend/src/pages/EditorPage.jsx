@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import Canvas from "../components/Canvas.jsx";
 import EditorToolbar from "../components/EditorToolbar.jsx";
 import MainCanvasSection from "../components/MainCanvasSection.jsx";
 import SceneCarousel from "../components/SceneCarousel.jsx";
@@ -12,52 +11,54 @@ import { CiSettings } from "react-icons/ci";
 import ProjectSettingsModal from "../components/ProjectSettingsModal";
 
 const VISIBLE = 4;
-const THUMB_W = 200;
-const THUMB_H = 120;
-const GAP = 48;
-const BTN_SIZE = 48;
 const DUMMY = "11111111-1111-1111-1111-111111111111";
+
+const LEFT_TOOL_WIDTH = 100;
+const RIGHT_PANEL_WIDTH = 260;
 
 function useDebounced(fn, delay = 400) {
   const t = useRef(null);
   const fnRef = useRef(fn);
-  useEffect(() => {
-    fnRef.current = fn;
-  }, [fn]);
-  const debounced = React.useCallback(
-    (...args) => {
-      if (t.current) clearTimeout(t.current);
-      t.current = setTimeout(() => fnRef.current(...args), delay);
-    },
-    [delay]
-  );
-  return debounced;
+  useEffect(() => { fnRef.current = fn; }, [fn]);
+  return React.useCallback((...args) => {
+    if (t.current) clearTimeout(t.current);
+    t.current = setTimeout(() => fnRef.current(...args), delay);
+  }, [delay]);
 }
 
+// 실제 스크롤바 폭 측정 (Windows 레이아웃형 스크롤 대응)
+
 export default function EditorPage({ projectId = DUMMY }) {
-  // 프로젝트 및 씬 관리 상태
   const { project_id } = useParams();
   const [pid, setPid] = useState(project_id);
+
   const [scenes, setScenes] = useState([]);
   const [projectName, setProjectName] = useState("");
   const [projectMeta, setProjectMeta] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
   const [start, setStart] = useState(0);
 
-  // 이미지 변환 관련 상태
-  const [imageUrl, setImageUrl] = useState(""); // 현재 표시되는 이미지 (변환된 결과)
+  // ✅ 갤러리 열림 상태: 하나만 사용 (초기값: false => 닫힌 채로 시작)
+  const [galleryOpen, setGalleryOpen] = useState(() => {
+    const saved = localStorage.getItem("wdss:galleryOpen");
+    return saved ? JSON.parse(saved) : false; // 기본 닫힘
+  });
+  useEffect(() => {
+    localStorage.setItem("wdss:galleryOpen", JSON.stringify(galleryOpen));
+  }, [galleryOpen]);
+
+  const [imageUrl, setImageUrl] = useState("");
   const [processing, setProcessing] = useState(false);
   const [targetDots, setTargetDots] = useState(2000);
-
-  // 원본 캔버스 상태 관리
   const [originalCanvasState, setOriginalCanvasState] = useState(null);
   const stageRef = useRef(null);
+  const galleryRef = useRef(null);
 
-  // 캔버스 관련 상태
   const [drawingMode, setDrawingMode] = useState("draw");
   const [eraserSize, setEraserSize] = useState(20);
   const [drawingColor, setDrawingColor] = useState("#222222");
   const [selectedObject, setSelectedObject] = useState(null);
+
 
   // 프로젝트 설정 모달 상태
   const [editingProject, setEditingProject] = useState(null);
@@ -71,45 +72,33 @@ export default function EditorPage({ projectId = DUMMY }) {
   };
 
   // 색상이 변경될 때 즉시 캔버스에 반영
+
   useEffect(() => {
-    if (stageRef.current && stageRef.current.setDrawingColor) {
-      stageRef.current.setDrawingColor(drawingColor);
-    }
+    stageRef.current?.setDrawingColor?.(drawingColor);
   }, [drawingColor]);
-  // const sceneId = 1; // 현재 에디터의 씬 ID (임시 하드코딩)
 
-  // unity 관련 상태
-  const { isUnityVisible, showUnity, hideUnity, sendTestData } = useUnity();
-
-  // 프로젝트가 없으면 생성하는 헬퍼
   const ensureProjectId = async () => {
     if (pid) return pid;
     const newId =
-      crypto && crypto.randomUUID
-        ? crypto.randomUUID()
-        : ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, (c) =>
-            (
-              c ^
-              (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (c / 4)))
-            ).toString(16)
-          );
-
+      crypto?.randomUUID?.() ??
+      ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, (c) =>
+        (c ^
+          (crypto.getRandomValues(new Uint8Array(1))[0] &
+            (15 >> (c / 4)))).toString(16)
+      );
     const { data } = await client.post("/projects", {
-      id: newId,
-      project_name: "Untitled Project",
-      user_id: null,
+      id: newId, project_name: "Untitled Project", user_id: null,
     });
     setPid(data.id);
     setProjectName("Untitled Project");
     return data.id;
   };
 
-  // 초기: 프로젝트가 있으면 목록 로드
   useEffect(() => {
     if (!pid) return;
-    // Load project meta (name)
     (async () => {
       try {
+
         const { data } = await client.get(`/projects/${pid}`);
         const p = data?.project ?? data;
         if (p?.project_name) setProjectName(p.project_name);
@@ -121,34 +110,25 @@ export default function EditorPage({ projectId = DUMMY }) {
           e?.response?.data || e?.message
         );
       }
+
     })();
   }, [pid]);
 
-  // 초기: 프로젝트가 있으면 목록 로드
   useEffect(() => {
     if (!pid) return;
     (async () => {
       try {
         const { data: list } = await client.get(`/projects/${pid}/scenes/`);
-        setScenes(
-          list.map((s, i) => ({
-            ...s,
-            name: s.name || `Scene ${s.scene_num ?? i + 1}`,
-          }))
-        );
+        setScenes(list.map((s, i) => ({ ...s, name: s.name || `Scene ${s.scene_num ?? i + 1}` })));
         if (list[0]) setSelectedId(list[0].id);
-      } catch (e) {
-        console.error(e);
-      }
+      } catch (e) { console.error(e); }
     })();
   }, [pid]);
 
-  // 씬 선택 → 상세 로드
   useEffect(() => {
-    if (!pid) return;
+    if (!pid || !selectedId) return;
     (async () => {
-      if (!selectedId) return;
-      const current = scenes.find((s) => s.id === selectedId);
+      const current = scenes.find(s => s.id === selectedId);
       if (!current || "drones" in current) return;
       try {
         const { data: detail } = await client.get(
@@ -180,8 +160,6 @@ export default function EditorPage({ projectId = DUMMY }) {
       }
     })();
   }, [selectedId, pid, scenes]);
-
-  // 저장(디바운스)
 
   const saveDebounced = useDebounced(
     async (scene_id, drones, preview, imageUrl, originalCanvasState) => {
@@ -225,82 +203,41 @@ export default function EditorPage({ projectId = DUMMY }) {
     [saveDebounced, imageUrl, originalCanvasState, setScenes]
   );
 
-  // + 생성
   const handleAddScene = async () => {
     try {
       const projectIdReady = await ensureProjectId();
-      console.log("확인된 Project ID:", projectIdReady);
       const scene_num = scenes.length + 1;
-      console.log("확인된 scene_num:", scene_num);
       const { data: created } = await client.post(
         `/projects/${projectIdReady}/scenes/`,
-        {
-          project_id: projectIdReady,
-          scene_num,
-        }
+        { project_id: projectIdReady, scene_num }
       );
-
-      const nextScenes = [...scenes, created];
-      setScenes(nextScenes);
+      const next = [...scenes, created];
+      setScenes(next);
       setSelectedId(created.id);
-
-      // console.log(`created ${created}`)
-      // console.log(`setSelectedId ${created.id}`)
-      const nextTotal = nextScenes.length + 1;
-      if (nextTotal > VISIBLE) setStart(nextTotal - VISIBLE);
-
-      // 새 씬으로 전환하면서 상태 초기화
+      if (next.length + 1 > VISIBLE) setStart(next.length + 1 - VISIBLE);
       setImageUrl("");
       setOriginalCanvasState(null);
-    } catch (e) {
-      console.error(e);
-      alert("씬 생성 실패");
-    }
+    } catch (e) { console.error(e); alert("씬 생성 실패"); }
   };
 
-  // 선택
   const handleSelect = (id) => {
     if (id === "__ADD__") return;
     setSelectedId(id);
-    const idx = items.findIndex((it) => it.id === id);
+    const items = [...scenes, { id: "__ADD__", isAdd: true }];
+    const idx = items.findIndex(it => it.id === id);
     if (idx < start) setStart(idx);
     if (idx >= start + VISIBLE) setStart(idx - VISIBLE + 1);
   };
 
-  // + 카드까지 포함
-  const items = useMemo(
-    () => [...scenes, { id: "__ADD__", isAdd: true }],
-    [scenes]
-  );
-  const total = items.length;
-  const canSlide = total > VISIBLE;
-  const end = Math.min(start + VISIBLE, total);
-  const visibleItems = items.slice(start, end);
-
   const selectedScene = useMemo(
-    () => scenes.find((s) => s.id === selectedId) || null,
+    () => scenes.find(s => s.id === selectedId) || null,
     [scenes, selectedId]
   );
 
-  // 이미지 변환 핸들러
   const handleTransform = async () => {
-    // 사전 조건 확인: 씬 선택 및 캔버스 준비 여부
-    if (!selectedId) {
-      alert("먼저 씬을 추가하거나 선택해 주세요.");
-      return;
-    }
-    if (!pid) {
-      alert("프로젝트 ID가 없습니다. 페이지를 새로고침해 주세요.");
-      return;
-    }
-    if (!stageRef.current) {
-      alert("캔버스가 아직 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.");
-      return;
-    }
-
-    console.log("Transform 시작 - pid:", pid, "selectedId:", selectedId);
-    console.log("originalCanvasState:", originalCanvasState);
-
+    if (!selectedId) return alert("먼저 씬을 추가하거나 선택해 주세요.");
+    if (!pid) return alert("프로젝트 ID가 없습니다. 페이지를 새로고침해 주세요.");
+    if (!stageRef.current) return alert("캔버스가 아직 준비되지 않았습니다.");
     try {
       setProcessing(true);
 
@@ -316,14 +253,9 @@ export default function EditorPage({ projectId = DUMMY }) {
         return;
       }
 
-      // 첫 번째 변환인지 확인 (원본 상태가 없는 경우)
       if (!originalCanvasState) {
-        console.log("첫 번째 변환: 현재 캔버스 상태를 원본으로 저장");
-        // 현재 캔버스 상태를 원본으로 저장
-        const currentState = stageRef.current.saveOriginalCanvasState();
-        if (currentState) {
-          setOriginalCanvasState(currentState);
-        }
+        const s = stageRef.current.saveOriginalCanvasState?.();
+        if (s) setOriginalCanvasState(s);
       } else {
         console.log("기존 원본 상태로 복원하여 변환");
         // 원본 상태로 복원
@@ -506,13 +438,8 @@ export default function EditorPage({ projectId = DUMMY }) {
 
       // 변환된 이미지 URL을 현재 씬에 저장은 각 분기에서 처리
     } catch (e) {
-      console.error("Transform error", e);
-      console.error("Error details:", e.response?.data || e.message);
-      alert(
-        `이미지 변환 중 오류가 발생했습니다: ${
-          e.response?.data?.message || e.message
-        }`
-      );
+      console.error(e);
+      alert(`이미지 변환 중 오류: ${e.response?.data?.message || e.message}`);
       setProcessing(false);
     }
   };
@@ -548,38 +475,24 @@ export default function EditorPage({ projectId = DUMMY }) {
   );
 
   const handleClearAll = React.useCallback(() => {
-    if (stageRef.current && stageRef.current.clear) {
-      if (
-        confirm(
-          "캔버스의 모든 내용을 지우시겠습니까? 이 작업은 되돌릴 수 없습니다."
-        )
-      ) {
-        stageRef.current.clear();
-        console.log("캔버스 전체가 초기화되었습니다");
-      }
-    }
+    if (!stageRef.current?.clear) return;
+    if (confirm("캔버스의 모든 내용을 지우시겠습니까?")) stageRef.current.clear();
   }, []);
 
   const handleColorChange = React.useCallback((color) => {
     setDrawingColor(color);
-    if (stageRef.current && stageRef.current.setDrawingColor) {
-      stageRef.current.setDrawingColor(color);
-    }
+    stageRef.current?.setDrawingColor?.(color);
   }, []);
 
   const handleColorPreview = React.useCallback((color) => {
-    // 미리보기 시에도 실제 상태를 변경하여 도구 전환 시에도 색상 유지
     setDrawingColor(color);
-    if (stageRef.current && stageRef.current.setDrawingColor) {
-      stageRef.current.setDrawingColor(color);
-    }
+    stageRef.current?.setDrawingColor?.(color);
   }, []);
 
   // Change fill color for single or multi-selection
   const handleSelectedFillChange = React.useCallback((hex) => {
     const canvas = stageRef.current;
-    if (!canvas) return;
-    const active = canvas.getActiveObject && canvas.getActiveObject();
+    const active = canvas?.getActiveObject?.();
     if (!active) return;
 
     const applyFill = (obj) => {
@@ -606,58 +519,38 @@ export default function EditorPage({ projectId = DUMMY }) {
     setSelectedObject((prev) => (prev ? { ...prev, fill: hex } : prev));
   }, []);
 
-  // Bridge editor controls to navbar via window for project routes
-  useEffect(() => {
-    window.editorAPI = {
-      // state
-      targetDots,
-      processing,
-      imageUrl,
-      selectedId,
-      projectName,
-      // refs & methods
-      stageRef,
-      setTargetDots,
-      handleTransform,
-    };
-    // notify listeners (e.g., Navbar) that editor state changed
-    window.dispatchEvent(
-      new CustomEvent("editor:updated", {
-        detail: {
-          targetDots,
-          processing,
-          imageUrl,
-          selectedId,
-          projectName,
-        },
-      })
-    );
-  }, [targetDots, processing, imageUrl, selectedId, projectName]);
-
   return (
     <div
+      className="editor-shell"
       style={{
         width: "100%",
+        minHeight: "100vh",
         background: "#fff",
         display: "flex",
-        minHeight: "100vh",
+        alignItems: "flex-start",
+        gap: 16,                 // 부모가 간격 관리
+        boxSizing: "border-box",
+        overflowX: "hidden",     // 가로 스크롤 가드
       }}
     >
+      {/* 왼쪽 툴바 */}
       <aside
+        id="left-rail"
         style={{
-          width: 100,
+          width: LEFT_TOOL_WIDTH,
           borderRight: "1px solid #eee",
-          padding: 16,
           position: "sticky",
           top: 0,
-          alignSelf: "flex-start",
           height: "100vh",
-          overflowY: "auto",
           background: "#fff",
-          display: "flex",
-          flexDirection: "column",
+          flex: "0 0 auto",
+          boxSizing: "border-box",
+          overflow: "visible",   // 팝오버가 밖으로 나올 수 있도록
+          zIndex: 50,
         }}
       >
+        {/* 내부에서만 스크롤 */}
+        <div style={{ height: "100%", overflowY: "auto", padding: 16 }}>
         <EditorToolbar
           pid={pid}
           selectedId={selectedId}
@@ -681,6 +574,7 @@ export default function EditorPage({ projectId = DUMMY }) {
           onClearAll={handleClearAll}
           stageRef={stageRef} // stageRef prop 전달
           layout="sidebar"
+          onGalleryStateChange={setGalleryOpen}
         />
         <div style={{ marginTop: "auto" }}>
           <button
@@ -705,12 +599,24 @@ export default function EditorPage({ projectId = DUMMY }) {
           >
             <CiSettings size={20} />
           </button>
+
         </div>
       </aside>
-      <div style={{ flex: 1 }}>
-        {/* 업로드 및 도구 바 */}
 
-        {/* 메인 캔버스 */}
+      {/* 갤러리 패널 */}
+      {galleryOpen && (
+        <div style={{ flex: "0 1 360px", minWidth: 0, boxSizing: "border-box" }}>
+          <ImageGallery onImageDragStart={(u) => console.log("drag:", u)} />
+        </div>
+      )}
+
+      {/* 메인 */}
+      <div
+        style={{
+          flex: "1 1 0%",
+          minWidth: 0,
+        }}
+      >
         <MainCanvasSection
           selectedScene={selectedScene}
           imageUrl={imageUrl}
@@ -723,33 +629,40 @@ export default function EditorPage({ projectId = DUMMY }) {
           onSelectionChange={setSelectedObject}
         />
 
-        {/* 씬 캐러셀 */}
         <SceneCarousel
+          projectId={pid}     
           scenes={scenes}
+          setScenes={setScenes}    
           selectedId={selectedId}
           start={start}
           setStart={setStart}
           onAddScene={handleAddScene}
           onSelectScene={handleSelect}
+          compact={galleryOpen}
         />
       </div>
+
+      {/* 오른쪽 패널 */}
       <aside
         style={{
-          width: 260,
+          width: RIGHT_PANEL_WIDTH,
           borderLeft: "1px solid #eee",
-          padding: 16,
           position: "sticky",
           top: 0,
-          alignSelf: "flex-start",
           height: "100vh",
-          overflowY: "auto",
           background: "#fff",
+          flex: "0 0 auto",
+          boxSizing: "border-box",
+          overflow: "visible",   // 팝오버가 밖으로
+          zIndex: 50,
         }}
       >
-        <ObjectPropertiesPanel
-          selection={selectedObject}
-          onChangeFill={handleSelectedFillChange}
-        />
+        <div style={{ height: "100%", overflowY: "auto", padding: 16 }}>
+          <ObjectPropertiesPanel
+            selection={selectedObject}
+            onChangeFill={handleSelectedFillChange}
+          />
+        </div>
       </aside>
 
       {editingProject && (
