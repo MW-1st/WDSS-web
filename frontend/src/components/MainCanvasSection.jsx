@@ -19,7 +19,7 @@ function MainCanvasSection({
       justifyContent: "center",
       padding: "24px 0 32px"
     }}>
-      <div style={{ width: "70%", maxWidth: 980 }}>
+      <div style={{ width: "84%", maxWidth: 1280 }}>
         <div
           style={{
             width: "100%",
@@ -37,8 +37,8 @@ function MainCanvasSection({
             <Canvas
               key={selectedScene.id}
               scene={selectedScene}
-              width={1200}
-              height={675}
+              width={1120}
+              height={630}
               onChange={(patch) => onChange(selectedScene.id, patch)}
               imageUrl={imageUrl}
               stageRef={stageRef}
