@@ -1159,7 +1159,7 @@ export default function Canvas({
     console.log('getCurrentCanvasAsSvg - 총 객체 수:', objects.length);
     
     objects.forEach((obj, index) => {
-      console.log(`객체 ${index}: type=${obj.type}, customType=${obj.customType}, fill=${obj.fill}, stroke=${obj.stroke}`);
+      // console.log(`객체 ${index}: type=${obj.type}, customType=${obj.customType}, fill=${obj.fill}, stroke=${obj.stroke}`);
       
       if (obj.customType === 'svgDot' || obj.customType === 'drawnDot') {
         // 도트의 중심점 계산
