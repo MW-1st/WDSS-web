@@ -27,7 +27,8 @@ export default function Canvas({
   drawingColor: externalDrawingColor = '#222222',
   activeLayerId: externalActiveLayerId,
   onModeChange,
-  onSelectionChange
+  onSelectionChange,
+  onPanChange
 }) {
   const canvasRef = useRef(null);
   const fabricCanvas = useRef(null);
@@ -202,6 +203,7 @@ export default function Canvas({
         obj.selectable = false;
         obj.evented = false;
       });
+      try { onPanChange && onPanChange(true); } catch {}
     };
 
     const exitPanMode = () => {
@@ -225,27 +227,36 @@ export default function Canvas({
           obj.evented = true;
         }
       });
+      try { onPanChange && onPanChange(false); } catch {}
     };
 
     const handleKeyDown = (e) => {
-      if (e.code === 'Space') {
+      if (
+        e.code === 'Space' &&
+        !['INPUT','TEXTAREA','SELECT'].includes(((e.target && e.target.tagName) || '').toUpperCase()) &&
+        !((e.target && e.target.getAttribute) && e.target.getAttribute('contenteditable') === 'true')
+      ) {
         e.preventDefault(); // 브라우저 기본 스크롤 방지
         e.stopPropagation(); // 이벤트 전파 중단
         
-        if (!isPanMode) {
+        if (isPanMode) {
+          exitPanMode();
+        } else {
           enterPanMode();
         }
       }
     };
 
     const handleKeyUp = (e) => {
-      if (e.code === 'Space') {
+      if (
+        e.code === 'Space' &&
+        !['INPUT','TEXTAREA','SELECT'].includes(((e.target && e.target.tagName) || '').toUpperCase()) &&
+        !((e.target && e.target.getAttribute) && e.target.getAttribute('contenteditable') === 'true')
+      ) {
         e.preventDefault(); // 브라우저 기본 스크롤 방지
         e.stopPropagation(); // 이벤트 전파 중단
         
-        if (isPanMode) {
-          exitPanMode();
-        }
+        // 토글 방식에서는 keyup 시 별도 동작 없음
       }
     };
 
@@ -418,6 +429,11 @@ export default function Canvas({
     
     document.addEventListener('keydown', handleKeyDown, { capture: true });
     document.addEventListener('keyup', handleKeyUp, { capture: true });
+    
+    // Expose minimal pan controls for external UI
+    canvas.enterPanMode = enterPanMode;
+    canvas.exitPanMode = exitPanMode;
+    canvas.getPanMode = () => isPanMode;
     
     // 캔버스 경계 추가
     addCanvasBoundary();
