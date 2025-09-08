@@ -37,6 +37,9 @@ export default function Canvas({
   const [drawingColor, setDrawingColor] = useState(externalDrawingColor);
   const currentColorRef = useRef(externalDrawingColor);
   useEffect(() => { currentColorRef.current = externalDrawingColor; }, [externalDrawingColor]);
+  // Keep latest drawing mode accessible inside closures
+  const drawingModeRef = useRef(drawingMode);
+  useEffect(() => { drawingModeRef.current = drawingMode; }, [drawingMode]);
   const eraseHandlers = useRef({});
   const selectionHandlers = useRef({});
   const onSelectionChangeRef = useRef(onSelectionChange);
@@ -215,10 +218,14 @@ export default function Canvas({
       // 원래 상태 복원
       canvas.isDrawingMode = originalDrawingMode;
       canvas.selection = originalSelection;
-      canvas.defaultCursor = 'default';
-      canvas.hoverCursor = 'move';
-      canvas.moveCursor = 'move';
-      canvas.setCursor('default');
+      try {
+        applyDrawingMode(drawingModeRef.current, currentColorRef.current);
+      } catch (_) {
+        canvas.defaultCursor = 'default';
+        canvas.hoverCursor = 'move';
+        canvas.moveCursor = 'move';
+        canvas.setCursor('default');
+      }
       
       // 객체들을 다시 활성화 (드롭된 이미지만)
       canvas.getObjects().forEach(obj => {
