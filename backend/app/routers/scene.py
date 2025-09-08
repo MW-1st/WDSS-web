@@ -7,7 +7,14 @@ from fastapi import HTTPException, Depends, APIRouter, UploadFile, File
 
 from app.db.database import get_conn
 from app.dependencies import get_current_user
-from app.schemas import SceneCreate, SceneUpdate, SceneResponse, Scene, ScenesResponse
+from app.schemas import (
+    SceneCreate,
+    SceneUpdate,
+    SceneResponse,
+    Scene,
+    ScenesResponse,
+    UserResponse,
+)
 
 from app.config import ORIGINALS_DIR, PROCESSED_DIR, TMP_DIR
 from app.schemas import TransformOptions
@@ -17,7 +24,7 @@ router = APIRouter()
 
 
 @router.get("", response_model=ScenesResponse)
-async def get_scenes(project_id: str, user: dict = Depends(get_current_user)):
+async def get_scenes(project_id: str, user: UserResponse = Depends(get_current_user)):
     """씬 목록 조회"""
     try:
         uuid.UUID(project_id)  # UUID 유효성 검사
@@ -63,7 +70,9 @@ async def get_scenes(project_id: str, user: dict = Depends(get_current_user)):
 
 @router.post("", response_model=SceneResponse)
 async def create_scene(
-    project_id: str, scene_data: SceneCreate, user: dict = Depends(get_current_user)
+    project_id: str,
+    scene_data: SceneCreate,
+    user: UserResponse = Depends(get_current_user),
 ):
     """빈 씬 생성"""
     try:
@@ -132,7 +141,7 @@ async def create_scene(
 
 @router.get("/{scene_id}", response_model=SceneResponse)
 async def get_scene(
-    project_id: str, scene_id: str, user: dict = Depends(get_current_user)
+    project_id: str, scene_id: str, user: UserResponse = Depends(get_current_user)
 ):
     """씬 정보 조회"""
     try:
@@ -173,7 +182,7 @@ async def update_scene(
     project_id: str,
     scene_id: str,
     scene_data: SceneUpdate,
-    user: dict = Depends(get_current_user),
+    user: UserResponse = Depends(get_current_user),
 ):
     """씬 업데이트"""
     try:
@@ -229,7 +238,7 @@ async def update_scene(
 
 @router.delete("/{scene_id}")
 async def delete_scene(
-    project_id: str, scene_id: str, user: dict = Depends(get_current_user)
+    project_id: str, scene_id: str, user: UserResponse = Depends(get_current_user)
 ):
     """씬 삭제"""
     try:
