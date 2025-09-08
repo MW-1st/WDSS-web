@@ -787,14 +787,15 @@ export default function EditorPage({ projectId = DUMMY }) {
                 aria-label="클릭 도구"
                 style={{
                   border: "1px solid #ccc",
-                  padding: "8px 12px",
-                  borderRadius: 6,
+                  padding: "8px 16px",
+                  borderRadius: 4,
                   cursor: "pointer",
+                  fontSize: 16,
                   background: drawingMode === 'select' && !isPanMode ? '#007bff' : '#f8f9fa',
                   color: drawingMode === 'select' && !isPanMode ? 'white' : 'black',
                 }}
               >
-                {isPanMode ? <IoHandRightOutline size={18} /> : <LuMousePointer size={18} />}
+                {isPanMode ? <IoHandRightOutline /> : <LuMousePointer />}
               </button>
               <button hidden
                 onClick={() => {
@@ -810,14 +811,15 @@ export default function EditorPage({ projectId = DUMMY }) {
                 aria-label="이동 도구"
                 style={{
                   border: "1px solid #ccc",
-                  padding: "8px 12px",
-                  borderRadius: 6,
+                  padding: "8px 16px",
+                  borderRadius: 4,
                   cursor: "pointer",
+                  fontSize: 16,
                   background: isPanMode ? '#007bff' : '#f8f9fa',
                   color: isPanMode ? 'white' : 'black',
                 }}
               >
-                <IoHandRightOutline size={18} />
+                <IoHandRightOutline />
               </button>
             </div>
             <EditorToolbar
