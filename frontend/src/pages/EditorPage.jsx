@@ -526,6 +526,15 @@ export default function EditorPage({ projectId = DUMMY }) {
   // 캔버스 핸들러 함수들
   const handleModeChange = React.useCallback(
       (mode) => {
+        // 이동도구가 선택된 경우 먼저 해제
+        try {
+          const canvas = stageRef.current;
+          const panActive = isPanMode || (canvas && typeof canvas.getPanMode === 'function' && canvas.getPanMode());
+          if (panActive && canvas && typeof canvas.exitPanMode === 'function') {
+            canvas.exitPanMode();
+          }
+        } catch (e) {}
+        setIsPanMode(false);
         setDrawingMode(mode);
         if (stageRef.current && stageRef.current.setDrawingMode) {
           stageRef.current.setDrawingMode(mode);
@@ -536,7 +545,7 @@ export default function EditorPage({ projectId = DUMMY }) {
           }, 20);
         }
       },
-      [drawingColor]
+      [drawingColor, isPanMode]
   );
 
 const handleClearAll = React.useCallback(async () => {
