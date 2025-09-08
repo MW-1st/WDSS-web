@@ -19,11 +19,9 @@ from app.routers.websocket import manager
 from starlette.responses import JSONResponse
 from app.dependencies import get_current_user
 from app.schemas import UserResponse, DeleteImageRequest
+from app.config import UPLOAD_DIRECTORY
 
 router = APIRouter(prefix="/image", tags=["image"])
-
-UPLOAD_DIRECTORY = "./uploads"
-os.makedirs(UPLOAD_DIRECTORY, exist_ok=True)
 
 
 @router.get("/my-images")
@@ -230,7 +228,7 @@ async def process_uploaded_image(
             except OSError:
                 pass
 
-    return {"output_url": f"/uploads/{os.path.basename(output_path)}"}
+    return {"output_url": f"uploads/{os.path.basename(output_path)}"}
 
 
 @router.post("/svg-to-json")
