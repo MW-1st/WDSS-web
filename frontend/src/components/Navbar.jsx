@@ -1,5 +1,5 @@
 import React from "react";
-import {Link, useLocation, useParams} from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { useUnity } from "../contexts/UnityContext.jsx";
 import client from "../api/client";
@@ -11,7 +11,7 @@ export default function Navbar({ transparent: propTransparent = false }) {
 
   // ===== ① 에디터(프로젝트) 전용 Navbar =====
   if (location.pathname.startsWith("/projects")) {
-    const projectId = location.pathname.split('/')[2];
+    const projectId = location.pathname.split("/")[2];
 
     const api = typeof window !== "undefined" ? window.editorAPI : undefined;
 
@@ -55,7 +55,7 @@ export default function Navbar({ transparent: propTransparent = false }) {
 
     const handleJsonGeneration = async () => {
       try {
-        const pathSegments = location.pathname.split('/');
+        const pathSegments = location.pathname.split("/");
         const projectId = pathSegments[2];
 
         if (!projectId) {
@@ -72,7 +72,8 @@ export default function Navbar({ transparent: propTransparent = false }) {
             });
 
             const saveFormData = new FormData();
-            saveFormData.append("svg_file",
+            saveFormData.append(
+              "svg_file",
               new File([svgBlob], `${sceneId}.svg`, { type: "image/svg+xml" })
             );
 
@@ -85,7 +86,8 @@ export default function Navbar({ transparent: propTransparent = false }) {
 
         // 모든 씬을 JSON으로 변환
         const response = await client.post(`/projects/${projectId}/json`);
-        const { json_url, unity_sent, scenes_processed, total_scenes } = response.data;
+        const { json_url, unity_sent, scenes_processed, total_scenes } =
+          response.data;
 
         if (json_url) {
           const base = client.defaults.baseURL?.replace(/\/$/, "") || "";
@@ -102,7 +104,6 @@ export default function Navbar({ transparent: propTransparent = false }) {
         } else {
           alert("JSON 생성에 실패했습니다.");
         }
-
       } catch (e) {
         console.error("Export all scenes error", e);
         alert("전체 프로젝트 내보내기 중 오류가 발생했습니다.");
@@ -114,32 +115,31 @@ export default function Navbar({ transparent: propTransparent = false }) {
         <div className="w-full flex justify-between items-center gap-40">
           {/* Project name */}
           <div
-            className="font-semibold max-w-[280px] truncate"
+            className="font-semibold text-2xl max-w-[480px] truncate pl-4"
             title={editorState.projectName || "Untitled Project"}
           >
             {editorState.projectName || "Untitled Project"}
           </div>
 
           <div className="flex flex-1 justify-between">
-              <button
-                onClick={() => api?.handleTransform && api.handleTransform()}
-                disabled={editorState.processing || !editorState.selectedId}
-                className={`px-3 py-1.5 rounded text-white ${
-                  editorState.processing
-                    ? "!bg-blue-600"
-                    : "!bg-blue-600 hover:!bg-blue-700"
-                }`}
-                title={
-                  editorState.processing
-                    ? "변환 중"
-                    : !editorState.selectedId
-                    ? "먼저 씬을 선택하세요"
-                    : undefined
-                }
-              >
-                변환
-              </button>
-
+            <button
+              onClick={() => api?.handleTransform && api.handleTransform()}
+              disabled={editorState.processing || !editorState.selectedId}
+              className={`px-3 py-1.5 rounded text-white ${
+                editorState.processing
+                  ? "!bg-blue-600"
+                  : "!bg-blue-600 hover:!bg-blue-700"
+              }`}
+              title={
+                editorState.processing
+                  ? "변환 중"
+                  : !editorState.selectedId
+                  ? "먼저 씬을 선택하세요"
+                  : undefined
+              }
+            >
+              변환
+            </button>
 
             {/* JSON + Unity */}
             <div className="flex items-center gap-2">
@@ -195,7 +195,10 @@ export default function Navbar({ transparent: propTransparent = false }) {
       <nav className={`${base} relative flex items-center h-16 px-8 font-bold`}>
         {/* 중앙 메뉴 */}
         <div className="absolute left-1/2 -translate-x-1/2 flex gap-40 text-xl pt-1">
-          <Link className="hover:underline underline-offset-4 decoration-2" to="/">
+          <Link
+            className="hover:underline underline-offset-4 decoration-2"
+            to="/"
+          >
             Main
           </Link>
           <Link

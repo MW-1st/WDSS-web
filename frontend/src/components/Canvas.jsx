@@ -197,6 +197,24 @@ export default function Canvas({
       isPanMode = true;
       canvas.isDrawingMode = false;
       canvas.selection = false;
+      // 팬 모드에서 그리기/지우기 핸들러가 동작하지 않도록 임시 해제
+      try {
+        if (eraseHandlers.current) {
+          if (eraseHandlers.current.startDraw) {
+            canvas.off('mouse:down', eraseHandlers.current.startDraw);
+            canvas.off('mouse:move', eraseHandlers.current.continueDraw);
+            canvas.off('mouse:up', eraseHandlers.current.stopDraw);
+          }
+          if (eraseHandlers.current.startErase) {
+            canvas.off('mouse:down', eraseHandlers.current.startErase);
+            canvas.off('mouse:move', eraseHandlers.current.erase);
+            canvas.off('mouse:up', eraseHandlers.current.stopErase);
+          }
+          if (eraseHandlers.current.wheelHandler) {
+            canvas.off('mouse:wheel', eraseHandlers.current.wheelHandler);
+          }
+        }
+      } catch (_) {}
       canvas.defaultCursor = 'grab';
       canvas.hoverCursor = 'grab';
       canvas.moveCursor = 'grab';
@@ -761,11 +779,21 @@ export default function Canvas({
       let isDrawing = false;
 
       const startDraw = (e) => {
+        // 팬 모드일 때는 브러쉬 점 그리기 방지
+        try {
+          const c = fabricCanvas.current;
+          if (c && typeof c.getPanMode === 'function' && c.getPanMode()) return;
+        } catch (_) {}
         isDrawing = true;
         drawDotAtPoint(e);
       };
 
       const continueDraw = (e) => {
+        // 팬 모드일 때는 브러쉬 이동 중 그리기 방지
+        try {
+          const c = fabricCanvas.current;
+          if (c && typeof c.getPanMode === 'function' && c.getPanMode()) return;
+        } catch (_) {}
         if (!isDrawing) return;
 
         // 최대 개수 체크를 continueDraw에서도 해야 함
@@ -921,11 +949,21 @@ export default function Canvas({
       let isErasing = false;
 
       const startErase = (e) => {
+        // 팬 모드일 때는 지우개 동작 방지
+        try {
+          const c = fabricCanvas.current;
+          if (c && typeof c.getPanMode === 'function' && c.getPanMode()) return;
+        } catch (_) {}
         isErasing = true;
         eraseAtPoint(e);
       };
 
       const erase = (e) => {
+        // 팬 모드일 때는 지우개 동작 방지
+        try {
+          const c = fabricCanvas.current;
+          if (c && typeof c.getPanMode === 'function' && c.getPanMode()) return;
+        } catch (_) {}
         if (!isErasing) return;
         eraseAtPoint(e);
       };
