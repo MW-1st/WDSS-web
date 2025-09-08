@@ -8,6 +8,8 @@ import ObjectPropertiesPanel from "../components/ObjectPropertiesPanel.jsx";
 import client from "../api/client";
 import { useUnity } from "../contexts/UnityContext.jsx";
 import { useParams } from "react-router-dom";
+import { CiSettings } from "react-icons/ci";
+import ProjectSettingsModal from "../components/ProjectSettingsModal";
 
 const VISIBLE = 4;
 const THUMB_W = 200;
@@ -38,6 +40,7 @@ export default function EditorPage({ projectId = DUMMY }) {
   const [pid, setPid] = useState(project_id);
   const [scenes, setScenes] = useState([]);
   const [projectName, setProjectName] = useState("");
+  const [projectMeta, setProjectMeta] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
   const [start, setStart] = useState(0);
 
@@ -55,6 +58,17 @@ export default function EditorPage({ projectId = DUMMY }) {
   const [eraserSize, setEraserSize] = useState(20);
   const [drawingColor, setDrawingColor] = useState("#222222");
   const [selectedObject, setSelectedObject] = useState(null);
+
+  // 프로젝트 설정 모달 상태
+  const [editingProject, setEditingProject] = useState(null);
+  const openProjectSettings = () => {
+    if (projectMeta) setEditingProject(projectMeta);
+  };
+  const closeProjectSettings = () => setEditingProject(null);
+  const handleSettingsSaved = (updated) => {
+    setProjectMeta(updated);
+    if (updated?.project_name) setProjectName(updated.project_name);
+  };
 
   // 색상이 변경될 때 즉시 캔버스에 반영
   useEffect(() => {
@@ -96,8 +110,10 @@ export default function EditorPage({ projectId = DUMMY }) {
     // Load project meta (name)
     (async () => {
       try {
-        const { data: proj } = await client.get(`/projects/${pid}`);
-        if (proj?.project_name) setProjectName(proj.project_name);
+        const { data } = await client.get(`/projects/${pid}`);
+        const p = data?.project ?? data;
+        if (p?.project_name) setProjectName(p.project_name);
+        if (p) setProjectMeta(p);
       } catch (e) {
         // Leave default if fetch fails
         console.warn(
@@ -638,6 +654,8 @@ export default function EditorPage({ projectId = DUMMY }) {
           height: "100vh",
           overflowY: "auto",
           background: "#fff",
+          display: "flex",
+          flexDirection: "column",
         }}
       >
         <EditorToolbar
@@ -664,6 +682,30 @@ export default function EditorPage({ projectId = DUMMY }) {
           stageRef={stageRef} // stageRef prop 전달
           layout="sidebar"
         />
+        <div style={{ marginTop: "auto" }}>
+          <button
+            type="button"
+            title="프로젝트 설정"
+            aria-label="프로젝트 설정"
+            onClick={openProjectSettings}
+            disabled={!projectMeta}
+            style={{
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              padding: 8,
+              border: "1px solid #e5e7eb",
+              borderRadius: 8,
+              background: "#f9fafb",
+              color: "#374151",
+              cursor: projectMeta ? "pointer" : "not-allowed",
+            }}
+          >
+            <CiSettings size={20} />
+          </button>
+        </div>
       </aside>
       <div style={{ flex: 1 }}>
         {/* 업로드 및 도구 바 */}
@@ -709,6 +751,14 @@ export default function EditorPage({ projectId = DUMMY }) {
           onChangeFill={handleSelectedFillChange}
         />
       </aside>
+
+      {editingProject && (
+        <ProjectSettingsModal
+          project={editingProject}
+          onClose={closeProjectSettings}
+          onSaved={handleSettingsSaved}
+        />
+      )}
     </div>
   );
 }
