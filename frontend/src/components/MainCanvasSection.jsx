@@ -1,5 +1,6 @@
 import React from "react";
 import Canvas from "../components/Canvas.jsx";
+
 function MainCanvasSection({
   selectedScene,
   imageUrl,
@@ -8,6 +9,7 @@ function MainCanvasSection({
   drawingMode,
   eraserSize,
   drawingColor,
+  activeLayerId,
   onModeChange,
   onSelectionChange,
 }) {
@@ -43,6 +45,7 @@ function MainCanvasSection({
               drawingMode={drawingMode}
               eraserSize={eraserSize}
               drawingColor={drawingColor}
+              activeLayerId={activeLayerId}
               onModeChange={onModeChange}
               onSelectionChange={onSelectionChange}
             />
