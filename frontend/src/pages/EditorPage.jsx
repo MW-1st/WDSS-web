@@ -228,7 +228,7 @@ export default function EditorPage({ projectId = DUMMY }) {
     if (!pid) return;
     (async () => {
       try {
-        const {data} = await client.get(`/projects/${pid}/scenes/`);
+        const {data} = await client.get(`/projects/${pid}/scenes`);
         const list = data.scenes || [];
         setScenes(
             list.map((s, i) => ({
@@ -311,7 +311,7 @@ export default function EditorPage({ projectId = DUMMY }) {
       const scene_num = scenes.length + 1;
       console.log("확인된 scene_num:", scene_num);
       const {data} = await client.post(
-          `/projects/${projectIdReady}/scenes/`,
+          `/projects/${projectIdReady}/scenes`,
           {
             scene_num,
           }
