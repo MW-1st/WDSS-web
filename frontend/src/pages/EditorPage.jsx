@@ -308,7 +308,11 @@ export default function EditorPage({ projectId = DUMMY }) {
     try {
       const projectIdReady = await ensureProjectId();
       console.log("확인된 Project ID:", projectIdReady);
-      const scene_num = scenes.length + 1;
+      const numericSceneNums = (scenes || [])
+        .map((s) => s?.scene_num)
+        .filter((n) => typeof n === "number" && !Number.isNaN(n));
+      const maxSceneNum = numericSceneNums.length ? Math.max(...numericSceneNums) : 0;
+      const scene_num = Math.max(maxSceneNum, scenes.length) + 1;
       console.log("확인된 scene_num:", scene_num);
       const {data} = await client.post(
           `/projects/${projectIdReady}/scenes`,
@@ -375,6 +379,15 @@ export default function EditorPage({ projectId = DUMMY }) {
   const canSlide = total > VISIBLE;
   const end = Math.min(start + VISIBLE, total);
   const visibleItems = items.slice(start, end);
+
+  // UI-only scene numbering: override default "Scene N" style names for display without touching DB/state
+  const scenesForUI = useMemo(() => {
+    return scenes.map((s, idx) => {
+      const n = (s?.name || "").trim();
+      const isDefault = /^Scene\s+\d+$/i.test(n) || n === "";
+      return isDefault ? { ...s, name: `Scene ${idx + 1}` } : s;
+    });
+  }, [scenes]);
 
   // 이미지 변환 핸들러
   const handleTransform = async () => {
@@ -836,7 +849,7 @@ export default function EditorPage({ projectId = DUMMY }) {
           {/* 씬 캐러셀 */}
           <SceneCarousel
               projectId={pid}
-              scenes={scenes}
+              scenes={scenesForUI}
               setScenes={setScenes}
               selectedId={selectedId}
               start={start}
