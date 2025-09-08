@@ -99,8 +99,11 @@ export default function Navbar({ transparent: propTransparent = false }) {
           const full = json_url.startsWith("http")
             ? json_url
             : `${base}/${json_url.replace(/^\//, "")}`;
-          try { setJsonBuilt(true); setLastJsonUrl(full); } catch {}
-          window.open(full, "_blank", "noopener");
+          try {
+            setJsonBuilt(true);
+            setLastJsonUrl(full);
+          } catch {}
+          // window.open(full, "_blank", "noopener");
 
           alert(
             unity_sent
@@ -164,17 +167,23 @@ export default function Navbar({ transparent: propTransparent = false }) {
               <button
                 onClick={() => {
                   if (!transformClicked || !jsonBuilt) {
-                    alert("먼저 '변환' 버튼과 'JSON 파일로만들기' 버튼을 순서대로 실행해 주세요.");
+                    alert(
+                      "먼저 '변환' 버튼과 'JSON 파일로만들기' 버튼을 순서대로 실행해 주세요."
+                    );
                     return;
                   }
                   if (!lastJsonUrl) {
-                    alert("다운로드할 JSON URL이 없습니다. 'JSON 파일로만들기'를 먼저 실행해 주세요.");
+                    alert(
+                      "다운로드할 JSON URL이 없습니다. 'JSON 파일로만들기'를 먼저 실행해 주세요."
+                    );
                     return;
                   }
                   try {
-                    const a = document.createElement('a');
+                    const a = document.createElement("a");
                     a.href = lastJsonUrl;
-                    a.download = `${(editorState.projectName || 'project').replace(/[^\\w.-]+/g, '_')}.json`;
+                    a.download = `${(
+                      editorState.projectName || "project"
+                    ).replace(/[^\\w.-]+/g, "_")}.json`;
                     document.body.appendChild(a);
                     a.click();
                     document.body.removeChild(a);
