@@ -517,18 +517,36 @@ export default function EditorPage({ projectId = DUMMY }) {
       [drawingColor]
   );
 
-  const handleClearAll = React.useCallback(() => {
-    if (stageRef.current && stageRef.current.clear) {
-      if (
-          confirm(
-              "캔버스의 모든 내용을 지우시겠습니까? 이 작업은 되돌릴 수 없습니다."
-          )
-      ) {
-        stageRef.current.clear();
-        console.log("캔버스 전체가 초기화되었습니다");
-      }
-    }
-  }, []);
+const handleClearAll = React.useCallback(async () => {
+ if (stageRef.current && stageRef.current.clear) {
+   if (
+       confirm(
+           "캔버스의 모든 내용을 지우시겠습니까? 이 작업은 되돌릴 수 없습니다."
+       )
+   ) {
+     try {
+       // 1. 캔버스 초기화
+       stageRef.current.clear();
+       console.log("캔버스가 초기화되었습니다");
+
+       // 2. 서버에 씬 초기화 요청
+       const response = await client.patch(`/projects/${pid}/scenes/${selectedId}`, {
+         status: 'reset'
+       });
+
+       console.log("서버 씬 초기화 완료:", response.data);
+
+       // 3. 성공 메시지 (선택사항)
+       // alert("씬이 완전히 초기화되었습니다.");
+
+     } catch (error) {
+       console.error("씬 초기화 중 오류 발생:", error);
+       // 에러 처리 - 사용자에게 알림
+       alert("씬 초기화 중 오류가 발생했습니다. 다시 시도해주세요.");
+     }
+   }
+ }
+}, [client, pid, selectedId]); // client, projectId, sceneId를 dependency에 추가
 
   const handleColorChange = React.useCallback((color) => {
     setDrawingColor(color);
