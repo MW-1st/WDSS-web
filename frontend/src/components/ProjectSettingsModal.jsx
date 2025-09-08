@@ -9,6 +9,7 @@ export default function ProjectSettingsModal({ project, onClose, onSaved, mode: 
     project_name: "",
     format: "dsj",
     max_scene: 15,
+    max_drone: 1000,
     max_speed: 6.0,
     max_accel: 3.0,
     min_separation: 2.0,
@@ -22,6 +23,7 @@ export default function ProjectSettingsModal({ project, onClose, onSaved, mode: 
         project_name: project.project_name ?? "",
         format: project.format ?? "dsj",
         max_scene: project.max_scene ?? 15,
+        max_drone: project.max_drone ?? 1000,
         max_speed: project.max_speed ?? 6.0,
         max_accel: project.max_accel ?? 3.0,
         min_separation: project.min_separation ?? 2.0,
@@ -31,6 +33,7 @@ export default function ProjectSettingsModal({ project, onClose, onSaved, mode: 
         project_name: "",
         format: "dsj",
         max_scene: 15,
+        max_drone: 1000,
         max_speed: 6.0,
         max_accel: 3.0,
         min_separation: 2.0,
@@ -55,7 +58,7 @@ export default function ProjectSettingsModal({ project, onClose, onSaved, mode: 
       return;
     }
 
-    const numericKeys = ["max_scene", "max_speed", "max_accel", "min_separation"];
+    const numericKeys = ["max_scene", "max_drone", "max_speed", "max_accel", "min_separation"];
     for (const k of numericKeys) {
       if (form[k] === "" || Number.isNaN(Number(form[k]))) {
         setError("숫자 필드를 올바르게 입력하세요");
@@ -67,6 +70,7 @@ export default function ProjectSettingsModal({ project, onClose, onSaved, mode: 
       project_name: form.project_name,
       format: form.format || "dsj",
       max_scene: Number(form.max_scene),
+      max_drone: Number(form.max_drone),
       max_speed: Number(form.max_speed),
       max_accel: Number(form.max_accel),
       min_separation: Number(form.min_separation),
@@ -162,6 +166,17 @@ export default function ProjectSettingsModal({ project, onClose, onSaved, mode: 
                 onChange={updateField("max_scene")}
                 className="w-full rounded border border-gray-300 px-3 py-2"
                 min={0}
+              />
+            </label>
+            <label className="block">
+              <div className="text-sm font-medium mb-1">max_drone</div>
+              <input
+                type="number"
+                inputMode="numeric"
+                value={form.max_drone}
+                onChange={updateField("max_drone")}
+                className="w-full rounded border border-gray-300 px-3 py-2"
+                min={100}
               />
             </label>
             <label className="block">

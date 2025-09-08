@@ -55,67 +55,57 @@ export default function Navbar({ transparent: propTransparent = false }) {
 
     const handleJsonGeneration = async () => {
       try {
-        if (
-          !api?.stageRef?.current ||
-          !api.stageRef.current.getCurrentCanvasAsSvg
-        ) {
-          alert("캔버스가 준비되지 않았습니다.");
-          return;
-        }
-        const canvasSvgData = api.stageRef.current.getCurrentCanvasAsSvg();
-        if (!canvasSvgData || canvasSvgData.totalDots === 0) {
-          alert("그릴 도트가 없습니다. 먼저 이미지 변환하거나 그림을 그려주세요.");
-          return;
-        }
-        const svgBlob = new Blob([canvasSvgData.svgString], {
-          type: "image/svg+xml",
-        });
-        // 1. processed 저장용 FormData
-        const saveFormData = new FormData();
-        saveFormData.append(
-          "svg_file", // 백엔드 파라미터명과 일치시켜야 함
-          new File([svgBlob], `${sceneId}.svg`, { type: "image/svg+xml" })
-        );
+        const pathSegments = location.pathname.split('/');
+        const projectId = pathSegments[2];
 
-        // 2. JSON 생성용 FormData (별도 생성)
-        const jsonFormData = new FormData();
-        jsonFormData.append(
-          "file",
-          new File([svgBlob], `${sceneId}.svg`, { type: "image/svg+xml" })
-        );
-
-        // 3. processed 저장
-        try {
-          await client.put(
-            `/projects/${projectId}/scenes/${sceneId}/processed`,
-            saveFormData
-          );
-        } catch (saveError) {
-          console.error("Processed save error:", saveError);
-          alert("캔버스 저장 중 오류가 발생했습니다.");
+        if (!projectId) {
+          alert("프로젝트 ID를 찾을 수 없습니다.");
           return;
         }
 
-        const jsonResp = await client.post("/image/svg-to-json", jsonFormData);
-        const jsonUrl = jsonResp.data?.json_url;
-        const unitySent = jsonResp.data?.unity_sent;
-        if (jsonUrl) {
+        // 현재 씬이 있고 수정사항이 있으면 먼저 저장
+        if (sceneId && api?.stageRef?.current?.getCurrentCanvasAsSvg) {
+          const canvasSvgData = api.stageRef.current.getCurrentCanvasAsSvg();
+          if (canvasSvgData && canvasSvgData.totalDots > 0) {
+            const svgBlob = new Blob([canvasSvgData.svgString], {
+              type: "image/svg+xml",
+            });
+
+            const saveFormData = new FormData();
+            saveFormData.append("svg_file",
+              new File([svgBlob], `${sceneId}.svg`, { type: "image/svg+xml" })
+            );
+
+            await client.put(
+              `/projects/${projectId}/scenes/${sceneId}/processed`,
+              saveFormData
+            );
+          }
+        }
+
+        // 모든 씬을 JSON으로 변환
+        const response = await client.post(`/projects/${projectId}/json`);
+        const { json_url, unity_sent, scenes_processed, total_scenes } = response.data;
+
+        if (json_url) {
           const base = client.defaults.baseURL?.replace(/\/$/, "") || "";
-          const full = jsonUrl.startsWith("http")
-            ? jsonUrl
-            : `${base}/${jsonUrl.replace(/^\//, "")}`;
+          const full = json_url.startsWith("http")
+            ? json_url
+            : `${base}/${json_url.replace(/^\//, "")}`;
           window.open(full, "_blank", "noopener");
+
           alert(
-            unitySent
-              ? `JSON 생성 및 Unity 전송 완료 (총 ${canvasSvgData.totalDots} 도트)`
-              : `JSON 생성 완료 (총 ${canvasSvgData.totalDots} 도트)`
+            unity_sent
+              ? `${scenes_processed}/${total_scenes}개 씬이 JSON으로 변환되고 Unity로 전송되었습니다!`
+              : `${scenes_processed}/${total_scenes}개 씬이 JSON으로 변환되었습니다!`
           );
         } else {
           alert("JSON 생성에 실패했습니다.");
         }
+
       } catch (e) {
-        console.error("SVG to JSON error", e);
-        alert("JSON 생성 중 오류가 발생했습니다.");
+        console.error("Export all scenes error", e);
+        alert("전체 프로젝트 내보내기 중 오류가 발생했습니다.");
       }
     };
 
