@@ -34,6 +34,10 @@ export default React.memo(function SceneCarousel({
   const projectId = projectIdProp ?? projectIdFromUrl ?? projectIdFromUrl2 ?? projectIdFromScenes;
 
   const containerRef = React.useRef(null);
+  // Inline SVG backgrounds to center arrow glyphs inside round buttons
+  const ARROW_COLOR = "%235b5bd6"; // encoded '#5b5bd6'
+  const leftArrowBg = `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='20' height='20'><path fill='none' stroke='${ARROW_COLOR}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='M15 6 L9 12 L15 18'/></svg>")`;
+  const rightArrowBg = `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='20' height='20'><path fill='none' stroke='${ARROW_COLOR}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='M9 6 L15 12 L9 18'/></svg>")`;
 
   const [dims, setDims] = React.useState(() => ({
     thumbW: compact ? 200 : 220,
@@ -48,17 +52,23 @@ export default React.memo(function SceneCarousel({
     if (!el) return;
     const containerW = el.getBoundingClientRect().width;
 
-    const MIN_W = compact ? 160 : 200;
-    const MAX_W = compact ? 220 : 240;
-    const GAP = compact ? 24 : 48;
+    // Slightly smaller thumbnails to make room for external arrows
+    const MIN_W = compact ? 150 : 180;
+    const MAX_W = compact ? 200 : 220;
+    const GAP = compact ? 24 : 40;
 
-    const maxThumbW = Math.floor((containerW - GAP * (VISIBLE - 1)) / VISIBLE);
+    // Reserve space for navigation buttons on both sides
+    const RESERVED_SIDE = BTN_SIZE + 20; // px
+    const innerW = Math.max(0, containerW - RESERVED_SIDE * 2);
+
+    const maxThumbW = Math.floor((innerW - GAP * (VISIBLE - 1)) / VISIBLE);
     const thumbW = clamp(maxThumbW, MIN_W, MAX_W);
     const thumbH = Math.round(thumbW * 0.6);
 
     const stripW = thumbW * VISIBLE + GAP * (VISIBLE - 1);
     const sideSpace = Math.max(0, (containerW - stripW) / 2);
-    const btnOffset = Math.max(0, sideSpace - BTN_SIZE - 8);
+    // Place arrows just outside the thumbnail strip with small breathing room
+    const btnOffset = Math.max(8, sideSpace - BTN_SIZE - 12);
 
     setDims({ thumbW, thumbH, gap: GAP, leftBtnX: btnOffset, rightBtnX: btnOffset });
   }, [compact]);
@@ -279,12 +289,16 @@ export default React.memo(function SceneCarousel({
             borderRadius: "50%",
             border: "1px solid #cfcfe6",
             background: "#fff",
+            backgroundImage: leftArrowBg,
+            backgroundRepeat: "no-repeat",
+            backgroundPosition: "center",
             boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             fontSize: 26,
             lineHeight: "1",
+            color: "transparent",
             cursor: startClamped === 0 ? "not-allowed" : "pointer",
             zIndex: 1,
           }}
@@ -295,7 +309,7 @@ export default React.memo(function SceneCarousel({
         </button>
       )}
 
-      <div style={{ display: "flex", justifyContent: "center", gap: dims.gap }}>
+      <div style={{ display: "flex", justifyContent: "center", gap: dims.gap, paddingLeft: BTN_SIZE + 24, paddingRight: BTN_SIZE + 24 }}>
         {visibleItems.map((item) =>
           item.isAdd ? (
             <button
@@ -336,12 +350,16 @@ export default React.memo(function SceneCarousel({
             borderRadius: "50%",
             border: "1px solid #cfcfe6",
             background: "#fff",
+            backgroundImage: rightArrowBg,
+            backgroundRepeat: "no-repeat",
+            backgroundPosition: "center",
             boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             fontSize: 26,
             lineHeight: "1",
+            color: "transparent",
             cursor: startClamped >= total - VISIBLE ? "not-allowed" : "pointer",
             zIndex: 1,
           }}
