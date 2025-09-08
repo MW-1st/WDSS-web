@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState } from 'react';
+import client from "../api/client.js";
 
 const UnityContext = createContext();
 
@@ -38,22 +39,11 @@ export const UnityProvider = ({ children }) => {
 
   const sendTestData = async () => {
     try {
-      const response = await fetch('http://localhost:8000/ws/test/broadcast', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (response.ok) {
-        const result = await response.json();
-        alert('테스트 데이터 전송 완료: ' + result.message);
-      } else {
-        alert('전송 실패: ' + response.status);
+        const response = await client.post('/ws/test/broadcast', {});
+        console.log('요청 성공:', response.data);
+      } catch (error) {
+        console.error('요청 실패:', error);
       }
-    } catch (error) {
-      alert('전송 오류: ' + error.message);
-    }
   };
 
   const value = {
