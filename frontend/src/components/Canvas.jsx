@@ -229,24 +229,32 @@ export default function Canvas({
     };
 
     const handleKeyDown = (e) => {
-      if (e.code === 'Space') {
+      if (
+        e.code === 'Space' &&
+        !['INPUT','TEXTAREA','SELECT'].includes(((e.target && e.target.tagName) || '').toUpperCase()) &&
+        !((e.target && e.target.getAttribute) && e.target.getAttribute('contenteditable') === 'true')
+      ) {
         e.preventDefault(); // 브라우저 기본 스크롤 방지
         e.stopPropagation(); // 이벤트 전파 중단
         
-        if (!isPanMode) {
+        if (isPanMode) {
+          exitPanMode();
+        } else {
           enterPanMode();
         }
       }
     };
 
     const handleKeyUp = (e) => {
-      if (e.code === 'Space') {
+      if (
+        e.code === 'Space' &&
+        !['INPUT','TEXTAREA','SELECT'].includes(((e.target && e.target.tagName) || '').toUpperCase()) &&
+        !((e.target && e.target.getAttribute) && e.target.getAttribute('contenteditable') === 'true')
+      ) {
         e.preventDefault(); // 브라우저 기본 스크롤 방지
         e.stopPropagation(); // 이벤트 전파 중단
         
-        if (isPanMode) {
-          exitPanMode();
-        }
+        // 토글 방식에서는 keyup 시 별도 동작 없음
       }
     };
 

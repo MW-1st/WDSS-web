@@ -774,6 +774,11 @@ export default function EditorPage({ projectId = DUMMY }) {
             <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
               <button
                 onClick={() => {
+                  if (!isPanMode) {
+                    const c0 = stageRef?.current;
+                    if (c0 && typeof c0.enterPanMode === 'function') c0.enterPanMode();
+                    return;
+                  }
                   setDrawingMode("select");
                   const c = stageRef?.current;
                   if (c && typeof c.exitPanMode === 'function') c.exitPanMode();
@@ -789,9 +794,9 @@ export default function EditorPage({ projectId = DUMMY }) {
                   color: drawingMode === 'select' && !isPanMode ? 'white' : 'black',
                 }}
               >
-                <LuMousePointer size={18} />
+                {isPanMode ? <IoHandRightOutline size={18} /> : <LuMousePointer size={18} />}
               </button>
-              <button
+              <button hidden
                 onClick={() => {
                   const c = stageRef?.current;
                   if (!c) return;
