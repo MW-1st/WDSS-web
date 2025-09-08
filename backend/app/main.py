@@ -34,7 +34,6 @@ class CORSStaticFilesMiddleware(BaseHTTPMiddleware):
             response.headers["Access-Control-Allow-Origin"] = "*"
             response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
             response.headers["Access-Control-Allow-Headers"] = "*"
-
         return response
 
 
