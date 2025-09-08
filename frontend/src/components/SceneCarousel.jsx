@@ -128,7 +128,7 @@ export default React.memo(function SceneCarousel({
   // Unified fetch that tolerates API shape and normalizes fields
   const fetchScenesNormalized = async () => {
     if (!projectId) throw new Error("project_id가 비어있습니다");
-    const { data } = await client.get(`/projects/${projectId}/scenes/`);
+    const { data } = await client.get(`/projects/${projectId}/scenes`);
     const list = Array.isArray(data) ? data : (data?.scenes ?? []);
     const mapped = list.map((s, i) => ({
       ...s,
