@@ -1,4 +1,6 @@
 import React from "react";
+import { useParams } from "react-router-dom";
+import client from "../api/client";
 
 const VISIBLE = 4;
 const BTN_SIZE = 48;
@@ -7,19 +9,31 @@ function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
 }
 
-function SceneCarousel({
-  scenes,
+export default React.memo(function SceneCarousel({
+  projectId: projectIdProp,      // 우선순위 1
+  scenes,                        // [{id, name, preview, project_id?}, ...]
+  setScenes,
   selectedId,
+  onSelectScene,
   start,
   setStart,
   onAddScene,
-  onSelectScene,
-  /** 갤러리 열림 등으로 중앙이 좁아졌을 때 더 컴팩트하게 배치 */
   compact = false,
 }) {
+  // URL 파라미터 우선순위 2 (둘 다 지원)
+  const { projectId: projectIdFromUrl, project_id: projectIdFromUrl2 } = useParams();
+
+  // 씬에서 추론 우선순위 3
+  const projectIdFromScenes = React.useMemo(() => {
+    const found = scenes.find((s) => s.project_id || s.projectId);
+    return found ? (found.project_id ?? found.projectId) : undefined;
+  }, [scenes]);
+
+  // 최종 projectId
+  const projectId = projectIdProp ?? projectIdFromUrl ?? projectIdFromUrl2 ?? projectIdFromScenes;
+
   const containerRef = React.useRef(null);
 
-  // ✨ 반응형 크기 계산
   const [dims, setDims] = React.useState(() => ({
     thumbW: compact ? 200 : 220,
     thumbH: compact ? Math.round(200 * 0.6) : Math.round(220 * 0.6),
@@ -28,41 +42,26 @@ function SceneCarousel({
     rightBtnX: 0,
   }));
 
-  // 크기 재계산 함수
   const recalc = React.useCallback(() => {
     const el = containerRef.current;
     if (!el) return;
+    const containerW = el.getBoundingClientRect().width;
 
-    const rect = el.getBoundingClientRect();
-    const containerW = rect.width;
-
-    // compact 일 때 더 작은 최소폭/간격
     const MIN_W = compact ? 160 : 200;
     const MAX_W = compact ? 220 : 240;
     const GAP = compact ? 24 : 48;
 
-    // 중앙 썸네일 줄(4개)이 들어갈 수 있는 최대 폭을 기준으로 썸네일 너비 계산
     const maxThumbW = Math.floor((containerW - GAP * (VISIBLE - 1)) / VISIBLE);
     const thumbW = clamp(maxThumbW, MIN_W, MAX_W);
     const thumbH = Math.round(thumbW * 0.6);
 
-    // 중앙 줄 전체 폭
     const stripW = thumbW * VISIBLE + GAP * (VISIBLE - 1);
-
-    // 좌/우 버튼 x 오프셋(px) — 중앙 줄의 좌우 바깥쪽에 위치
     const sideSpace = Math.max(0, (containerW - stripW) / 2);
-    const btnOffset = Math.max(0, sideSpace - BTN_SIZE - 8); // 8px 여유
+    const btnOffset = Math.max(0, sideSpace - BTN_SIZE - 8);
 
-    setDims({
-      thumbW,
-      thumbH,
-      gap: GAP,
-      leftBtnX: btnOffset,
-      rightBtnX: btnOffset,
-    });
+    setDims({ thumbW, thumbH, gap: GAP, leftBtnX: btnOffset, rightBtnX: btnOffset });
   }, [compact]);
 
-  // ResizeObserver로 반응형 처리
   React.useEffect(() => {
     recalc();
     const el = containerRef.current;
@@ -78,15 +77,11 @@ function SceneCarousel({
     };
   }, [recalc]);
 
-  // 갤러리 토글 같은 외부 요인이 바뀌면 재계산
   React.useEffect(() => {
     recalc();
   }, [compact, recalc]);
 
-  const items = React.useMemo(
-    () => [...scenes, { id: "__ADD__", isAdd: true }],
-    [scenes]
-  );
+  const items = React.useMemo(() => [...scenes, { id: "__ADD__", isAdd: true }], [scenes]);
   const total = items.length;
   const canSlide = total > VISIBLE;
   const end = Math.min(start + VISIBLE, total);
@@ -94,24 +89,162 @@ function SceneCarousel({
 
   const handleSelect = (id) => {
     if (id === "__ADD__") return;
-    onSelectScene(id);
+    onSelectScene?.(id);
     const idx = items.findIndex((it) => it.id === id);
     if (idx < start) setStart(idx);
     if (idx >= start + VISIBLE) setStart(idx - VISIBLE + 1);
   };
 
+  // ---------- 서버 통신 유틸 (axios client 사용) ----------
+  const fetchScenes = async () => {
+    if (!projectId) throw new Error("project_id가 비어있습니다");
+    // Swagger: GET /projects/{project_id}/scenes/  (트레일링 슬래시 O)
+    const { data } = await client.get(`/projects/${projectId}/scenes/`);
+    const mapped = Array.isArray(data)
+      ? data.map((s, i) => ({
+          id: s.id,
+          name: s.name ?? s.title ?? `Scene ${s.scene_num ?? i + 1}`,
+          preview: s.preview ?? s.preview_url ?? null,
+          project_id: s.project_id ?? s.projectId ?? projectId,
+        }))
+      : [];
+    setScenes(mapped);
+    return mapped;
+  };
+
+  const deleteSceneOnServer = async (sceneId) => {
+    if (!projectId) throw new Error("project_id가 비어있습니다");
+    // Swagger: DELETE /projects/{project_id}/scenes/{scene_id} (보통 슬래시 X)
+    await client.delete(`/projects/${projectId}/scenes/${sceneId}`);
+    return true;
+  };
+  // --------------------------------------------------------
+
+  const pickNeighbor = (deletedId, list) => {
+    if (!list || list.length === 0) return null;
+    const idx = list.findIndex((s) => s.id === deletedId);
+    if (idx === -1) return selectedId;
+    return list[idx + 1]?.id ?? list[idx - 1]?.id ?? null;
+  };
+
+  const handleDeleteClick = async (e, item) => {
+    e.stopPropagation();
+    if (item.isAdd) return;
+
+    if (!projectId) {
+      alert("삭제에 실패했습니다.\n원인: project_id가 비어있습니다.\n해결: SceneCarousel에 projectId를 prop으로 넘기거나, URL에 /projects/:project_id 형태로 전달하세요.");
+      return;
+    }
+
+    if (!window.confirm(`"${item.name ?? "Scene"}" 씬을 삭제할까요?`)) return;
+
+    try {
+      // 1) 서버에 실제 삭제
+      await deleteSceneOnServer(item.id);
+
+      // 2) 삭제된 씬 기준 이웃 선택 준비(재조회 전에 계산)
+      const neighbor = selectedId === item.id ? pickNeighbor(item.id, scenes) : selectedId;
+
+      // 3) 서버에서 최신 목록 다시 받아서 반영
+      const newList = await fetchScenes();
+      onSelectScene?.(neighbor && newList.some((x) => x.id === neighbor) ? neighbor : newList[0]?.id ?? null);
+
+      // 4) start 보정 (총 아이템 = 씬 개수 + “추가” 1)
+      const totalNext = newList.length + 1;
+      const maxStart = Math.max(0, totalNext - VISIBLE);
+      if (start > maxStart) setStart(maxStart);
+
+    } catch (err) {
+      const status = err?.response?.status;
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        err.message ||
+        "알 수 없는 오류";
+      alert(
+        [
+          "삭제에 실패했습니다.",
+          `원인: ${status ? status + " " : ""}${msg}`,
+          `확인: project_id=${projectId}, scene_id=${item.id}`,
+        ].join("\n")
+      );
+    }
+  };
+
+  const Thumb = ({ item }) => {
+    const isSelected = selectedId === item.id;
+    return (
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => handleSelect(item.id)}
+        onKeyDown={(ev) => (ev.key === "Enter" || ev.key === " ") && handleSelect(item.id)}
+        title={item.name}
+        style={{
+          width: dims.thumbW,
+          height: dims.thumbH,
+          background: item.preview ? `url(${item.preview})` : "#ddd",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          borderRadius: 8,
+          border: isSelected ? "2px solid #5b5bd6" : "1px solid #d0d0d0",
+          boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
+          cursor: "pointer",
+          position: "relative",
+          overflow: "hidden",
+          outline: "none",
+        }}
+      >
+        <span
+          style={{
+            position: "absolute",
+            left: 8,
+            bottom: 6,
+            fontSize: 12,
+            color: "#333",
+            opacity: 0.6,
+            background: "rgba(255,255,255,0.7)",
+            padding: "2px 6px",
+            borderRadius: 4,
+          }}
+        >
+          {item.name || "Scene"}
+        </span>
+
+        <button
+          type="button"
+          onClick={(e) => handleDeleteClick(e, item)}
+          aria-label="씬 삭제"
+          title="씬 삭제"
+          style={{
+            position: "absolute",
+            top: 6,
+            right: 6,
+            width: 28,
+            height: 28,
+            borderRadius: 6,
+            border: "1px solid #e4e4ef",
+            background: "rgba(255,255,255,0.92)",
+            boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 16,
+            lineHeight: "1",
+            cursor: "pointer",
+          }}
+        >
+          🗑
+        </button>
+      </div>
+    );
+  };
+
   return (
     <section
       ref={containerRef}
-      style={{
-        position: "relative",
-        marginTop: 8,
-        marginBottom: 72,
-        // 썸네일 줄이 가운데 정렬되도록 컨테이너는 가로 100%
-        width: "100%",
-      }}
+      style={{ position: "relative", marginTop: 8, marginBottom: 72, width: "100%" }}
     >
-      {/* Prev */}
       {canSlide && (
         <button
           onClick={() => setStart((s) => Math.max(0, s - 1))}
@@ -142,14 +275,7 @@ function SceneCarousel({
         </button>
       )}
 
-      {/* 중앙 썸네일 묶음 */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          gap: dims.gap,
-        }}
-      >
+      <div style={{ display: "flex", justifyContent: "center", gap: dims.gap }}>
         {visibleItems.map((item) =>
           item.isAdd ? (
             <button
@@ -171,48 +297,11 @@ function SceneCarousel({
               +
             </button>
           ) : (
-            <button
-              key={item.id}
-              onClick={() => handleSelect(item.id)}
-              title={item.name}
-              style={{
-                width: dims.thumbW,
-                height: dims.thumbH,
-                background: item.preview ? `url(${item.preview})` : "#ddd",
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-                borderRadius: 8,
-                border:
-                  selectedId === item.id
-                    ? "2px solid #5b5bd6"
-                    : "1px solid #d0d0d0",
-                boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
-                cursor: "pointer",
-                position: "relative",
-                overflow: "hidden",
-              }}
-            >
-              <span
-                style={{
-                  position: "absolute",
-                  left: 8,
-                  bottom: 6,
-                  fontSize: 12,
-                  color: "#333",
-                  opacity: 0.6,
-                  background: "rgba(255,255,255,0.7)",
-                  padding: "2px 6px",
-                  borderRadius: 4,
-                }}
-              >
-                {item.name || "Scene"}
-              </span>
-            </button>
+            <Thumb key={item.id} item={item} />
           )
         )}
       </div>
 
-      {/* Next */}
       {canSlide && (
         <button
           onClick={() => setStart((s) => Math.min(total - VISIBLE, s + 1))}
@@ -233,8 +322,7 @@ function SceneCarousel({
             justifyContent: "center",
             fontSize: 26,
             lineHeight: "1",
-            cursor:
-              start >= total - VISIBLE ? "not-allowed" : "pointer",
+            cursor: start >= total - VISIBLE ? "not-allowed" : "pointer",
             zIndex: 1,
           }}
           aria-label="다음"
@@ -245,6 +333,4 @@ function SceneCarousel({
       )}
     </section>
   );
-}
-
-export default React.memo(SceneCarousel);
+});

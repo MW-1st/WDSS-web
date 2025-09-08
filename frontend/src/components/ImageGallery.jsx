@@ -2,8 +2,10 @@ import React, { useState, useEffect } from "react";
 import client from "../api/client.js";
 
 export default function ImageGallery({ onImageDragStart }) {
+  
   const [uploadedImages, setUploadedImages] = useState([]);
   const [loading, setLoading] = useState(false);
+  
 
   // localStorage에서 이미지 목록 로드
   useEffect(() => {

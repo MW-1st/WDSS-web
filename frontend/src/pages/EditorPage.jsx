@@ -35,7 +35,14 @@ export default function EditorPage({ projectId = DUMMY }) {
   const [selectedId, setSelectedId] = useState(null);
   const [start, setStart] = useState(0);
 
-  const [galleryOpen, setGalleryOpen] = useState(true);
+  // ✅ 갤러리 열림 상태: 하나만 사용 (초기값: false => 닫힌 채로 시작)
+  const [galleryOpen, setGalleryOpen] = useState(() => {
+    const saved = localStorage.getItem("wdss:galleryOpen");
+    return saved ? JSON.parse(saved) : false; // 기본 닫힘
+  });
+  useEffect(() => {
+    localStorage.setItem("wdss:galleryOpen", JSON.stringify(galleryOpen));
+  }, [galleryOpen]);
 
   const [imageUrl, setImageUrl] = useState("");
   const [processing, setProcessing] = useState(false);
@@ -573,7 +580,9 @@ export default function EditorPage({ projectId = DUMMY }) {
         />
 
         <SceneCarousel
+          projectId={pid}     
           scenes={scenes}
+          setScenes={setScenes}    
           selectedId={selectedId}
           start={start}
           setStart={setStart}
