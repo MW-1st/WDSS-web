@@ -45,7 +45,9 @@ app.add_middleware(CORSStaticFilesMiddleware)
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(project.router, prefix="/projects", tags=["project"])
 # app.include_router(image.router, prefix="/images", tags=["image"])
-app.include_router(scene.router, prefix="/projects", tags=["scenes"])
+app.include_router(
+    scene.router, prefix="/projects/{project_id}/scenes", tags=["scenes"]
+)
 
 app.include_router(image_router.router)
 app.include_router(websocket.router)
