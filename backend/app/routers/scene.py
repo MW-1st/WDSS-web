@@ -450,7 +450,46 @@ async def save_canvas_as_processed(
     scene_id: uuid.UUID,
     svg_file: UploadFile = File(...),
 ):
-    pass
+    """캔버스에서 수정된 SVG를 processed 리소스로 저장"""
+
+    # 씬 존재 여부 및 권한 확인
+    async with get_conn() as conn:
+        scene_exists = await conn.fetchval(
+            """
+            SELECT EXISTS(SELECT 1
+                          FROM project_scenes ps
+                                   JOIN scene s ON ps.scene_id = s.id
+                          WHERE s.id = $1
+                            AND ps.project_id = $2)
+            """,
+            scene_id,
+            project_id,
+        )
+
+        if not scene_exists:
+            raise HTTPException(status_code=404, detail="Scene not found")
+
+    try:
+        # 직접 processed 디렉토리에 저장
+        final_processed_path = os.path.join(PROCESSED_DIR, f"{scene_id}.svg")
+
+        async with aiofiles.open(final_processed_path, "wb") as out_file:
+            content = await svg_file.read()
+            await out_file.write(content)
+
+        # 응답 데이터 준비
+        processed_url = os.path.join("processed", f"{scene_id}.svg").replace("\\", "/")
+
+        return {
+            "success": True,
+            "processed_url": processed_url,
+            "message": "Canvas saved as processed image successfully",
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to save canvas as processed image: {e}"
+        )
 
 
 def get_display_url(original_s3_key: str) -> str:

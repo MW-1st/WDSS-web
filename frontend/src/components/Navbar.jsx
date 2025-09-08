@@ -1,5 +1,5 @@
 import React from "react";
-import { Link, useLocation } from "react-router-dom";
+import {Link, useLocation, useParams} from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { useUnity } from "../contexts/UnityContext.jsx";
 import client from "../api/client";
@@ -11,6 +11,8 @@ export default function Navbar({ transparent: propTransparent = false }) {
 
   // ===== ① 에디터(프로젝트) 전용 Navbar =====
   if (location.pathname.startsWith("/projects")) {
+    const projectId = location.pathname.split('/')[2];
+
     const api = typeof window !== "undefined" ? window.editorAPI : undefined;
 
     const [editorState, setEditorState] = React.useState(() => ({
@@ -20,6 +22,8 @@ export default function Navbar({ transparent: propTransparent = false }) {
       selectedId: api?.selectedId || null,
       projectName: api?.projectName || "",
     }));
+
+    const sceneId = editorState.selectedId;
 
     React.useEffect(() => {
       const handler = (e) => {
@@ -66,12 +70,33 @@ export default function Navbar({ transparent: propTransparent = false }) {
         const svgBlob = new Blob([canvasSvgData.svgString], {
           type: "image/svg+xml",
         });
-        const fd = new FormData();
-        fd.append(
-          "file",
-          new File([svgBlob], "modified_canvas.svg", { type: "image/svg+xml" })
+        // 1. processed 저장용 FormData
+        const saveFormData = new FormData();
+        saveFormData.append(
+          "svg_file", // 백엔드 파라미터명과 일치시켜야 함
+          new File([svgBlob], `${sceneId}.svg`, { type: "image/svg+xml" })
         );
-        const jsonResp = await client.post("/image/svg-to-json", fd);
+
+        // 2. JSON 생성용 FormData (별도 생성)
+        const jsonFormData = new FormData();
+        jsonFormData.append(
+          "file",
+          new File([svgBlob], `${sceneId}.svg`, { type: "image/svg+xml" })
+        );
+
+        // 3. processed 저장
+        try {
+          await client.put(
+            `/projects/${projectId}/scenes/${sceneId}/processed`,
+            saveFormData
+          );
+        } catch (saveError) {
+          console.error("Processed save error:", saveError);
+          alert("캔버스 저장 중 오류가 발생했습니다.");
+          return;
+        }
+
+        const jsonResp = await client.post("/image/svg-to-json", jsonFormData);
         const jsonUrl = jsonResp.data?.json_url;
         const unitySent = jsonResp.data?.unity_sent;
         if (jsonUrl) {
