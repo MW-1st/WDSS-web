@@ -2,7 +2,7 @@ import React from "react";
 import { useParams } from "react-router-dom";
 import client from "../api/client";
 import { getImageUrl } from "../utils/imageUtils";
-import { RiDeleteBin6Line } from "react-icons/ri";
+import { RiDeleteBinLine } from "react-icons/ri";
 
 const VISIBLE = 4;
 const BTN_SIZE = 48;
