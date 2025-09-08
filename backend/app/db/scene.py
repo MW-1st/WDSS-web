@@ -100,26 +100,35 @@ async def update_scene(
     if not rel:
         return None  # 존재하지 않으면 None 반환
 
-    drones_as_json_string = json.dumps(scene_data.drones)
+    # drones_as_json_string = json.dumps(scene_data.drones)
+    # await conn.execute(
+    #     """
+    #     INSERT INTO scene_payload (scene_id, drones, preview)
+    #     VALUES ($1, $2, $3) ON CONFLICT (scene_id) DO
+    #     UPDATE
+    #         SET drones = EXCLUDED.drones,
+    #         preview = COALESCE (EXCLUDED.preview, scene_payload.preview)
+    #     """,
+    #     scene_id,
+    #     drones_as_json_string,
+    #     scene_data.preview,
+    # )
+
     await conn.execute(
         """
-        INSERT INTO scene_payload (scene_id, drones, preview)
-        VALUES ($1, $2, $3) ON CONFLICT (scene_id) DO
-        UPDATE
-            SET drones = EXCLUDED.drones,
-            preview = COALESCE (EXCLUDED.preview, scene_payload.preview)
+        UPDATE scene 
+        SET s3_key = $2
+        WHERE id = $1
         """,
         scene_id,
-        drones_as_json_string,
-        scene_data.preview,
+        scene_data.imageUrl,  # preview를 s3_key에 저장
     )
 
     # 업데이트된 전체 데이터를 다시 조회하여 반환
     updated_row = await conn.fetchrow(
         """
-        SELECT s.id, s.scene_num, sp.drones, sp.preview
-        FROM scene s
-                 LEFT JOIN scene_payload sp ON sp.scene_id = s.id
+        SELECT s.id, s.scene_num
+        FROM scene
         WHERE s.id = $1
         """,
         scene_id,

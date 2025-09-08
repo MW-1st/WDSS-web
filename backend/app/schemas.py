@@ -1,6 +1,6 @@
 import datetime
 import uuid
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from typing import Optional, List, Any
 
 
@@ -154,24 +154,40 @@ class ProjectDetailDataResponse(SuccessResponse):
     project: ProjectDetailResponse
 
 
-class SceneBrief(BaseModel):
+# schemas.py에서 Scene 관련 스키마 수정
+class SceneCreate(BaseModel):
+    scene_num: int
+
+
+class SceneUpdate(BaseModel):
+    s3_key: Optional[str] = None
+
+
+class Scene(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
-    scene_num: Optional[int] = None
-    name: Optional[str] = None
-    preview: Optional[str] = None  # base64 썸네일(선택)
+    project_id: str
+    scene_num: int
+    s3_key: Optional[str] = None
 
 
-class SceneDetail(BaseModel):
-    id: str
-    scene_num: Optional[int] = None
-    drones: List[Any] = Field(default_factory=list)  # ✅ 가변 기본값 방지
-    preview: Optional[str] = None
+class SceneResponse(BaseModel):
+    success: bool
+    scene: Scene
 
 
-class SceneCreateReq(BaseModel):
-    scene_num: int  # ✅ project_id는 경로 파라미터로 받음
+class ScenesResponse(BaseModel):
+    success: bool
+    scenes: List[Scene]
 
 
-class SceneSaveReq(BaseModel):
-    drones: List[Any] = Field(default_factory=list)  # ✅
-    preview: Optional[str] = None
+class DeleteImageRequest(BaseModel):
+    imageUrl: str
+
+
+class TransformOptions(BaseModel):
+    target_dots: int | None = 2000
+    color_r: int | None = 0
+    color_g: int | None = 0
+    color_b: int | None = 0
