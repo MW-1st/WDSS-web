@@ -4,6 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from app.routers import auth, scene, websocket, project, image_router
 from app.db.database import init_db, close_db
 from starlette.middleware.base import BaseHTTPMiddleware
+from app.config import create_upload_directories
 
 app = FastAPI()
 
@@ -51,6 +52,18 @@ app.mount(
     name="uploads",
 )
 
+app.mount(
+    "/originals",
+    StaticFiles(directory="processed"),
+    name="originals",
+)
+
+app.mount(
+    "/processed",
+    StaticFiles(directory="processed"),
+    name="processed",
+)
+
 # Static files for generated JSON
 app.mount(
     "/svg-json",
@@ -61,6 +74,7 @@ app.mount(
 
 @app.on_event("startup")
 async def startup():
+    create_upload_directories()
     await init_db()
 
 
