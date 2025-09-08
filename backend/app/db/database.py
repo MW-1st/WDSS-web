@@ -84,7 +84,7 @@ async def _ensure_schema(conn: asyncpg.Connection) -> None:
             "SELECT to_regclass('public.auth_credentials')"
         )
         if users_exists is None or creds_exists is None:
-            sql_path = os.path.join(os.path.dirname(__file__), "WDSS.sql")
+            sql_path = os.path.join(os.path.dirname(__file__), "db", "WDSS.sql")
             with open(sql_path, "r", encoding="utf-8") as f:
                 sql_text = f.read()
             # Execute statements individually to satisfy asyncpg
