@@ -306,6 +306,12 @@ export default function EditorPage({ projectId = DUMMY }) {
   // + 생성
   const handleAddScene = async () => {
     try {
+      // 최대 씬 개수 제한 (프로젝트 설정)
+      const maxScenes = projectMeta?.max_scene ?? projectMeta?.maxScenes ?? null;
+      if (Number.isFinite(maxScenes) && maxScenes !== null && scenes.length >= maxScenes) {
+        alert(`씬은 최대 ${maxScenes}개까지만 생성할 수 있어요.`);
+        return;
+      }
       const projectIdReady = await ensureProjectId();
       console.log("확인된 Project ID:", projectIdReady);
       const numericSceneNums = (scenes || [])
