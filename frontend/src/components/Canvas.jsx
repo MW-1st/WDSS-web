@@ -12,7 +12,10 @@ import {
   Circle,
   FabricImage,
   PencilBrush,
+  Rect,
 } from "fabric";
+import useLayers from "../hooks/useLayers";
+import * as fabricLayerUtils from "../utils/fabricLayerUtils";
 
 export default function Canvas({
   width = 800,
@@ -21,8 +24,8 @@ export default function Canvas({
   stageRef: externalStageRef,
   drawingMode: externalDrawingMode = "draw",
   eraserSize: externalEraserSize = 20,
-
   drawingColor: externalDrawingColor = '#222222',
+  activeLayerId: externalActiveLayerId,
   onModeChange,
   onSelectionChange
 }) {
@@ -36,7 +39,53 @@ export default function Canvas({
   const onSelectionChangeRef = useRef(onSelectionChange);
   useEffect(() => { onSelectionChangeRef.current = onSelectionChange; }, [onSelectionChange]);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [canvasRevision, setCanvasRevision] = useState(0);
   const [deleteIconPos, setDeleteIconPos] = useState(null);
+
+  // 레이어 관리 훅
+  const {
+    layers,
+    activeLayerId,
+    setActiveLayerId,
+    createLayer,
+    deleteLayer,
+    toggleLayerVisibility,
+    toggleLayerLock,
+    renameLayer,
+    reorderLayers,
+    getActiveLayer,
+    getLayer,
+    getSortedLayers
+  } = useLayers();
+
+  // 클로저(closure) 문제 해결을 위한 ref
+  // 이벤트 핸들러가 항상 최신 값을 참조하도록 보장
+  const activeLayerIdRef = useRef(activeLayerId);
+  useEffect(() => {
+    activeLayerIdRef.current = activeLayerId;
+  }, [activeLayerId]);
+
+  const layersRef = useRef(layers);
+  useEffect(() => {
+    layersRef.current = layers;
+  }, [layers]);
+
+  const getSortedLayersRef = useRef(getSortedLayers);
+  useEffect(() => {
+    getSortedLayersRef.current = getSortedLayers;
+  }, [getSortedLayers]);
+
+  // [중요] 레이어 상태 동기화를 위한 중앙 집중식 Effect
+  // layers 배열(순서, zIndex 등 포함)이 변경될 때마다 캔버스 객체들의 순서를 재정렬합니다.
+  // 이것이 캔버스와 레이어 패널의 상태를 일치시키는 가장 확실한 방법입니다.
+  useEffect(() => {
+    if (fabricCanvas.current) {
+      console.log('🔄 [Sync Effect] Layer state changed, reordering canvas objects...');
+      // getSortedLayers는 layers 상태에 의존하므로, 이 effect가 실행될 때는 항상 최신 상태를 반영합니다.
+      const sortedLayers = getSortedLayers();
+      fabricLayerUtils.reorderObjectsByLayers(fabricCanvas.current, sortedLayers);
+    }
+  }, [layers, canvasRevision]); // 'layers' 또는 'canvasRevision' 상태가 변경될 때마다 실행
 
   // Use useLayoutEffect to initialize the canvas
   useLayoutEffect(() => {
@@ -53,6 +102,16 @@ export default function Canvas({
       perPixelTargetFind: false, // 픽셀 단위 대상 찾기 비활성화
       enableRetinaScaling: false, // 레티나 스케일링 비활성화로 성능 향상
     });
+
+    // 그리기 영역을 캔버스 경계로 제한
+    const clipPath = new Rect({
+      left: 0,
+      top: 0,
+      width: width,
+      height: height,
+      absolutePositioned: true
+    });
+    canvas.clipPath = clipPath;
 
     // 그리기 모드 설정 (성능 최적화)
     canvas.isDrawingMode = true;
@@ -71,6 +130,198 @@ export default function Canvas({
     // 초기 렌더링 활성화
     canvas.renderOnAddRemove = true;
     canvas.renderAll();
+
+    // 간단한 줌 기능 추가
+    const handleCanvasZoom = (opt) => {
+      const e = opt.e;
+      
+      // Ctrl키와 함께 휠 이벤트가 발생한 경우에만 처리
+      if (e.ctrlKey) {
+        e.preventDefault(); // 브라우저 기본 줌 방지
+        
+        const delta = e.deltaY;
+        let zoom = canvas.getZoom();
+        zoom *= 0.999 ** delta;
+        
+        // 줌 범위 제한
+        if (zoom > 20) zoom = 20;
+        if (zoom < 0.01) zoom = 0.01;
+        
+        // 마우스 포인터 중심으로 줌
+        canvas.zoomToPoint({ x: opt.e.offsetX, y: opt.e.offsetY }, zoom);
+      }
+    };
+
+    // 캔버스 경계 표시 (실제 변환될 영역)
+    const addCanvasBoundary = () => {
+      const boundary = new Rect({
+        left: 0,
+        top: 0,
+        width: width,
+        height: height,
+        fill: 'transparent',
+        stroke: '#999',
+        strokeWidth: 1,
+        strokeDashArray: [5, 5],
+        selectable: false,
+        evented: false,
+        excludeFromExport: true,
+        name: 'canvasBoundary'
+      });
+      canvas.add(boundary);
+      canvas.sendObjectToBack(boundary);
+    };
+
+    // 팬 모드 구현 (안전하게)
+    let isPanMode = false;
+    let isPanning = false;
+    let lastPosX, lastPosY;
+    let originalDrawingMode = false;
+    let originalSelection = false;
+
+    const enterPanMode = () => {
+      if (isPanMode) return;
+      
+      // 현재 상태 저장
+      originalDrawingMode = canvas.isDrawingMode;
+      originalSelection = canvas.selection;
+      
+      // 팬 모드로 전환
+      isPanMode = true;
+      canvas.isDrawingMode = false;
+      canvas.selection = false;
+      canvas.defaultCursor = 'grab';
+      canvas.hoverCursor = 'grab';
+      canvas.moveCursor = 'grab';
+      canvas.setCursor('grab');
+      
+      // 모든 객체를 선택 불가능하게 설정
+      canvas.getObjects().forEach(obj => {
+        obj.selectable = false;
+        obj.evented = false;
+      });
+    };
+
+    const exitPanMode = () => {
+      if (!isPanMode) return;
+      
+      isPanMode = false;
+      isPanning = false;
+      
+      // 원래 상태 복원
+      canvas.isDrawingMode = originalDrawingMode;
+      canvas.selection = originalSelection;
+      canvas.defaultCursor = 'default';
+      canvas.hoverCursor = 'move';
+      canvas.moveCursor = 'move';
+      canvas.setCursor('default');
+      
+      // 객체들을 다시 활성화 (드롭된 이미지만)
+      canvas.getObjects().forEach(obj => {
+        if (obj.customType === 'droppedImage') {
+          obj.selectable = true;
+          obj.evented = true;
+        }
+      });
+    };
+
+    const handleKeyDown = (e) => {
+      if (e.code === 'Space') {
+        e.preventDefault(); // 브라우저 기본 스크롤 방지
+        e.stopPropagation(); // 이벤트 전파 중단
+        
+        if (!isPanMode) {
+          enterPanMode();
+        }
+      }
+    };
+
+    const handleKeyUp = (e) => {
+      if (e.code === 'Space') {
+        e.preventDefault(); // 브라우저 기본 스크롤 방지
+        e.stopPropagation(); // 이벤트 전파 중단
+        
+        if (isPanMode) {
+          exitPanMode();
+        }
+      }
+    };
+
+    const handleMouseDown = (opt) => {
+      if (isPanMode && !isPanning) {
+        isPanning = true;
+        lastPosX = opt.e.clientX;
+        lastPosY = opt.e.clientY;
+        canvas.setCursor('grabbing');
+        opt.e.preventDefault();
+        opt.e.stopImmediatePropagation();
+      }
+    };
+
+    const handleMouseMove = (opt) => {
+      if (isPanMode && isPanning) {
+        const e = opt.e;
+        const vpt = canvas.viewportTransform;
+        vpt[4] += e.clientX - lastPosX;
+        vpt[5] += e.clientY - lastPosY;
+        canvas.requestRenderAll();
+        lastPosX = e.clientX;
+        lastPosY = e.clientY;
+        opt.e.preventDefault();
+        opt.e.stopImmediatePropagation();
+      }
+    };
+
+    const handleMouseUp = (opt) => {
+      if (isPanMode && isPanning) {
+        isPanning = false;
+        canvas.setCursor('grab');
+        opt.e.preventDefault();
+        opt.e.stopImmediatePropagation();
+      }
+    };
+
+    // 패스 생성 이벤트 리스너 (그리기 모드에서 레이어 정보 할당)
+    const handlePathCreated = (e) => {
+      const path = e.path;
+      if (path) {
+        // 클로저 문제를 피하기 위해 ref에서 최신 값을 가져옴
+        const currentActiveLayerId = activeLayerIdRef.current;
+        const currentLayers = layersRef.current;
+        const activeLayer = currentLayers.find(layer => layer.id === currentActiveLayerId);
+        console.log('🎨 Path created - using activeLayerId:', currentActiveLayerId, 'layer:', activeLayer?.name);
+        
+        if (activeLayer) {
+          fabricLayerUtils.assignObjectToLayer(path, activeLayer.id, activeLayer.name);
+          console.log('✅ Path assigned to layer:', activeLayer.name);
+          setCanvasRevision(c => c + 1); // 캔버스 변경을 알림
+        } else {
+          console.error('❌ Path assignment failed - no active layer found!');
+          console.log('Debug info:', {
+            refActiveLayerId: currentActiveLayerId,
+            externalActiveLayerId,
+            internalActiveLayerId: activeLayerId,
+            availableLayers: currentLayers.map(l => ({id: l.id, name: l.name, type: l.type}))
+          });
+        }
+      }
+    };
+
+    // 객체 추가 이벤트 리스너 (모든 객체에 대해 레이어 할당)
+    const handleObjectAdded = (e) => {
+      const obj = e.target;
+      if (obj && !obj.layerId) { // 레이어 정보가 없는 객체만 처리
+        // 클로저 문제를 피하기 위해 ref에서 최신 값을 가져옴
+        const currentActiveLayerId = activeLayerIdRef.current;
+        const currentLayers = layersRef.current;
+        const activeLayer = currentLayers.find(layer => layer.id === currentActiveLayerId);
+        
+        if (activeLayer) {
+          fabricLayerUtils.assignObjectToLayer(obj, activeLayer.id, activeLayer.name);
+          console.log('Object assigned to layer:', activeLayer.name);
+        }
+      }
+    };
 
     // Selection change handlers
     const notifySelection = () => {
@@ -155,7 +406,27 @@ export default function Canvas({
     canvas.on('after:render', handleAfterRender);
     selectionHandlers.current = { handleCreated, handleUpdated, handleCleared };
 
+    // 이벤트 리스너 등록
+    canvas.on('mouse:wheel', handleCanvasZoom);
+    canvas.on('mouse:down', handleMouseDown);
+    canvas.on('mouse:move', handleMouseMove);
+    canvas.on('mouse:up', handleMouseUp);
+    canvas.on('path:created', handlePathCreated);
+    canvas.on('object:added', handleObjectAdded);
+    
+    document.addEventListener('keydown', handleKeyDown, { capture: true });
+    document.addEventListener('keyup', handleKeyUp, { capture: true });
+    
+    // 캔버스 경계 추가
+    addCanvasBoundary();
+
     return () => {
+      canvas.off('mouse:wheel', handleCanvasZoom);
+      canvas.off('mouse:down', handleMouseDown);
+      canvas.off('mouse:move', handleMouseMove);
+      canvas.off('mouse:up', handleMouseUp);
+      canvas.off('path:created', handlePathCreated);
+      canvas.off('object:added', handleObjectAdded);
       if (selectionHandlers.current.handleCreated) canvas.off('selection:created', selectionHandlers.current.handleCreated);
       if (selectionHandlers.current.handleUpdated) canvas.off('selection:updated', selectionHandlers.current.handleUpdated);
       if (selectionHandlers.current.handleCleared) canvas.off('selection:cleared', selectionHandlers.current.handleCleared);
@@ -163,8 +434,9 @@ export default function Canvas({
       canvas.off('object:scaling', handleTransforming);
       canvas.off('object:rotating', handleTransforming);
       canvas.off('object:modified', handleModified);
-      canvas.off('mouse:wheel', handleWheel);
       canvas.off('after:render', handleAfterRender);
+      document.removeEventListener('keydown', handleKeyDown, { capture: true });
+      document.removeEventListener('keyup', handleKeyUp, { capture: true });
       canvas.dispose();
     };
   }, [width, height, externalStageRef]);
@@ -255,6 +527,12 @@ export default function Canvas({
               moveCursor: 'crosshair'
             });
 
+            // SVG 도트는 배경 레이어에 할당
+            const backgroundLayer = getLayer('background');
+            if (backgroundLayer) {
+              fabricLayerUtils.assignObjectToLayer(fabricCircle, backgroundLayer.id, backgroundLayer.name);
+            }
+
             canvas.add(fabricCircle);
             addedCount++;
           });
@@ -262,6 +540,7 @@ export default function Canvas({
           console.log(`총 ${addedCount}개의 circle을 캔버스에 추가했습니다`);
           console.log("캔버스 객체 개수:", canvas.getObjects().length);
 
+          setCanvasRevision(c => c + 1); // 캔버스 변경을 알림
           canvas.renderAll();
         })
         .catch((err) => {
@@ -326,6 +605,15 @@ export default function Canvas({
       updateBrushColor(externalDrawingColor);
     }
   }, [externalDrawingColor]);
+
+  // 외부에서 activeLayerId가 변경될 때 반응
+  useEffect(() => {
+    console.log('🔄 외부 activeLayerId 변경:', externalActiveLayerId, '현재 내부 activeLayerId:', activeLayerId);
+    if (externalActiveLayerId && externalActiveLayerId !== activeLayerId) {
+      console.log('✅ Canvas activeLayerId 업데이트:', activeLayerId, '->', externalActiveLayerId);
+      setActiveLayerId(externalActiveLayerId);
+    }
+  }, [externalActiveLayerId]);
 
   // 지우개 크기가 변경될 때 현재 모드에 따라 업데이트
   useEffect(() => {
@@ -419,14 +707,20 @@ export default function Canvas({
       const continueDraw = (e) => {
         if (!isDrawing) return;
         drawDotAtPoint(e);
+        canvas.requestRenderAll(); // 실시간 피드백을 위해 최적화된 렌더링 호출
       };
 
       const stopDraw = () => {
         isDrawing = false;
+        setCanvasRevision(c => c + 1); // 캔버스 변경을 알림
       };
 
       const drawDotAtPoint = (e) => {
         const pointer = canvas.getPointer(e.e);
+        // 클로저 문제를 피하기 위해 ref에서 최신 값을 가져옴
+        const currentActiveLayerId = activeLayerIdRef.current;
+        const currentLayers = layersRef.current;
+        const activeLayer = currentLayers.find(layer => layer.id === currentActiveLayerId);
 
         // 새로운 도트 생성 (SVG circle과 같은 크기 2px 사용)
         const dotRadius = 1;
@@ -443,8 +737,14 @@ export default function Canvas({
           moveCursor: 'crosshair'
         });
 
+        // 레이어 정보 할당
+        if (activeLayer) {
+          fabricLayerUtils.assignObjectToLayer(newDot, activeLayer.id, activeLayer.name);
+        }
+
         canvas.add(newDot);
-        canvas.renderAll();
+        // 연속적인 드로잉 중에는 매번 renderAll을 호출하지 않습니다.
+        // 렌더링은 continueDraw와 stopDraw에서 관리합니다.
       };
 
       // 고정 크기 브러시 커서 생성
@@ -811,8 +1111,19 @@ export default function Canvas({
           centeredRotation: true,
         });
 
+        // 드롭된 이미지는 활성 레이어에 할당  
+        const currentActiveLayerId = externalActiveLayerId;
+        const activeLayer = layers.find(layer => layer.id === currentActiveLayerId);
+        console.log('🖼️ Image dropped - using activeLayerId:', currentActiveLayerId, 'layer:', activeLayer?.name);
+        
+        if (activeLayer) {
+          fabricLayerUtils.assignObjectToLayer(img, activeLayer.id, activeLayer.name);
+        }
+
         canvas.add(img);
         canvas.setActiveObject(img);
+        setCanvasRevision(c => c + 1); // 캔버스 변경을 알림
+        
         canvas.renderAll();
       })
       .catch((err) => {
@@ -820,8 +1131,6 @@ export default function Canvas({
         alert("이미지를 로드할 수 없습니다.");
       });
   };
-
-  // toggleSelectionMode는 이제 toggleDrawingMode로 대체됨
 
   // 전체 지우기 핸들러
   const handleClearAll = () => {
@@ -836,7 +1145,6 @@ export default function Canvas({
       console.log("캔버스 전체가 초기화되었습니다");
     }
   };
-
 
   // 현재 캔버스의 모든 객체를 색상별로 분석하여 SVG 생성
   const getCurrentCanvasAsSvg = () => {
@@ -903,7 +1211,6 @@ export default function Canvas({
       hasMultipleColors: new Set([...dots.map(d => d.originalColor), ...pathObjects.map(p => p.originalColor)]).size > 1
     };
   };
-
 
   // 현재 캔버스 전체를 이미지로 내보내기
   const exportCanvasAsImage = () => {
@@ -981,6 +1288,7 @@ export default function Canvas({
     canvas.getObjects().forEach((obj) => canvas.remove(obj));
     canvas.backgroundColor = "#fafafa";
     canvas.renderAll();
+    setCanvasRevision(c => c + 1); // 캔버스 변경을 알림
   };
 
   // 원본 캔버스 상태 저장 및 복원 기능
@@ -1015,85 +1323,137 @@ export default function Canvas({
     return true;
   };
 
+  // 레이어 가시성 제어 함수
+  const handleLayerVisibilityChange = useCallback((layerId) => {
+    if (fabricCanvas.current) {
+      const layer = getLayer(layerId);
+      if (layer) {
+        fabricLayerUtils.setLayerVisibility(fabricCanvas.current, layerId, !layer.visible);
+        toggleLayerVisibility(layerId);
+      }
+    }
+  }, [getLayer, toggleLayerVisibility]);
+
+  // 레이어 잠금 제어 함수
+  const handleLayerLockChange = useCallback((layerId) => {
+    if (fabricCanvas.current) {
+      const layer = getLayer(layerId);
+      if (layer) {
+        fabricLayerUtils.setLayerLock(fabricCanvas.current, layerId, !layer.locked);
+        toggleLayerLock(layerId);
+      }
+    }
+  }, [getLayer, toggleLayerLock]);
+
+  // 레이어 삭제 (캔버스 객체도 함께 삭제)
+  const handleDeleteLayer = useCallback((layerId) => {
+    if (fabricCanvas.current) {
+      // 먼저 캔버스에서 해당 레이어의 모든 객체 삭제
+      fabricLayerUtils.deleteLayerObjects(fabricCanvas.current, layerId);
+      // 캔버스 변경을 알림 (객체 삭제 후)
+      setCanvasRevision(c => c + 1);
+      // 그다음 레이어 상태에서 삭제
+      deleteLayer(layerId);
+    }
+  }, [deleteLayer]);
+
   // 외부에서 사용할 수 있도록 ref에 함수 등록
   useEffect(() => {
-  if (externalStageRef && externalStageRef.current) {
-    externalStageRef.current.getCurrentCanvasAsSvg = getCurrentCanvasAsSvg;
-    externalStageRef.current.exportCanvasAsImage = exportCanvasAsImage;
-    externalStageRef.current.exportDrawnLinesOnly = exportDrawnLinesOnly;
-    externalStageRef.current.hasDrawnContent = hasDrawnContent;
-    externalStageRef.current.clear = clearCanvas;
+    if (externalStageRef && externalStageRef.current) {
+      externalStageRef.current.getCurrentCanvasAsSvg = getCurrentCanvasAsSvg;
+      externalStageRef.current.exportCanvasAsImage = exportCanvasAsImage;
+      externalStageRef.current.exportDrawnLinesOnly = exportDrawnLinesOnly;
+      externalStageRef.current.hasDrawnContent = hasDrawnContent;
+      externalStageRef.current.clear = clearCanvas;
+      
+      // 누락된 loadImageFromUrl 메서드 추가
+      externalStageRef.current.loadImageFromUrl = (url) => {
+        console.log("loadImageFromUrl 호출됨:", url);
+        if (!fabricCanvas.current) return;
 
-    // 누락된 loadImageFromUrl 메서드 추가
-    externalStageRef.current.loadImageFromUrl = (url) => {
-      console.log("loadImageFromUrl 호출됨:", url);
-      if (!fabricCanvas.current) return;
+        const canvas = fabricCanvas.current;
 
-      const canvas = fabricCanvas.current;
+        if (url.endsWith(".svg")) {
+          fetch(url)
+            .then(response => response.text())
+            .then(svgText => {
+              // 기존 SVG 요소들 제거
+              const existingSvgObjects = canvas.getObjects()
+                .filter(obj => obj.customType === "svgDot" || obj.type === "image");
+              existingSvgObjects.forEach(obj => canvas.remove(obj));
 
-      if (url.endsWith(".svg")) {
-        fetch(url)
-          .then(response => response.text())
-          .then(svgText => {
-            // 기존 SVG 요소들 제거
-            const existingSvgObjects = canvas.getObjects()
-              .filter(obj => obj.customType === "svgDot" || obj.type === "image");
-            existingSvgObjects.forEach(obj => canvas.remove(obj));
+              // SVG 파싱
+              const parser = new DOMParser();
+              const svgDoc = parser.parseFromString(svgText, "image/svg+xml");
+              const circles = svgDoc.querySelectorAll("circle");
 
-            // SVG 파싱
-            const parser = new DOMParser();
-            const svgDoc = parser.parseFromString(svgText, "image/svg+xml");
-            const circles = svgDoc.querySelectorAll("circle");
+              circles.forEach((circleEl) => {
+                const cx = parseFloat(circleEl.getAttribute('cx') || '0');
+                const cy = parseFloat(circleEl.getAttribute('cy') || '0');
+                const r = parseFloat(circleEl.getAttribute('r') || '2');
+                const originalFill = circleEl.getAttribute('fill') || '#000000';
 
-            circles.forEach((circleEl) => {
-              const cx = parseFloat(circleEl.getAttribute('cx') || '0');
-              const cy = parseFloat(circleEl.getAttribute('cy') || '0');
-              const r = parseFloat(circleEl.getAttribute('r') || '2');
-              const originalFill = circleEl.getAttribute('fill') || '#000000';
+                const fabricCircle = new Circle({
+                  left: cx - r,
+                  top: cy - r,
+                  radius: r,
+                  fill: originalFill,
+                  selectable: false,
+                  evented: true,
+                  customType: "svgDot",
+                  originalCx: cx,
+                  originalCy: cy,
+                  originalFill: originalFill,
+                  hoverCursor: 'crosshair',
+                  moveCursor: 'crosshair'
+                });
 
-              const fabricCircle = new Circle({
-                left: cx - r,
-                top: cy - r,
-                radius: r,
-                fill: originalFill,
-                selectable: false,
-                evented: true,
-                customType: "svgDot",
-                originalCx: cx,
-                originalCy: cy,
-                originalFill: originalFill,
-                hoverCursor: 'crosshair',
-                moveCursor: 'crosshair'
+                canvas.add(fabricCircle);
               });
 
-              canvas.add(fabricCircle);
-            });
+              canvas.renderAll();
+            })
+            .catch(err => console.error("SVG 로드 실패:", err));
+        }
+      };
 
-            canvas.renderAll();
-          })
-          .catch(err => console.error("SVG 로드 실패:", err));
-      }
-    };
-
-    externalStageRef.current.applyDrawingMode = (mode, color) => {
-      const currentColor = color || externalDrawingColor;
-      console.log('applyDrawingMode with color:', mode, currentColor);
-      applyDrawingMode(mode, currentColor);
-    };
-    externalStageRef.current.setDrawingMode = (mode) => {
-      setDrawingMode(mode);
-      setTimeout(() => {
-        externalStageRef.current.applyDrawingMode(mode, drawingColor);
-      }, 10);
-    };
-    externalStageRef.current.setDrawingColor = (color) => {
-      setDrawingColor(color);
-      updateBrushColor(color);
-    };
-    externalStageRef.current.saveOriginalCanvasState = saveOriginalCanvasState;
-    externalStageRef.current.restoreOriginalCanvasState = restoreOriginalCanvasState;
-  }
-}, [externalStageRef]);
+      externalStageRef.current.applyDrawingMode = (mode, color) => {
+        // 색상 정보를 명시적으로 전달받아 사용
+        const currentColor = color || externalDrawingColor;
+        console.log('applyDrawingMode with color:', mode, currentColor);
+        applyDrawingMode(mode, currentColor);
+      };
+      externalStageRef.current.setDrawingMode = (mode) => {
+        setDrawingMode(mode);
+        // 현재 색상을 명시적으로 전달
+        setTimeout(() => {
+          externalStageRef.current.applyDrawingMode(mode, drawingColor);
+        }, 10);
+      };
+      externalStageRef.current.setDrawingColor = (color) => {
+        setDrawingColor(color);
+        updateBrushColor(color);
+      };
+      // 원본 상태 관리 함수 추가
+      externalStageRef.current.saveOriginalCanvasState = saveOriginalCanvasState;
+      externalStageRef.current.restoreOriginalCanvasState = restoreOriginalCanvasState;
+      
+      // 레이어 관리 함수들 추가
+      externalStageRef.current.layers = {
+        getLayers: getSortedLayers,
+        getActiveLayerId: () => activeLayerId,
+        setActiveLayer: setActiveLayerId,
+        createLayer,
+        deleteLayer: handleDeleteLayer, // 캔버스 객체도 함께 삭제하는 핸들러 사용
+        renameLayer,
+        toggleVisibility: handleLayerVisibilityChange,
+        toggleLock: handleLayerLockChange,
+        reorderLayers: reorderLayers,
+      };
+    }
+  }, [externalStageRef, getSortedLayers, activeLayerId, setActiveLayerId, createLayer, 
+      handleDeleteLayer, renameLayer, handleLayerVisibilityChange, handleLayerLockChange, 
+      reorderLayers]);
 
   return (
     <div
