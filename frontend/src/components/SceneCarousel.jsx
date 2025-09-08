@@ -2,6 +2,7 @@ import React from "react";
 import { useParams } from "react-router-dom";
 import client from "../api/client";
 import { getImageUrl } from "../utils/imageUtils";
+import { RiDeleteBinLine } from "react-icons/ri";
 
 const VISIBLE = 4;
 const BTN_SIZE = 48;
@@ -369,7 +370,7 @@ export default React.memo(function SceneCarousel({
             cursor: "pointer",
           }}
         >
-          🗑
+          <RiDeleteBinLine size={16} color="#6b7280" />
         </button>
       </div>
     );
