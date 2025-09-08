@@ -1,20 +1,22 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import Canvas from "../components/Canvas.jsx";
 import EditorToolbar from "../components/EditorToolbar.jsx";
 import MainCanvasSection from "../components/MainCanvasSection.jsx";
 import SceneCarousel from "../components/SceneCarousel.jsx";
 import ImageGallery from "../components/ImageGallery.jsx";
 import LayerPanel from "../components/LayerPanel.jsx";
+import ObjectPropertiesPanel from "../components/ObjectPropertiesPanel.jsx";
 import client from "../api/client";
+import { getImageUrl } from '../utils/imageUtils';
 import { useUnity } from "../contexts/UnityContext.jsx";
 import { useParams } from "react-router-dom";
+import { CiSettings } from "react-icons/ci";
+import ProjectSettingsModal from "../components/ProjectSettingsModal";
 
 const VISIBLE = 4;
-const THUMB_W = 200;
-const THUMB_H = 120;
-const GAP = 48;
-const BTN_SIZE = 48;
 const DUMMY = "11111111-1111-1111-1111-111111111111";
+
+const LEFT_TOOL_WIDTH = 100;
+const RIGHT_PANEL_WIDTH = 260;
 
 function useDebounced(fn, delay = 400) {
   const t = useRef(null);
@@ -33,33 +35,61 @@ function useDebounced(fn, delay = 400) {
 }
 
 export default function EditorPage({ projectId = DUMMY }) {
-  // 프로젝트 및 씬 관리 상태
-  const { project_id } = useParams();
+  const {project_id} = useParams();
   const [pid, setPid] = useState(project_id);
   const [scenes, setScenes] = useState([]);
   const [projectName, setProjectName] = useState("");
+  const [projectMeta, setProjectMeta] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
   const [start, setStart] = useState(0);
 
+  // 갤러리 열림 상태
+  const [galleryOpen, setGalleryOpen] = useState(() => {
+    const saved = localStorage.getItem("wdss:galleryOpen");
+    return saved ? JSON.parse(saved) : false;
+  });
+  useEffect(() => {
+    localStorage.setItem("wdss:galleryOpen", JSON.stringify(galleryOpen));
+  }, [galleryOpen]);
+
   // 이미지 변환 관련 상태
-  const [imageUrl, setImageUrl] = useState(""); // 현재 표시되는 이미지 (변환된 결과)
   const [processing, setProcessing] = useState(false);
   const [targetDots, setTargetDots] = useState(2000);
-  
+
   // 원본 캔버스 상태 관리
-  const [originalCanvasState, setOriginalCanvasState] = useState(null);
   const stageRef = useRef(null);
+  const galleryRef = useRef(null);
 
   // 캔버스 관련 상태
   const [drawingMode, setDrawingMode] = useState("draw");
   const [eraserSize, setEraserSize] = useState(20);
   const [drawingColor, setDrawingColor] = useState('#222222');
+  const [selectedObject, setSelectedObject] = useState(null);
   
   // 레이어 관련 상태
   const [canvasReady, setCanvasReady] = useState(false);
   const [layersState, setLayersState] = useState([]);
   const [activeLayerIdState, setActiveLayerIdState] = useState(null);
   const [selectedObjectLayerId, setSelectedObjectLayerId] = useState(null);
+
+  // 프로젝트 설정 모달 상태
+  const [editingProject, setEditingProject] = useState(null);
+  const openProjectSettings = () => {
+    if (projectMeta) setEditingProject(projectMeta);
+  };
+  const closeProjectSettings = () => setEditingProject(null);
+  const handleSettingsSaved = (updated) => {
+    setProjectMeta(updated);
+    if (updated?.project_name) setProjectName(updated.project_name);
+  };
+
+  const selectedScene = useMemo(
+      () => scenes.find((s) => s.id === selectedId) || null,
+      [scenes, selectedId]
+  );
+
+  const imageUrl = selectedScene?.displayUrl || getImageUrl(selectedScene?.s3_key) || "";
+  const originalCanvasState = selectedScene ? selectedScene.originalCanvasState : null;
   
   // 레이어 상태를 업데이트하는 함수
   const updateLayerState = React.useCallback(() => {
@@ -69,17 +99,13 @@ export default function EditorPage({ projectId = DUMMY }) {
         const activeId = stageRef.current.layers.getActiveLayerId();
         
         setLayersState(prevLayers => {
-          // 레이어가 실제로 변경되었는지 확인
           const layersChanged = JSON.stringify(prevLayers.map(l => ({id: l.id, zIndex: l.zIndex, name: l.name, visible: l.visible, locked: l.locked}))) !== 
                                JSON.stringify(layers.map(l => ({id: l.id, zIndex: l.zIndex, name: l.name, visible: l.visible, locked: l.locked})));
           
           if (layersChanged) {
             console.log('Layers changed, updating state');
-            console.log('Previous layers:', prevLayers);
-            console.log('New layers:', layers);
             return [...layers];
           } else {
-            console.log('Layers unchanged, keeping previous state');
             return prevLayers;
           }
         });
@@ -96,10 +122,11 @@ export default function EditorPage({ projectId = DUMMY }) {
       } catch (error) {
         console.warn('Error updating layer state:', error);
       }
-    } else {
-      console.warn('stageRef.current or stageRef.current.layers not available');
     }
   }, []);
+
+  // unity 관련 상태
+  const {isUnityVisible, showUnity, hideUnity, sendTestData} = useUnity();
 
   // 색상이 변경될 때 즉시 캔버스에 반영
   useEffect(() => {
@@ -123,7 +150,6 @@ export default function EditorPage({ projectId = DUMMY }) {
         // 캔버스 선택 이벤트 리스너 추가
         const canvas = stageRef.current;
         const handleSelectionChanged = () => {
-          // 선택된 객체의 레이어 ID 가져오기
           const activeObject = canvas.getActiveObject();
           if (activeObject && activeObject.layerId) {
             setSelectedObjectLayerId(activeObject.layerId);
@@ -136,7 +162,6 @@ export default function EditorPage({ projectId = DUMMY }) {
         canvas.on('selection:updated', handleSelectionChanged);
         canvas.on('selection:cleared', () => setSelectedObjectLayerId(null));
         
-        // cleanup 함수 설정
         return () => {
           if (canvas) {
             canvas.off('selection:created', handleSelectionChanged);
@@ -145,7 +170,6 @@ export default function EditorPage({ projectId = DUMMY }) {
           }
         };
       } else {
-        // Canvas가 준비되지 않았으면 잠시 후 다시 확인
         timeoutId = setTimeout(checkCanvasReady, 100);
       }
     };
@@ -157,26 +181,19 @@ export default function EditorPage({ projectId = DUMMY }) {
       if (timeoutId) clearTimeout(timeoutId);
       if (cleanup) cleanup();
     };
-  }, []); // updateLayerState 의존성 제거
-  // const sceneId = 1; // 현재 에디터의 씬 ID (임시 하드코딩)
-
-  // unity 관련 상태
-  const { isUnityVisible, showUnity, hideUnity, sendTestData } = useUnity();
+  }, []);
 
   // 프로젝트가 없으면 생성하는 헬퍼
   const ensureProjectId = async () => {
     if (pid) return pid;
     const newId =
-      crypto && crypto.randomUUID
-        ? crypto.randomUUID()
-        : ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, (c) =>
-            (
-              c ^
-              (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (c / 4)))
-            ).toString(16)
-          );
-
-    const { data } = await client.post("/projects", {
+        crypto?.randomUUID?.() ??
+        ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, (c) =>
+            (c ^
+                (crypto.getRandomValues(new Uint8Array(1))[0] &
+                    (15 >> (c / 4)))).toString(16)
+        );
+    const {data} = await client.post("/projects", {
       id: newId,
       project_name: "Untitled Project",
       user_id: null,
@@ -192,13 +209,14 @@ export default function EditorPage({ projectId = DUMMY }) {
     // Load project meta (name)
     (async () => {
       try {
-        const { data: proj } = await client.get(`/projects/${pid}`);
-        if (proj?.project_name) setProjectName(proj.project_name);
+        const {data} = await client.get(`/projects/${pid}`);
+        const p = data?.project ?? data;
+        if (p?.project_name) setProjectName(p.project_name);
+        if (p) setProjectMeta(p);
       } catch (e) {
-        // Leave default if fetch fails
         console.warn(
-          "Failed to load project info",
-          e?.response?.data || e?.message
+            "Failed to load project info",
+            e?.response?.data || e?.message
         );
       }
     })();
@@ -209,12 +227,14 @@ export default function EditorPage({ projectId = DUMMY }) {
     if (!pid) return;
     (async () => {
       try {
-        const { data: list } = await client.get(`/projects/${pid}/scenes/`);
+        const {data} = await client.get(`/projects/${pid}/scenes/`);
+        const list = data.scenes || [];
         setScenes(
-          list.map((s, i) => ({
-            ...s,
-            name: s.name || `Scene ${s.scene_num ?? i + 1}`,
-          }))
+            list.map((s, i) => ({
+              ...s,
+              name: s.name || `Scene ${s.scene_num ?? i + 1}`,
+              imageUrl: getImageUrl(s.s3_key),
+            }))
         );
         if (list[0]) setSelectedId(list[0].id);
       } catch (e) {
@@ -225,64 +245,62 @@ export default function EditorPage({ projectId = DUMMY }) {
 
   // 씬 선택 → 상세 로드
   useEffect(() => {
-    if (!pid) return;
-    (async () => {
-      if (!selectedId) return;
-      const current = scenes.find((s) => s.id === selectedId);
-      if (!current || "drones" in current) return;
-      try {
-        const { data: detail } = await client.get(
-          `/projects/${pid}/scenes/${selectedId}`
-        );
-        setScenes((prev) =>
-          prev.map((s) => (s.id === selectedId ? { ...s, ...detail } : s))
-        );
+    if (!pid || !selectedId) {
+      return;
+    }
 
-        // 씬이 변경될 때 해당 씬의 이미지 URL과 원본 캔버스 상태 업데이트
-        if (detail.imageUrl) {
-          setImageUrl(detail.imageUrl);
-        } else {
-          setImageUrl("");
+    const current = scenes.find((s) => s.id === selectedId);
+    if (!current) return;
+
+    const imageUrl = getImageUrl(current.s3_key);
+
+    if (!("s3_key" in current)) {
+      (async () => {
+        try {
+          const {data} = await client.get(
+              `/projects/${pid}/scenes/${selectedId}`
+          );
+          const detail = data.scene || {};
+          setScenes((prev) =>
+              prev.map((s) => (s.id === selectedId ? {...s, ...detail} : s))
+          );
+        } catch (e) {
+          console.error(e);
         }
-        
-        // 원본 캔버스 상태 로드
-        if (detail.originalCanvasState) {
-          setOriginalCanvasState(detail.originalCanvasState);
-          console.log("씬에서 원본 캔버스 상태 로드:", detail.originalCanvasState);
-        } else {
-          setOriginalCanvasState(null);
-        }
-      } catch (e) {
-        console.error(e);
-      }
-    })();
-  }, [selectedId, pid, scenes]);
+      })();
+    }
+  }, [selectedId, pid]);
 
   // 저장(디바운스)
-
   const saveDebounced = useDebounced(async (scene_id, drones, preview, imageUrl, originalCanvasState) => {
     if (!pid) return;
     try {
-      const { data: saved } = await client.put(`/projects/${pid}/scenes/${scene_id}`, {
-        project_id: pid,
-        scene_id,
-        drones,
-        preview,
-        imageUrl, // 현재 표시되는 이미지 URL
-        originalCanvasState, // 원본 캔버스 상태 저장
+      const {data} = await client.post(`/projects/${pid}/scenes/${scene_id}`, {
+        // s3_key: imageUrl
       });
-      setScenes((prev) => prev.map((s) => (s.id === scene_id ? { ...s, ...saved } : s)));
+      const saved = data.scene || {};
+      setScenes((prev) => prev.map((s) => (s.id === scene_id ? {...s, ...saved} : s)));
     } catch (e) {
       console.error(e);
     }
   }, 500);
 
   // Canvas → 변경 반영
-  const handleSceneChange = React.useCallback((id, patch) => {
-    setScenes((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
-    saveDebounced(id, patch.data, patch.preview, imageUrl, originalCanvasState);
-  }, [saveDebounced, imageUrl, originalCanvasState, setScenes]);
-
+  const handleSceneChange = React.useCallback(
+      (id, patch) => {
+        setScenes((prev) =>
+            prev.map((s) => (s.id === id ? {...s, ...patch} : s))
+        );
+        saveDebounced(
+            id,
+            patch.data,
+            patch.preview,
+            imageUrl,
+            originalCanvasState
+        );
+      },
+      [saveDebounced, imageUrl, originalCanvasState, setScenes]
+  );
 
   // + 생성
   const handleAddScene = async () => {
@@ -291,26 +309,20 @@ export default function EditorPage({ projectId = DUMMY }) {
       console.log("확인된 Project ID:", projectIdReady);
       const scene_num = scenes.length + 1;
       console.log("확인된 scene_num:", scene_num);
-      const { data: created } = await client.post(
-        `/projects/${projectIdReady}/scenes/`,
-        {
-          project_id: projectIdReady,
-          scene_num,
-        }
+      const {data} = await client.post(
+          `/projects/${projectIdReady}/scenes/`,
+          {
+            scene_num,
+          }
       );
-
+      const created = data.scene || {};
       const nextScenes = [...scenes, created];
       setScenes(nextScenes);
       setSelectedId(created.id);
 
-      // console.log(`created ${created}`)
-      // console.log(`setSelectedId ${created.id}`)
       const nextTotal = nextScenes.length + 1;
       if (nextTotal > VISIBLE) setStart(nextTotal - VISIBLE);
 
-      // 새 씬으로 전환하면서 상태 초기화
-      setImageUrl("");
-      setOriginalCanvasState(null);
     } catch (e) {
       console.error(e);
       alert("씬 생성 실패");
@@ -321,29 +333,24 @@ export default function EditorPage({ projectId = DUMMY }) {
   const handleSelect = (id) => {
     if (id === "__ADD__") return;
     setSelectedId(id);
-    const idx = items.findIndex((it) => it.id === id);
+    const items = [...scenes, {id: "__ADD__", isAdd: true}];
+    const idx = items.findIndex(it => it.id === id);
     if (idx < start) setStart(idx);
     if (idx >= start + VISIBLE) setStart(idx - VISIBLE + 1);
   };
 
   // + 카드까지 포함
   const items = useMemo(
-    () => [...scenes, { id: "__ADD__", isAdd: true }],
-    [scenes]
+      () => [...scenes, {id: "__ADD__", isAdd: true}],
+      [scenes]
   );
   const total = items.length;
   const canSlide = total > VISIBLE;
   const end = Math.min(start + VISIBLE, total);
   const visibleItems = items.slice(start, end);
 
-  const selectedScene = useMemo(
-    () => scenes.find((s) => s.id === selectedId) || null,
-    [scenes, selectedId]
-  );
-
   // 이미지 변환 핸들러
   const handleTransform = async () => {
-    // 사전 조건 확인: 씬 선택 및 캔버스 준비 여부
     if (!selectedId) {
       alert("먼저 씬을 추가하거나 선택해 주세요.");
       return;
@@ -357,244 +364,138 @@ export default function EditorPage({ projectId = DUMMY }) {
       return;
     }
 
-    console.log("Transform 시작 - pid:", pid, "selectedId:", selectedId);
-    console.log("originalCanvasState:", originalCanvasState);
+    setProcessing(true);
 
     try {
-      setProcessing(true);
-      
-      // 캔버스에 내용이 있는지 확인
-      const hasContent = stageRef.current.hasDrawnContent && stageRef.current.hasDrawnContent();
-      
-      if (!hasContent) {
-        alert("변환할 내용이 없습니다. 먼저 이미지를 추가하거나 그림을 그려주세요.");
-        setProcessing(false);
-        return;
-      }
+      let finalUrl = '';
+      let newS3Key = null;
 
-      // 첫 번째 변환인지 확인 (원본 상태가 없는 경우)
-      if (!originalCanvasState) {
-        console.log("첫 번째 변환: 현재 캔버스 상태를 원본으로 저장");
-        // 현재 캔버스 상태를 원본으로 저장
-        const currentState = stageRef.current.saveOriginalCanvasState();
-        if (currentState) {
-          setOriginalCanvasState(currentState);
-        }
-      } else {
-        console.log("기존 원본 상태로 복원하여 변환");
-        // 원본 상태로 복원
-        stageRef.current.restoreOriginalCanvasState(originalCanvasState);
-        // 잠시 기다려서 복원 완료 후 진행
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-      
-      // 현재 캔버스 내용을 이미지로 변환 (원본 상태에서)
-      const canvasImage = stageRef.current.exportCanvasAsImage();
-      
-      if (!canvasImage) {
-        alert("캔버스 이미지를 생성할 수 없습니다.");
-        setProcessing(false);
-        return;
-      }
-      
-      console.log("원본 상태에서 캔버스를 변환합니다");
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      const img = new Image();
-        
-        img.onload = async () => {
-          canvas.width = img.width;
-          canvas.height = img.height;
-          ctx.drawImage(img, 0, 0);
+      const checkResp = await client.get(`/projects/${pid}/scenes/${selectedId}/originals`);
+      const originalExists = checkResp.data.exists;
 
-          // 캔버스를 blob으로 변환
-          canvas.toBlob(async (blob) => {
-            console.log("Generated blob:", blob);
-            console.log("Blob size:", blob.size);
-            console.log("Blob type:", blob.type);
-
-            // File 객체로 변환 (ImageUpload와 동일한 방식)
-            const file = new File([blob], "canvas_drawing.png", {
-              type: "image/png",
-            });
-            console.log("Created file:", file);
-
-            const fd = new FormData();
-            fd.append("image", file);
-
-            try {
-              // 먼저 캔버스 이미지를 업로드
-              console.log("캔버스 이미지를 업로드합니다");
-              console.log("pid:", pid, "selectedId:", selectedId);
-              console.log(
-                "pid type:",
-                typeof pid,
-                "selectedId type:",
-                typeof selectedId
-              );
-              console.log(
-                "업로드 URL:",
-                `/projects/${pid}/scenes/${selectedId}/upload-image`
-              );
-
-              // project_id와 scene_id 모두 UUID로 유지
-              const projectId = pid; // UUID 형식 그대로 사용
-              const sceneId = selectedId; // UUID 형식 그대로 사용
-              console.log(
-                "Using - projectId (UUID):",
-                projectId,
-                "sceneId (UUID):",
-                sceneId
-              );
-              const uploadResp = await client.post(
-                `/projects/${projectId}/scenes/${sceneId}/upload-image`,
-                fd
-              );
-              const uploadedImagePath = uploadResp.data?.image_url;
-
-              if (!uploadedImagePath) {
-                alert("캔버스 이미지 업로드에 실패했습니다.");
-                setProcessing(false);
-                return;
-              }
-
-              console.log("업로드된 이미지:", uploadedImagePath);
-
-              // 캔버스 이미지를 직접 변환 API로 전달
-              console.log("캔버스 이미지를 직접 변환 API로 전달");
-              const transformFd = new FormData();
-
-              transformFd.append('file', file);
-              
-              // RGB 색상으로 변환
-              const hexToRgb = (hex) => {
-                const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-                if (result) {
-                  return {
-                    r: parseInt(result[1], 16),
-                    g: parseInt(result[2], 16),
-                    b: parseInt(result[3], 16)
-                  };
-                }
-                return { r: 0, g: 0, b: 0 };
-              };
-              
-              const rgbColor = hexToRgb(drawingColor);
-              console.log("전송할 색상 정보:", rgbColor);
-              const resp = await client.post(
-                `/image/process?target_dots=${encodeURIComponent(targetDots)}&color_r=${rgbColor.r}&color_g=${rgbColor.g}&color_b=${rgbColor.b}`,
-                transformFd,
-                {
-                  headers: {
-                    "Content-Type": "multipart/form-data",
-                  },
-                }
-              );
-              let outputUrl = resp.data?.output_url || "";
-              console.log("변환 완료, 서버 응답:", resp.data);
-              console.log("새로운 SVG URL:", outputUrl);
-
-              if (!outputUrl) {
-                alert("서버에서 변환된 이미지 URL을 받지 못했습니다.");
-                setProcessing(false);
-                return;
-              }
-
-              // 먼저 캔버스 초기화 (기존 내용 제거)
-              if (stageRef.current && stageRef.current.clear) {
-                stageRef.current.clear();
-              }
-
-              let finalUrl;
-              if (outputUrl.startsWith("http")) {
-                finalUrl = outputUrl;
-              } else {
-                const base = client.defaults.baseURL?.replace(/\/$/, "") || "";
-                const path = String(outputUrl).replace(/\\\\/g, "/");
-                finalUrl = `${base}/${path.replace(/^\//, "")}`;
-              }
-
-              console.log("최종 이미지 URL:", finalUrl);
-              setImageUrl(finalUrl);
-
-              
-              // 변환된 이미지 URL과 원본 캔버스 상태를 현재 씬에 저장
-              if (selectedId && pid) {
-                saveDebounced(selectedId, selectedScene?.drones, selectedScene?.preview, finalUrl, originalCanvasState);
-              }
-            } catch (e) {
-              console.error("Canvas transform error", e);
-              console.error("Full error object:", e);
-              console.error("Error response:", e.response);
-              console.error("Error status:", e.response?.status);
-              console.error("Error data:", e.response?.data);
-              console.error("Error headers:", e.response?.headers);
-              console.error("Request URL:", e.config?.url);
-              console.error("Request method:", e.config?.method);
-              console.error("Request data:", e.config?.data);
-
-              let errorMsg =
-                e.response?.data?.detail ||
-                e.response?.data?.message ||
-                e.message;
-              if (typeof errorMsg === "object") {
-                errorMsg = JSON.stringify(errorMsg);
-              }
-              alert(`캔버스 변환 중 오류가 발생했습니다: ${errorMsg}`);
-            } finally {
-              setProcessing(false);
+      if (originalExists) {
+        console.log("원본이 존재하여 재변환을 요청합니다.");
+        const rgbColor = hexToRgb(drawingColor);
+        const resp = await client.post(
+            `/projects/${pid}/scenes/${selectedId}/transformations`,
+            {
+              target_dots: targetDots,
+              color_r: rgbColor.r,
+              color_g: rgbColor.g,
+              color_b: rgbColor.b,
             }
-          }, "image/png");
-        };
+        );
+        finalUrl = getImageUrl(resp.data.output_url);
 
-        img.src = canvasImage;
+      } else {
+        console.log("원본이 없어 최초 생성을 요청합니다.");
+        const hasContent = stageRef.current.hasDrawnContent && stageRef.current.hasDrawnContent();
+        if (!hasContent) {
+          alert("변환할 내용이 없습니다. 먼저 이미지를 추가하거나 그림을 그려주세요.");
+          setProcessing(false);
+          return;
+        }
+        const canvasImage = stageRef.current.exportCanvasAsImage();
+        const blob = await new Promise(resolve => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            canvas.getContext('2d').drawImage(img, 0, 0);
+            canvas.toBlob(resolve, 'image/png');
+          };
+          img.src = canvasImage;
+        });
+        const file = new File([blob], "canvas_drawing.png", {type: "image/png"});
+        const fd = new FormData();
+        fd.append("image", file);
 
-      // 변환된 이미지 URL을 현재 씬에 저장은 각 분기에서 처리
+        const resp = await client.post(
+            `/projects/${pid}/scenes/${selectedId}/originals?target_dots=${targetDots}`,
+            fd
+        );
+        finalUrl = getImageUrl(resp.data.output_url);
+        newS3Key = resp.data.s3_key;
+      }
+
+      console.log("변환 완료! 최종 URL:", finalUrl);
+
+      if (finalUrl) {
+        if (stageRef.current && stageRef.current.clear) {
+          stageRef.current.clear();
+        }
+
+        setScenes(prevScenes =>
+            prevScenes.map(scene => {
+              if (scene.id === selectedId) {
+                const updatedScene = {
+                  ...scene,
+                  displayUrl: finalUrl,
+                };
+                if (newS3Key) {
+                  updatedScene.s3_key = newS3Key;
+                }
+                return updatedScene;
+              }
+              return scene;
+            })
+        );
+
+        setTimeout(() => {
+          if (stageRef.current && stageRef.current.loadImageFromUrl) {
+            fetch(finalUrl)
+                .then(response => console.log("수동 fetch 결과:", response.status))
+                .catch(err => console.error("수동 fetch 실패:", err));
+
+            stageRef.current.loadImageFromUrl(finalUrl);
+          }
+        }, 200);
+        
+        if (selectedScene) {
+          saveDebounced(selectedId, selectedScene?.drones, selectedScene?.preview, finalUrl, originalCanvasState);
+        }
+      }
     } catch (e) {
       console.error("Transform error", e);
-      console.error("Error details:", e.response?.data || e.message);
-      alert(
-        `이미지 변환 중 오류가 발생했습니다: ${
-          e.response?.data?.message || e.message
-        }`
-      );
+      const errorMsg = e.response?.data?.detail || e.message;
+      alert(`이미지 변환 중 오류가 발생했습니다: ${errorMsg}`);
+    } finally {
       setProcessing(false);
     }
   };
 
-  // 버튼 스타일
-  const buttonStyle = {
-    padding: "10px 20px",
-    backgroundColor: "#007bff",
-    color: "white",
-    border: "none",
-    borderRadius: "4px",
-    cursor: "pointer",
-    marginRight: "10px",
+  const hexToRgb = (hex) => {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16)} : {
+      r: 0,
+      g: 0,
+      b: 0
+    };
   };
-  const sendButtonStyle = { ...buttonStyle, backgroundColor: "#28a745" };
-  const closeButtonStyle = { ...buttonStyle, backgroundColor: "#dc3545" };
 
   // 캔버스 핸들러 함수들
-  const handleModeChange = React.useCallback((mode) => {
-    setDrawingMode(mode);
-    if (stageRef.current && stageRef.current.setDrawingMode) {
-      stageRef.current.setDrawingMode(mode);
-      // 모드 변경 후 현재 색상을 다시 설정하여 유지
-      setTimeout(() => {
-        if (stageRef.current && stageRef.current.setDrawingColor) {
-          stageRef.current.setDrawingColor(drawingColor);
+  const handleModeChange = React.useCallback(
+      (mode) => {
+        setDrawingMode(mode);
+        if (stageRef.current && stageRef.current.setDrawingMode) {
+          stageRef.current.setDrawingMode(mode);
+          setTimeout(() => {
+            if (stageRef.current && stageRef.current.setDrawingColor) {
+              stageRef.current.setDrawingColor(drawingColor);
+            }
+          }, 20);
         }
-      }, 20); 
-    }
-  }, [drawingColor]);
+      },
+      [drawingColor]
+  );
 
   const handleClearAll = React.useCallback(() => {
     if (stageRef.current && stageRef.current.clear) {
       if (
-        confirm(
-          "캔버스의 모든 내용을 지우시겠습니까? 이 작업은 되돌릴 수 없습니다."
-        )
+          confirm(
+              "캔버스의 모든 내용을 지우시겠습니까? 이 작업은 되돌릴 수 없습니다."
+          )
       ) {
         stageRef.current.clear();
         console.log("캔버스 전체가 초기화되었습니다");
@@ -610,20 +511,45 @@ export default function EditorPage({ projectId = DUMMY }) {
   }, []);
 
   const handleColorPreview = React.useCallback((color) => {
-    // 미리보기 시에도 실제 상태를 변경하여 도구 전환 시에도 색상 유지
     setDrawingColor(color);
     if (stageRef.current && stageRef.current.setDrawingColor) {
       stageRef.current.setDrawingColor(color);
     }
   }, []);
 
+  // Change fill color for single or multi-selection
+  const handleSelectedFillChange = React.useCallback((hex) => {
+    const canvas = stageRef.current;
+    if (!canvas) return;
+    const active = canvas.getActiveObject && canvas.getActiveObject();
+    if (!active) return;
+
+    const applyFill = (obj) => {
+      if (
+          obj?.customType === "svgDot" ||
+          obj?.customType === "drawnDot" ||
+          obj?.type === "circle"
+      ) {
+        obj.set({fill: hex, originalFill: hex});
+        if ((obj.type === "path" || obj.type === "line" || !obj.fill) && ("stroke" in obj)) {
+          obj.set({stroke: hex});
+        }
+      }
+    };
+
+    if (((active?.type && active.type.toLowerCase() === "activeselection") || active?.type === "group")) {
+      (active._objects || active.getObjects?.() || []).forEach(applyFill);
+    } else {
+      applyFill(active);
+    }
+
+    canvas.renderAll && canvas.renderAll();
+    setSelectedObject((prev) => (prev ? {...prev, fill: hex} : prev));
+  }, []);
+
   // 레이어 관련 핸들러들
   const handleLayerSelect = React.useCallback((layerId) => {
     console.log('EditorPage handleLayerSelect called:', layerId);
-    console.log('Current activeLayerIdState:', activeLayerIdState);
-    console.log('stageRef.current exists:', !!stageRef.current);
-    console.log('stageRef.current.layers exists:', !!stageRef.current?.layers);
-    console.log('setActiveLayer exists:', !!stageRef.current?.layers?.setActiveLayer);
     
     if (stageRef.current && stageRef.current.layers && stageRef.current.layers.setActiveLayer) {
       try {
@@ -631,10 +557,8 @@ export default function EditorPage({ projectId = DUMMY }) {
         stageRef.current.layers.setActiveLayer(layerId);
         console.log('setActiveLayer called, now calling updateLayerState');
         
-        // 즉시 상태 업데이트
         updateLayerState();
         
-        // 추가로 짧은 지연 후에도 한 번 더
         setTimeout(() => {
           console.log('Delayed updateLayerState call');
           updateLayerState();
@@ -650,12 +574,10 @@ export default function EditorPage({ projectId = DUMMY }) {
   const handleCreateLayer = React.useCallback(() => {
     console.log('Create layer called');
     if (stageRef.current && stageRef.current.layers && stageRef.current.layers.createLayer) {
-      // 현재 레이어 목록을 가져와서 기본 이름 계산
       const currentLayers = stageRef.current.layers.getLayers() || [];
       const drawingLayers = currentLayers.filter(layer => layer.type === 'drawing');
       let layerNumber = drawingLayers.length + 1;
       
-      // 기본 이름이 이미 있는지 확인하고 중복되지 않는 번호 찾기
       while (currentLayers.some(layer => layer.name === `레이어 ${layerNumber}`)) {
         layerNumber++;
       }
@@ -663,10 +585,8 @@ export default function EditorPage({ projectId = DUMMY }) {
       const defaultName = `레이어 ${layerNumber}`;
       const layerName = prompt('새 레이어 이름을 입력하세요:', defaultName);
       
-      // 사용자가 취소하지 않았다면 레이어 생성
       if (layerName !== null) {
         try {
-          // 빈 문자열이거나 기본값과 같으면 자동 이름 생성, 그렇지 않으면 사용자 입력 사용
           const finalName = (layerName.trim() === '' || layerName.trim() === defaultName) 
             ? null 
             : layerName.trim();
@@ -748,7 +668,6 @@ export default function EditorPage({ projectId = DUMMY }) {
     }
   }, [updateLayerState]);
 
-
   // Bridge editor controls to navbar via window for project routes
   useEffect(() => {
     window.editorAPI = {
@@ -765,123 +684,196 @@ export default function EditorPage({ projectId = DUMMY }) {
     };
     // notify listeners (e.g., Navbar) that editor state changed
     window.dispatchEvent(
-      new CustomEvent("editor:updated", {
-        detail: {
-          targetDots,
-          processing,
-          imageUrl,
-          selectedId,
-          projectName,
-        },
-      })
+        new CustomEvent("editor:updated", {
+          detail: {
+            targetDots,
+            processing,
+            imageUrl,
+            selectedId,
+            projectName,
+          },
+        })
     );
   }, [targetDots, processing, imageUrl, selectedId, projectName]);
 
   return (
-    <div
-      style={{
-        width: "100%",
-        background: "#fff",
-        display: "flex",
-        minHeight: "100vh",
-      }}
-    >
-      <aside
-        style={{
-          width: 100,
-          borderRight: "1px solid #eee",
-          padding: 16,
-          position: "sticky",
-          top: 0,
-          alignSelf: "flex-start",
-          height: "100vh",
-          overflowY: "auto",
-          background: "#fff",
-        }}
+      <div
+          className="editor-shell"
+          style={{
+            width: "100%",
+            minHeight: "100vh",
+            background: "#fff",
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 16,
+            boxSizing: "border-box",
+            overflowX: "hidden",
+          }}
       >
-        <EditorToolbar
-          pid={pid}
-          selectedId={selectedId}
-          imageUrl={imageUrl}
-          targetDots={targetDots}
-          setTargetDots={setTargetDots}
-          processing={processing}
-          onTransform={handleTransform}
-          isUnityVisible={isUnityVisible}
-          showUnity={showUnity}
-          hideUnity={hideUnity}
-          onImageDragStart={(imageUrl) =>
-            console.log("Image drag started:", imageUrl)
-          }
-          drawingMode={drawingMode}
-          eraserSize={eraserSize}
-          drawingColor={drawingColor}
-          onModeChange={handleModeChange}
-          onColorChange={handleColorChange}
-          onColorPreview={handleColorPreview}
-          onClearAll={handleClearAll}
-          stageRef={stageRef} // stageRef prop 전달
-          layout="sidebar"
-        />
-      </aside>
-      <div style={{ flex: 1 }}>
-        {/* 업로드 및 도구 바 */}
-
-        {/* 메인 캔버스 */}
-        <MainCanvasSection
-          selectedScene={selectedScene}
-          imageUrl={imageUrl}
-          stageRef={stageRef}
-          onChange={handleSceneChange}
-          drawingMode={drawingMode}
-          eraserSize={eraserSize}
-          drawingColor={drawingColor}
-          activeLayerId={activeLayerIdState}
-          onModeChange={handleModeChange}
-        />
-
-        {/* 씬 캐러셀 */}
-        <SceneCarousel
-          scenes={scenes}
-          selectedId={selectedId}
-          start={start}
-          setStart={setStart}
-          onAddScene={handleAddScene}
-          onSelectScene={handleSelect}
-        />
-      </div>
-      <aside
-        style={{
-          width: 300,
-          borderLeft: "1px solid #eee",
-          padding: 16,
-          position: "sticky",
-          top: 0,
-          alignSelf: "flex-start",
-          height: "100vh",
-          overflowY: "auto",
-          background: "#fff",
-        }}
-      >
-        {canvasReady ? (
-          <LayerPanel
-            layers={layersState}
-            activeLayerId={activeLayerIdState}
-            selectedObjectLayerId={selectedObjectLayerId}
-            onLayerSelect={handleLayerSelect}
-            onCreateLayer={handleCreateLayer}
-            onDeleteLayer={handleDeleteLayer}
-            onToggleVisibility={handleToggleVisibility}
-            onToggleLock={handleToggleLock}
-            onRenameLayer={handleRenameLayer}
-            onLayerReorder={handleLayerReorder}
-          />
-        ) : (
-          <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
-            캔버스 준비 중...
+        {/* 왼쪽 툴바 */}
+        <aside
+            id="left-rail"
+            style={{
+              width: LEFT_TOOL_WIDTH,
+              borderRight: "1px solid #eee",
+              position: "sticky",
+              top: 0,
+              height: "100vh",
+              background: "#fff",
+              flex: "0 0 auto",
+              boxSizing: "border-box",
+              overflow: "visible",
+              zIndex: 50,
+            }}
+        >
+          <div style={{height: "100%", overflowY: "auto", padding: 16}}>
+            <EditorToolbar
+                pid={pid}
+                selectedId={selectedId}
+                imageUrl={imageUrl}
+                targetDots={targetDots}
+                setTargetDots={setTargetDots}
+                processing={processing}
+                onTransform={handleTransform}
+                isUnityVisible={isUnityVisible}
+                showUnity={showUnity}
+                hideUnity={hideUnity}
+                onImageDragStart={(imageUrl) =>
+                    console.log("Image drag started:", imageUrl)
+                }
+                drawingMode={drawingMode}
+                eraserSize={eraserSize}
+                drawingColor={drawingColor}
+                onModeChange={handleModeChange}
+                onColorChange={handleColorChange}
+                onColorPreview={handleColorPreview}
+                onClearAll={handleClearAll}
+                stageRef={stageRef}
+                layout="sidebar"
+                onGalleryStateChange={setGalleryOpen}
+            />
+            <div style={{marginTop: "auto"}}>
+              <button
+                  type="button"
+                  title="프로젝트 설정"
+                  aria-label="프로젝트 설정"
+                  onClick={openProjectSettings}
+                  disabled={!projectMeta}
+                  style={{
+                    width: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6,
+                    padding: 8,
+                    border: "1px solid #e5e7eb",
+                    borderRadius: 8,
+                    background: "#f9fafb",
+                    color: "#374151",
+                    cursor: projectMeta ? "pointer" : "not-allowed",
+                  }}
+              >
+                <CiSettings size={20}/>
+              </button>
+            </div>
           </div>
+        </aside>
+
+        {/* 갤러리 패널 */}
+        {galleryOpen && (
+            <div style={{flex: "0 1 360px", minWidth: 0, boxSizing: "border-box"}}>
+              <ImageGallery onImageDragStart={(u) => console.log("drag:", u)}/>
+            </div>
         )}
-      </aside>
-    </div>
+
+        {/* 메인 */}
+        <div
+            style={{
+              flex: "1 1 0%",
+              minWidth: 0,
+            }}
+        >
+          <MainCanvasSection
+              selectedScene={selectedScene}
+              imageUrl={imageUrl}
+              stageRef={stageRef}
+              onChange={handleSceneChange}
+              drawingMode={drawingMode}
+              eraserSize={eraserSize}
+              drawingColor={drawingColor}
+              activeLayerId={activeLayerIdState}
+              onModeChange={handleModeChange}
+              onSelectionChange={setSelectedObject}
+          />
+
+          {/* 씬 캐러셀 */}
+          <SceneCarousel
+              projectId={pid}
+              scenes={scenes}
+              setScenes={setScenes}
+              selectedId={selectedId}
+              start={start}
+              setStart={setStart}
+              onAddScene={handleAddScene}
+              onSelectScene={handleSelect}
+              compact={galleryOpen}
+          />
+        </div>
+
+        {/* 오른쪽 패널 - 레이어와 객체 속성을 함께 표시 */}
+        <aside
+            style={{
+              width: RIGHT_PANEL_WIDTH,
+              borderLeft: "1px solid #eee",
+              position: "sticky",
+              top: 0,
+              height: "100vh",
+              background: "#fff",
+              flex: "0 0 auto",
+              boxSizing: "border-box",
+              overflow: "visible",
+              zIndex: 50,
+            }}
+        >
+          <div style={{height: "100%", overflowY: "auto", padding: 16}}>
+            {/* 레이어 패널 */}
+            {canvasReady ? (
+              <LayerPanel
+                layers={layersState}
+                activeLayerId={activeLayerIdState}
+                selectedObjectLayerId={selectedObjectLayerId}
+                onLayerSelect={handleLayerSelect}
+                onCreateLayer={handleCreateLayer}
+                onDeleteLayer={handleDeleteLayer}
+                onToggleVisibility={handleToggleVisibility}
+                onToggleLock={handleToggleLock}
+                onRenameLayer={handleRenameLayer}
+                onLayerReorder={handleLayerReorder}
+              />
+            ) : (
+              <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+                캔버스 준비 중...
+              </div>
+            )}
+            
+            {/* 구분선 */}
+            <div style={{ margin: '16px 0', borderTop: '1px solid #eee' }} />
+            
+            {/* 객체 속성 패널 */}
+            <ObjectPropertiesPanel
+                selection={selectedObject}
+                onChangeFill={handleSelectedFillChange}
+            />
+          </div>
+        </aside>
+
+        {editingProject && (
+            <ProjectSettingsModal
+                project={editingProject}
+                onClose={closeProjectSettings}
+                onSaved={handleSettingsSaved}
+            />
+        )}
+      </div>
   );
 }

@@ -8,9 +8,9 @@ def process_image(
     input_path: str,
     step: int = 3,
     target_dots: int | None = None,
-    canny_threshold1: int = 80,   # 강한 엣지만 검출
+    canny_threshold1: int = 80,  # 강한 엣지만 검출
     canny_threshold2: int = 200,  # 더 높은 임계값으로 선명한 윤곽선만
-    blur_ksize: int = 5,          # 더 강한 블러로 노이즈 제거
+    blur_ksize: int = 5,  # 더 강한 블러로 노이즈 제거
     blur_sigma: float = 1.2,
     color_rgb: tuple[int, int, int] | None = None,
 ) -> str:
@@ -20,9 +20,9 @@ def process_image(
     - 파이프라인: Gray → GaussianBlur → Canny → Grid Sampling
     - target_dots가 주어지면 엣지 픽셀 수로부터 step을 자동 계산합니다.
       대략적으로 기대 도트 수 ≈ edge_pixels / (step^2)로 가정하여 step ≈ sqrt(edge_pixels / target_dots)
-    - 결과는 backend/uploaded_images/processed_<uuid>_<dot_count>.png 로 저장됩니다.
+    - 결과는 backend/uploads/processed_<uuid>_<dot_count>.png 로 저장됩니다.
 
-    Returns: 백엔드 루트 기준 상대 경로 (e.g., "uploaded_images/processed_xxx.png")
+    Returns: 백엔드 루트 기준 상대 경로 (e.g., "uploads/processed_xxx.png")
     """
     if not os.path.exists(input_path):
         raise FileNotFoundError(f"Input image not found: {input_path}")
@@ -36,14 +36,14 @@ def process_image(
 
     # 간단하고 빠른 엣지 검출
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    
+
     # 기본 블러 + Canny 엣지
     k = max(3, blur_ksize | 1)
     blur = cv2.GaussianBlur(gray, (k, k), blur_sigma)
     edges = cv2.Canny(blur, canny_threshold1, canny_threshold2)
-    
+
     # 최소한의 모폴로지 연산
-    kernel = np.ones((2,2), np.uint8)
+    kernel = np.ones((2, 2), np.uint8)
     edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)  # 끊어진 선만 연결
 
     # step 자동 계산 (target_dots 지정 시 우선)
@@ -75,9 +75,9 @@ def process_image(
                     points.append((x, y))
     dot_count = len(points)
 
-    # 출력 경로 준비 (backend/uploaded_images)
+    # 출력 경로 준비 (backend/uploads)
     backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-    out_dir = os.path.join(backend_dir, "uploaded_images")
+    out_dir = os.path.join(backend_dir, "uploads")
     os.makedirs(out_dir, exist_ok=True)
 
     out_name = f"processed_{uuid.uuid4().hex}_{dot_count}.svg"
@@ -91,36 +91,41 @@ def process_image(
         saturation = hsv[1]
         value = hsv[2]
         return (20 <= hue <= 30) and saturation > 50 and value > 100
-    
+
     def is_pen_stroke_area(img, x, y, radius=3):
         """해당 영역이 펜 스트로크인지 판별 (균일한 색상 영역)"""
-        if y < radius or x < radius or y >= img.shape[0]-radius or x >= img.shape[1]-radius:
+        if (
+            y < radius
+            or x < radius
+            or y >= img.shape[0] - radius
+            or x >= img.shape[1] - radius
+        ):
             return False
-        
+
         # 주변 픽셀들의 색상 분산을 체크
-        region = img[y-radius:y+radius+1, x-radius:x+radius+1]
-        mean_color = np.mean(region, axis=(0,1))
-        std_color = np.std(region, axis=(0,1))
-        
+        region = img[y - radius : y + radius + 1, x - radius : x + radius + 1]
+        mean_color = np.mean(region, axis=(0, 1))
+        std_color = np.std(region, axis=(0, 1))
+
         # RGB 각 채널의 표준편차가 모두 작으면 균일한 영역 (펜 스트로크)
         return all(std < 15 for std in std_color)  # 표준편차 15 이하면 균일
-    
+
     def get_dominant_pen_color(img, points, sample_size=50):
         """펜 스트로크 영역에서 주요 색상들을 추출"""
         pen_colors = []
-        
+
         # 샘플링으로 성능 최적화
         sample_points = points[:sample_size] if len(points) > sample_size else points
-        
-        for (x, y) in sample_points:
+
+        for x, y in sample_points:
             if y < img.shape[0] and x < img.shape[1]:
                 if is_pen_stroke_area(img, x, y):
                     b, g, r = img[int(y), int(x)]
                     pen_colors.append((r, g, b))
-        
+
         if not pen_colors:
             return {}
-        
+
         # 색상을 클러스터링하여 주요 펜 색상들 찾기
         unique_colors = {}
         for color in pen_colors:
@@ -130,49 +135,50 @@ def process_image(
                 if all(abs(color[i] - group_color[i]) < 20 for i in range(3)):
                     found_group = group_color
                     break
-            
+
             if found_group:
                 unique_colors[found_group] += 1
             else:
                 unique_colors[color] = 1
-        
+
         # 빈도가 높은 색상들만 반환 (전체의 10% 이상)
         threshold = len(pen_colors) * 0.1
-        dominant_colors = {color: count for color, count in unique_colors.items() 
-                          if count >= threshold}
-        
+        dominant_colors = {
+            color: count for color, count in unique_colors.items() if count >= threshold
+        }
+
         return dominant_colors
-    
+
     # 펜 스트로크 색상 분석 (간소화)
     dominant_pen_colors = get_dominant_pen_color(img, points)
-    
+
     circles = []
-    for (x, y) in points:
+    for x, y in points:
         if y < img.shape[0] and x < img.shape[1]:
             b, g, r = img[int(y), int(x)]
-            
+
             # 펜 스트로크 영역인지 확인
             if is_pen_stroke_area(img, x, y):
                 # 가장 가까운 주요 펜 색상으로 통일
                 best_match = None
-                min_distance = float('inf')
-                
+                min_distance = float("inf")
+
                 for pen_color in dominant_pen_colors:
                     distance = sum(abs(pen_color[i] - [r, g, b][i]) for i in range(3))
                     if distance < min_distance:
                         min_distance = distance
                         best_match = pen_color
-                
+
                 if best_match and min_distance < 60:  # 임계값 내의 색상만 통일
                     r, g, b = best_match
-            
+
             # 노란색 계열 특별 처리
             if is_yellow_like(r, g, b):
                 saturation_boost = 1.2
                 b = max(0, min(255, int(b * 0.8)))
                 r = max(0, min(255, int(r * saturation_boost)))
                 g = max(0, min(255, int(g * saturation_boost)))
-            
+
             actual_color = f"rgb({int(r)}, {int(g)}, {int(b)})"
         else:
             # 범위를 벗어난 경우
@@ -181,13 +187,13 @@ def process_image(
                 actual_color = f"rgb({r}, {g}, {b})"
             else:
                 actual_color = "#000"
-        
-        circles.append(f"<circle cx=\"{x}\" cy=\"{y}\" r=\"2\" fill=\"{actual_color}\" />")
+
+        circles.append(f'<circle cx="{x}" cy="{y}" r="2" fill="{actual_color}" />')
 
     # SVG 저장 (비ASCII 경로 호환)
     svg_header = (
-        f"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-        f"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{w}\" height=\"{h}\" viewBox=\"0 0 {w} {h}\">\n"
+        f'<?xml version="1.0" encoding="UTF-8"?>\n'
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}">\n'
     )
     svg_footer = "\n</svg>\n"
     svg_content = svg_header + ("\n".join(circles)) + svg_footer

@@ -4,17 +4,20 @@ import { createPortal } from "react-dom";
 import { FaPen, FaPaintBrush, FaEraser, FaRegTrashAlt } from "react-icons/fa";
 import { PiSelectionPlusBold } from "react-icons/pi";
 import ColorPicker from "./ColorPicker.jsx";
-const CanvasTools = React.memo(function CanvasTools({ 
-  drawingMode = 'draw', 
+import "../styles/CanvasTools.css"; // 이렇게 수정
 
+
+const CanvasTools = React.memo(function CanvasTools({
+  drawingMode = "draw",
   eraserSize = 20,
-  drawingColor = '#222222',
+  drawingColor = "#222222",
   onModeChange,
   onClearAll,
   onColorChange,
   onColorPreview,
 }) {
   const [hovered, setHovered] = useState(null);
+
   const anchorRefs = {
     draw: useRef(null),
     select: useRef(null),
@@ -22,19 +25,21 @@ const CanvasTools = React.memo(function CanvasTools({
     erase: useRef(null),
     pixelErase: useRef(null),
     clear: useRef(null),
+    color: useRef(null),
   };
+
   const [tooltipPos, setTooltipPos] = useState({ top: 0, left: 0 });
 
   const getTooltipText = (mode) => {
     switch (mode) {
       case "draw":
-        return "그리기: 자유곡선을 그립니다.";
+        return "그리기(P): 자유곡선을 그립니다.";
       case "select":
-        return "선택: 객체 이동/크기 조절.";
+        return "선택(V): 객체 이동/크기 조절.";
       case "brush":
-        return "브러시: 점을 찍습니다.";
+        return "브러시(B): 점을 찍습니다.";
       case "erase":
-        return "지우개: 선과 점을 지웁니다.";
+        return "지우개(E): 선과 점을 지웁니다.";
       case "pixelErase":
         return "픽셀 지우개: 배경을 칠합니다.";
       default:
@@ -117,6 +122,11 @@ const CanvasTools = React.memo(function CanvasTools({
           document.body
         )
       : null;
+
+  const handleNativeColorChange = (e) => {
+    const newColor = e.target.value;
+    onColorChange?.(newColor);
+  };
 
   return (
     <div style={{ padding: "12px 0" }}>
@@ -204,16 +214,46 @@ const CanvasTools = React.memo(function CanvasTools({
         </div>
       </div>
 
-      {/* 색상 선택 */}
-      <div style={{ marginBottom: '12px' }}>
-        <h5 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600' }}>
+      {/* 색상 선택 - 완전한 정사각형 (내부도 정사각형) */}
+      <div style={{ marginBottom: "12px" }}>
+        <h5 style={{ margin: "0 0 8px 0", fontSize: "14px", fontWeight: 600 }}>
           색상 선택
         </h5>
-        <ColorPicker
-          color={drawingColor}
-          onChange={onColorChange}
-          onPreview={onColorPreview}
-        />
+
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 6 }}>
+          <input
+            ref={anchorRefs.color}
+            type="color"
+            value={drawingColor}
+            onChange={handleNativeColorChange}
+            className="square-color-picker"
+            aria-label="색상 선택"
+            title={drawingColor}
+            style={{
+              width: 32,
+              height: 32,
+              cursor: "pointer",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+              transition: "all 0.2s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.transform = "scale(1.1)";
+              e.target.style.boxShadow = "0 2px 6px rgba(0,0,0,0.15)";
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.transform = "scale(1)";
+              e.target.style.boxShadow = "0 1px 3px rgba(0,0,0,0.1)";
+            }}
+          />
+          <span style={{ 
+            fontFamily: "monospace", 
+            fontSize: 13,
+            color: "#666",
+            marginLeft: 2
+          }}>
+            {drawingColor}
+          </span>
+        </div>
       </div>
 
       {/* 전체 지우기 버튼 */}
@@ -230,10 +270,10 @@ const CanvasTools = React.memo(function CanvasTools({
           <FaRegTrashAlt />
         </button>
       </div>
+
       <TooltipPortal />
     </div>
   );
 });
 
 export default CanvasTools;
-

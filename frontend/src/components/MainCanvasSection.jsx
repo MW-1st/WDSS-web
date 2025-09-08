@@ -1,5 +1,6 @@
 import React from "react";
 import Canvas from "../components/Canvas.jsx";
+
 function MainCanvasSection({
   selectedScene,
   imageUrl,
@@ -10,6 +11,7 @@ function MainCanvasSection({
   drawingColor,
   activeLayerId,
   onModeChange,
+  onSelectionChange,
 }) {
   return (
     <section style={{
@@ -33,6 +35,7 @@ function MainCanvasSection({
         >
           {selectedScene ? (
             <Canvas
+              key={selectedScene.id}
               scene={selectedScene}
               width={1200}
               height={675}
@@ -44,6 +47,7 @@ function MainCanvasSection({
               drawingColor={drawingColor}
               activeLayerId={activeLayerId}
               onModeChange={onModeChange}
+              onSelectionChange={onSelectionChange}
             />
           ) : (
             <div style={{ color: "#666", fontSize: 14 }}>

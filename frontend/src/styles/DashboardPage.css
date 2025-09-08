@@ -1,0 +1,138 @@
+.dashboard-container {
+  padding: 24px 48px;
+  font-family: "NanumHuman";
+  background-color: #ffffff;
+  min-height: 100vh;
+}
+.dashboard-header {
+  margin-bottom: 0;
+  padding: 48px 32px; /* 안쪽 여백 넉넉히 */
+  color: #fff; /* 글씨를 흰색으로 바꿔야 잘 보임 */
+  border-radius: 12px;
+
+  background-image: url("/public/img/banner.png"); /* 이미지 경로 */
+  background-size: cover; /* 꽉 차게 */
+  background-position: center; /* 중앙 정렬 */
+  background-repeat: no-repeat;
+}
+
+/* 상단 영역 */
+.dashboard-header {
+  margin-bottom: 0; /* 구분선이 main에 들어가므로 여기선 하단 여백 최소화 */
+}
+
+.welcome-message {
+  font-size: 2.7rem;
+  font-weight: 900;
+  color: #ffffff;
+  margin: 0 0 8px 0;
+  font-family: "NanumHuman";
+}
+
+.welcome-sub-message {
+  font-size: 1rem;
+  color: #c1ceda;
+  margin: 0;
+}
+
+/* 버튼 그룹 */
+.dashboard-actions {
+  margin-top: 16px;
+  margin-bottom: 16px; /* 헤더 내부 간격 */
+}
+
+.create-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #fff;
+  background-color: #007bff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 4px 6px rgba(0, 123, 255, 0.1);
+  transition: all 0.2s ease;
+}
+.create-button:hover {
+  background-color: #0056b3;
+}
+
+/* ▼▼ 여기부터가 '분리' 핵심 ▼▼ */
+.dashboard-main {
+  margin-top: 32px;
+  padding-top: 28px;
+}
+
+/* 섹션 안 제목 */
+.section-title {
+  font-size: 1.7rem;
+  font-weight: 600;
+  color: #343a40;
+  margin: 0 0 16px 0;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #eee; /* 섹션 내부에서도 내용과 구분 */
+}
+
+/* 프로젝트 그리드/카드 */
+.project-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+.project-card {
+  background-color: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  outline: none;
+}
+.project-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+}
+.project-card:focus-visible {
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.35);
+}
+
+.card-thumbnail {
+  background-color: #f1f3f5;
+  height: 160px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.card-body {
+  padding: 16px 20px;
+  flex-grow: 1;
+}
+
+.card-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+  color: #212529;
+}
+
+.card-date {
+  font-size: 0.875rem;
+  color: #868e96;
+  margin: 0;
+}
+
+/* 빈 상태 */
+.empty-state {
+  text-align: center;
+  padding: 48px;
+  background-color: #fff;
+  border-radius: 12px;
+  color: #6c757d;
+}

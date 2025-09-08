@@ -5,6 +5,7 @@ import {
   useState,
   useCallback,
 } from "react";
+import { MdDelete } from "react-icons/md";
 // fabric.js 최적화: 필요한 부분만 import
 import {
   Canvas as FabricCanvas,
@@ -25,7 +26,8 @@ export default function Canvas({
   eraserSize: externalEraserSize = 20,
   drawingColor: externalDrawingColor = '#222222',
   activeLayerId: externalActiveLayerId,
-  onModeChange
+  onModeChange,
+  onSelectionChange
 }) {
   const canvasRef = useRef(null);
   const fabricCanvas = useRef(null);
@@ -33,8 +35,12 @@ export default function Canvas({
   const [eraserSize, setEraserSize] = useState(externalEraserSize);
   const [drawingColor, setDrawingColor] = useState(externalDrawingColor);
   const eraseHandlers = useRef({});
+  const selectionHandlers = useRef({});
+  const onSelectionChangeRef = useRef(onSelectionChange);
+  useEffect(() => { onSelectionChangeRef.current = onSelectionChange; }, [onSelectionChange]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [canvasRevision, setCanvasRevision] = useState(0);
+  const [deleteIconPos, setDeleteIconPos] = useState(null);
 
   // 레이어 관리 훅
   const {
@@ -289,8 +295,6 @@ export default function Canvas({
           fabricLayerUtils.assignObjectToLayer(path, activeLayer.id, activeLayer.name);
           console.log('✅ Path assigned to layer:', activeLayer.name);
           setCanvasRevision(c => c + 1); // 캔버스 변경을 알림
-
-          
         } else {
           console.error('❌ Path assignment failed - no active layer found!');
           console.log('Debug info:', {
@@ -319,6 +323,89 @@ export default function Canvas({
       }
     };
 
+    // Selection change handlers
+    const notifySelection = () => {
+      const cb = onSelectionChangeRef.current;
+      if (!cb) return;
+      const active = canvas.getActiveObject();
+      if (!active) {
+        cb(null);
+        return;
+      }
+      cb({
+        type: active.type || null,
+        customType: active.customType || null,
+        fill: active.fill || null,
+        radius: typeof active.radius === 'number' ? active.radius : null,
+        left: active.left ?? null,
+        top: active.top ?? null,
+      });
+    };
+
+    const updateDeleteIconPosition = () => {
+      const active = canvas.getActiveObject();
+      if (!active) {
+        setDeleteIconPos(null);
+        return;
+      }
+      try {
+        // 최신 좌표 강제 업데이트
+        if (typeof active.setCoords === 'function') active.setCoords();
+
+        // Fabric aCoords를 이용해 선택 박스 우상단(tr)을 기준점으로 사용
+        const aCoords = active.aCoords;
+        if (!aCoords || !aCoords.tr) {
+          setDeleteIconPos(null);
+          return;
+        }
+
+        const tr = aCoords.tr; // { x, y } in canvas viewport coords
+
+        // 캔버스 DOM 스케일 보정 (CSS 크기 ↔ 논리 캔버스 크기)
+        const el = canvas.getElement();
+        const clientW = el.clientWidth || canvas.getWidth();
+        const clientH = el.clientHeight || canvas.getHeight();
+        const scaleX = clientW / canvas.getWidth();
+        const scaleY = clientH / canvas.getHeight();
+
+        // 버튼 크기 및 오프셋 (우상단에 살짝 붙이기)
+        const BTN = 28;
+        const OFFSET_X = 24; // 오른쪽 모서리에서 안쪽으로 24px
+        const OFFSET_Y = 8;  // 위로 8px 띄우기
+
+        // DOM 좌표 (컨테이너 기준, 캔버스는 컨테이너 좌상단에 배치됨)
+        const leftCss = tr.x * scaleX - OFFSET_X;
+        const topCss = tr.y * scaleY - OFFSET_Y;
+
+        const clampedLeft = Math.max(0, Math.min(leftCss, clientW - BTN));
+        const clampedTop = Math.max(0, Math.min(topCss, clientH - BTN));
+
+        setDeleteIconPos({ left: clampedLeft, top: clampedTop });
+      } catch (e) {
+        setDeleteIconPos(null);
+      }
+    };
+
+    const handleCreated = () => { notifySelection(); updateDeleteIconPosition(); };
+    const handleUpdated = () => { notifySelection(); updateDeleteIconPosition(); };
+    const handleCleared = () => { const cb = onSelectionChangeRef.current; if (cb) cb(null); setDeleteIconPos(null); };
+
+    canvas.on('selection:created', handleCreated);
+    canvas.on('selection:updated', handleUpdated);
+    canvas.on('selection:cleared', handleCleared);
+    // 추가 갱신 타이밍들: 이동/스케일/회전/수정/휠(줌)/렌더 후
+    const handleTransforming = () => updateDeleteIconPosition();
+    const handleModified = () => updateDeleteIconPosition();
+    const handleWheel = () => updateDeleteIconPosition();
+    const handleAfterRender = () => updateDeleteIconPosition();
+    canvas.on('object:moving', handleTransforming);
+    canvas.on('object:scaling', handleTransforming);
+    canvas.on('object:rotating', handleTransforming);
+    canvas.on('object:modified', handleModified);
+    canvas.on('mouse:wheel', handleWheel);
+    canvas.on('after:render', handleAfterRender);
+    selectionHandlers.current = { handleCreated, handleUpdated, handleCleared };
+
     // 이벤트 리스너 등록
     canvas.on('mouse:wheel', handleCanvasZoom);
     canvas.on('mouse:down', handleMouseDown);
@@ -340,11 +427,39 @@ export default function Canvas({
       canvas.off('mouse:up', handleMouseUp);
       canvas.off('path:created', handlePathCreated);
       canvas.off('object:added', handleObjectAdded);
+      if (selectionHandlers.current.handleCreated) canvas.off('selection:created', selectionHandlers.current.handleCreated);
+      if (selectionHandlers.current.handleUpdated) canvas.off('selection:updated', selectionHandlers.current.handleUpdated);
+      if (selectionHandlers.current.handleCleared) canvas.off('selection:cleared', selectionHandlers.current.handleCleared);
+      canvas.off('object:moving', handleTransforming);
+      canvas.off('object:scaling', handleTransforming);
+      canvas.off('object:rotating', handleTransforming);
+      canvas.off('object:modified', handleModified);
+      canvas.off('after:render', handleAfterRender);
       document.removeEventListener('keydown', handleKeyDown, { capture: true });
       document.removeEventListener('keyup', handleKeyUp, { capture: true });
       canvas.dispose();
     };
   }, [width, height, externalStageRef]);
+
+  // Delete key to remove current selection in select mode
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (drawingMode !== 'select') return;
+      if (!fabricCanvas.current) return;
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+      const canvas = fabricCanvas.current;
+      const activeObjects = canvas.getActiveObjects();
+      if (!activeObjects || activeObjects.length === 0) return;
+      e.preventDefault();
+      activeObjects.forEach((obj) => canvas.remove(obj));
+      canvas.discardActiveObject();
+      canvas.requestRenderAll();
+      setDeleteIconPos(null);
+      const cb = onSelectionChangeRef.current; if (cb) cb(null);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [drawingMode]);
 
   // Effect for loading the background image
   useEffect(() => {
@@ -818,6 +933,16 @@ export default function Canvas({
         }
       });
 
+      // Also enable selection for svg/drawn dots
+      canvas.getObjects().forEach((obj) => {
+        if (obj.customType === "svgDot" || obj.customType === "drawnDot") {
+          obj.selectable = true;
+          obj.evented = true;
+          obj.hasControls = false;
+          obj.hasBorders = true;
+        }
+      });
+
       // 이전 핸들러들 정리
       Object.values(eraseHandlers.current).forEach((handler) => {
         if (typeof handler === "function") {
@@ -999,8 +1124,6 @@ export default function Canvas({
         canvas.setActiveObject(img);
         setCanvasRevision(c => c + 1); // 캔버스 변경을 알림
         
-        
-        
         canvas.renderAll();
       })
       .catch((err) => {
@@ -1008,8 +1131,6 @@ export default function Canvas({
         alert("이미지를 로드할 수 없습니다.");
       });
   };
-
-  // toggleSelectionMode는 이제 toggleDrawingMode로 대체됨
 
   // 전체 지우기 핸들러
   const handleClearAll = () => {
@@ -1024,7 +1145,6 @@ export default function Canvas({
       console.log("캔버스 전체가 초기화되었습니다");
     }
   };
-
 
   // 현재 캔버스의 모든 객체를 색상별로 분석하여 SVG 생성
   const getCurrentCanvasAsSvg = () => {
@@ -1091,7 +1211,6 @@ export default function Canvas({
       hasMultipleColors: new Set([...dots.map(d => d.originalColor), ...pathObjects.map(p => p.originalColor)]).size > 1
     };
   };
-
 
   // 현재 캔버스 전체를 이미지로 내보내기
   const exportCanvasAsImage = () => {
@@ -1204,7 +1323,6 @@ export default function Canvas({
     return true;
   };
 
-
   // 레이어 가시성 제어 함수
   const handleLayerVisibilityChange = useCallback((layerId) => {
     if (fabricCanvas.current) {
@@ -1227,7 +1345,6 @@ export default function Canvas({
     }
   }, [getLayer, toggleLayerLock]);
 
-
   // 레이어 삭제 (캔버스 객체도 함께 삭제)
   const handleDeleteLayer = useCallback((layerId) => {
     if (fabricCanvas.current) {
@@ -1248,6 +1365,58 @@ export default function Canvas({
       externalStageRef.current.exportDrawnLinesOnly = exportDrawnLinesOnly;
       externalStageRef.current.hasDrawnContent = hasDrawnContent;
       externalStageRef.current.clear = clearCanvas;
+      
+      // 누락된 loadImageFromUrl 메서드 추가
+      externalStageRef.current.loadImageFromUrl = (url) => {
+        console.log("loadImageFromUrl 호출됨:", url);
+        if (!fabricCanvas.current) return;
+
+        const canvas = fabricCanvas.current;
+
+        if (url.endsWith(".svg")) {
+          fetch(url)
+            .then(response => response.text())
+            .then(svgText => {
+              // 기존 SVG 요소들 제거
+              const existingSvgObjects = canvas.getObjects()
+                .filter(obj => obj.customType === "svgDot" || obj.type === "image");
+              existingSvgObjects.forEach(obj => canvas.remove(obj));
+
+              // SVG 파싱
+              const parser = new DOMParser();
+              const svgDoc = parser.parseFromString(svgText, "image/svg+xml");
+              const circles = svgDoc.querySelectorAll("circle");
+
+              circles.forEach((circleEl) => {
+                const cx = parseFloat(circleEl.getAttribute('cx') || '0');
+                const cy = parseFloat(circleEl.getAttribute('cy') || '0');
+                const r = parseFloat(circleEl.getAttribute('r') || '2');
+                const originalFill = circleEl.getAttribute('fill') || '#000000';
+
+                const fabricCircle = new Circle({
+                  left: cx - r,
+                  top: cy - r,
+                  radius: r,
+                  fill: originalFill,
+                  selectable: false,
+                  evented: true,
+                  customType: "svgDot",
+                  originalCx: cx,
+                  originalCy: cy,
+                  originalFill: originalFill,
+                  hoverCursor: 'crosshair',
+                  moveCursor: 'crosshair'
+                });
+
+                canvas.add(fabricCircle);
+              });
+
+              canvas.renderAll();
+            })
+            .catch(err => console.error("SVG 로드 실패:", err));
+        }
+      };
+
       externalStageRef.current.applyDrawingMode = (mode, color) => {
         // 색상 정보를 명시적으로 전달받아 사용
         const currentColor = color || externalDrawingColor;
@@ -1284,7 +1453,7 @@ export default function Canvas({
     }
   }, [externalStageRef, getSortedLayers, activeLayerId, setActiveLayerId, createLayer, 
       handleDeleteLayer, renameLayer, handleLayerVisibilityChange, handleLayerLockChange, 
-      reorderLayers]); // 드래그 앤 드롭 레이어 순서 변경 함수 추가
+      reorderLayers]);
 
   return (
     <div
@@ -1300,6 +1469,43 @@ export default function Canvas({
       onDrop={handleDrop}
     >
       <canvas ref={canvasRef} />
+      {deleteIconPos && drawingMode === 'select' && (
+        <button
+          type="button"
+          onClick={() => {
+            if (!fabricCanvas.current) return;
+            const canvas = fabricCanvas.current;
+            const activeObjects = canvas.getActiveObjects();
+            if (!activeObjects || activeObjects.length === 0) return;
+            activeObjects.forEach((obj) => canvas.remove(obj));
+            canvas.discardActiveObject();
+            canvas.requestRenderAll();
+            setDeleteIconPos(null);
+            const cb = onSelectionChangeRef.current; if (cb) cb(null);
+          }}
+          style={{
+            position: 'absolute',
+            left: deleteIconPos.left,
+            top: deleteIconPos.top,
+            background: '#dc3545',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 16,
+            width: 28,
+            height: 28,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 2px 6px rgba(0,0,0,.25)',
+            cursor: 'pointer',
+            zIndex: 5000,
+          }}
+          title="선택 영역 삭제"
+          aria-label="선택 영역 삭제"
+        >
+          <MdDelete size={18} />
+        </button>
+      )}
       {isDragOver && (
         <div
           style={{

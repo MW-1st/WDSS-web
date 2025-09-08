@@ -4,6 +4,7 @@ CREATE TABLE "users" (
   "id" uuid PRIMARY KEY,
   "email" varchar(32) UNIQUE,
   "username" varchar(32) UNIQUE,
+  "is_email_verified" boolean NOT NULL DEFAULT false,
   "status" varchar(16) NOT NULL DEFAULT 'ACTIVE',
   "last_login_at" timestamptz,
   "created_at" timestamptz NOT NULL DEFAULT (now()),
