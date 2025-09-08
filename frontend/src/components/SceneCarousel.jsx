@@ -1,6 +1,7 @@
 import React from "react";
 import { useParams } from "react-router-dom";
 import client from "../api/client";
+import { getImageUrl } from "../utils/imageUtils";
 
 const VISIBLE = 4;
 const BTN_SIZE = 48;
@@ -83,9 +84,11 @@ export default React.memo(function SceneCarousel({
 
   const items = React.useMemo(() => [...scenes, { id: "__ADD__", isAdd: true }], [scenes]);
   const total = items.length;
+  const maxStart = Math.max(0, total - VISIBLE);
+  const startClamped = clamp(start, 0, maxStart);
   const canSlide = total > VISIBLE;
-  const end = Math.min(start + VISIBLE, total);
-  const visibleItems = items.slice(start, end);
+  const end = Math.min(startClamped + VISIBLE, total);
+  const visibleItems = items.slice(startClamped, end);
 
   const handleSelect = (id) => {
     if (id === "__ADD__") return;
@@ -108,6 +111,23 @@ export default React.memo(function SceneCarousel({
           project_id: s.project_id ?? s.projectId ?? projectId,
         }))
       : [];
+    setScenes(mapped);
+    return mapped;
+  };
+
+  // Unified fetch that tolerates API shape and normalizes fields
+  const fetchScenesNormalized = async () => {
+    if (!projectId) throw new Error("project_id가 비어있습니다");
+    const { data } = await client.get(`/projects/${projectId}/scenes/`);
+    const list = Array.isArray(data) ? data : (data?.scenes ?? []);
+    const mapped = list.map((s, i) => ({
+      ...s,
+      id: s.id,
+      name: s.name ?? s.title ?? `Scene ${s.scene_num ?? i + 1}`,
+      preview: s.preview ?? s.preview_url ?? getImageUrl?.(s.s3_key) ?? null,
+      imageUrl: getImageUrl?.(s.s3_key) ?? null,
+      project_id: s.project_id ?? s.projectId ?? projectId,
+    }));
     setScenes(mapped);
     return mapped;
   };
@@ -146,7 +166,7 @@ export default React.memo(function SceneCarousel({
       const neighbor = selectedId === item.id ? pickNeighbor(item.id, scenes) : selectedId;
 
       // 3) 서버에서 최신 목록 다시 받아서 반영
-      const newList = await fetchScenes();
+      const newList = await fetchScenesNormalized();
       onSelectScene?.(neighbor && newList.some((x) => x.id === neighbor) ? neighbor : newList[0]?.id ?? null);
 
       // 4) start 보정 (총 아이템 = 씬 개수 + “추가” 1)
@@ -248,7 +268,7 @@ export default React.memo(function SceneCarousel({
       {canSlide && (
         <button
           onClick={() => setStart((s) => Math.max(0, s - 1))}
-          disabled={start === 0}
+          disabled={startClamped === 0}
           style={{
             position: "absolute",
             left: `${dims.leftBtnX}px`,
@@ -265,7 +285,7 @@ export default React.memo(function SceneCarousel({
             justifyContent: "center",
             fontSize: 26,
             lineHeight: "1",
-            cursor: start === 0 ? "not-allowed" : "pointer",
+            cursor: startClamped === 0 ? "not-allowed" : "pointer",
             zIndex: 1,
           }}
           aria-label="이전"
@@ -305,7 +325,7 @@ export default React.memo(function SceneCarousel({
       {canSlide && (
         <button
           onClick={() => setStart((s) => Math.min(total - VISIBLE, s + 1))}
-          disabled={start >= total - VISIBLE}
+          disabled={startClamped >= total - VISIBLE}
           style={{
             position: "absolute",
             right: `${dims.rightBtnX}px`,
@@ -322,7 +342,7 @@ export default React.memo(function SceneCarousel({
             justifyContent: "center",
             fontSize: 26,
             lineHeight: "1",
-            cursor: start >= total - VISIBLE ? "not-allowed" : "pointer",
+            cursor: startClamped >= total - VISIBLE ? "not-allowed" : "pointer",
             zIndex: 1,
           }}
           aria-label="다음"

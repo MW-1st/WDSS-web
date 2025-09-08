@@ -235,7 +235,12 @@ export default function EditorPage({ projectId = DUMMY }) {
           }
       );
       const created = data.scene || {};
-      const nextScenes = [...scenes, created];
+      const createdNorm = {
+        ...created,
+        name: created.name || `Scene ${created.scene_num ?? scene_num}`,
+        imageUrl: getImageUrl(created.s3_key),
+      };
+      const nextScenes = [...scenes, createdNorm];
       setScenes(nextScenes);
       setSelectedId(created.id);
 
