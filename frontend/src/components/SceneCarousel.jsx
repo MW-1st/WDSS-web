@@ -1,6 +1,7 @@
 import React from "react";
 import { useParams } from "react-router-dom";
 import client from "../api/client";
+import { getImageUrl } from "../utils/imageUtils";
 
 const VISIBLE = 4;
 const BTN_SIZE = 48;
@@ -33,6 +34,10 @@ export default React.memo(function SceneCarousel({
   const projectId = projectIdProp ?? projectIdFromUrl ?? projectIdFromUrl2 ?? projectIdFromScenes;
 
   const containerRef = React.useRef(null);
+  // Inline SVG backgrounds to center arrow glyphs inside round buttons
+  const ARROW_COLOR = "%235b5bd6"; // encoded '#5b5bd6'
+  const leftArrowBg = `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='20' height='20'><path fill='none' stroke='${ARROW_COLOR}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='M15 6 L9 12 L15 18'/></svg>")`;
+  const rightArrowBg = `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='20' height='20'><path fill='none' stroke='${ARROW_COLOR}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='M9 6 L15 12 L9 18'/></svg>")`;
 
   const [dims, setDims] = React.useState(() => ({
     thumbW: compact ? 200 : 220,
@@ -47,17 +52,23 @@ export default React.memo(function SceneCarousel({
     if (!el) return;
     const containerW = el.getBoundingClientRect().width;
 
-    const MIN_W = compact ? 160 : 200;
-    const MAX_W = compact ? 220 : 240;
-    const GAP = compact ? 24 : 48;
+    // Slightly smaller thumbnails to make room for external arrows
+    const MIN_W = compact ? 150 : 180;
+    const MAX_W = compact ? 200 : 220;
+    const GAP = compact ? 24 : 40;
 
-    const maxThumbW = Math.floor((containerW - GAP * (VISIBLE - 1)) / VISIBLE);
+    // Reserve space for navigation buttons on both sides
+    const RESERVED_SIDE = BTN_SIZE + 20; // px
+    const innerW = Math.max(0, containerW - RESERVED_SIDE * 2);
+
+    const maxThumbW = Math.floor((innerW - GAP * (VISIBLE - 1)) / VISIBLE);
     const thumbW = clamp(maxThumbW, MIN_W, MAX_W);
     const thumbH = Math.round(thumbW * 0.6);
 
     const stripW = thumbW * VISIBLE + GAP * (VISIBLE - 1);
     const sideSpace = Math.max(0, (containerW - stripW) / 2);
-    const btnOffset = Math.max(0, sideSpace - BTN_SIZE - 8);
+    // Place arrows just outside the thumbnail strip with small breathing room
+    const btnOffset = Math.max(8, sideSpace - BTN_SIZE - 12);
 
     setDims({ thumbW, thumbH, gap: GAP, leftBtnX: btnOffset, rightBtnX: btnOffset });
   }, [compact]);
@@ -83,9 +94,11 @@ export default React.memo(function SceneCarousel({
 
   const items = React.useMemo(() => [...scenes, { id: "__ADD__", isAdd: true }], [scenes]);
   const total = items.length;
+  const maxStart = Math.max(0, total - VISIBLE);
+  const startClamped = clamp(start, 0, maxStart);
   const canSlide = total > VISIBLE;
-  const end = Math.min(start + VISIBLE, total);
-  const visibleItems = items.slice(start, end);
+  const end = Math.min(startClamped + VISIBLE, total);
+  const visibleItems = items.slice(startClamped, end);
 
   const handleSelect = (id) => {
     if (id === "__ADD__") return;
@@ -108,6 +121,23 @@ export default React.memo(function SceneCarousel({
           project_id: s.project_id ?? s.projectId ?? projectId,
         }))
       : [];
+    setScenes(mapped);
+    return mapped;
+  };
+
+  // Unified fetch that tolerates API shape and normalizes fields
+  const fetchScenesNormalized = async () => {
+    if (!projectId) throw new Error("project_id가 비어있습니다");
+    const { data } = await client.get(`/projects/${projectId}/scenes/`);
+    const list = Array.isArray(data) ? data : (data?.scenes ?? []);
+    const mapped = list.map((s, i) => ({
+      ...s,
+      id: s.id,
+      name: s.name ?? s.title ?? `Scene ${s.scene_num ?? i + 1}`,
+      preview: s.preview ?? s.preview_url ?? getImageUrl?.(s.s3_key) ?? null,
+      imageUrl: getImageUrl?.(s.s3_key) ?? null,
+      project_id: s.project_id ?? s.projectId ?? projectId,
+    }));
     setScenes(mapped);
     return mapped;
   };
@@ -146,7 +176,7 @@ export default React.memo(function SceneCarousel({
       const neighbor = selectedId === item.id ? pickNeighbor(item.id, scenes) : selectedId;
 
       // 3) 서버에서 최신 목록 다시 받아서 반영
-      const newList = await fetchScenes();
+      const newList = await fetchScenesNormalized();
       onSelectScene?.(neighbor && newList.some((x) => x.id === neighbor) ? neighbor : newList[0]?.id ?? null);
 
       // 4) start 보정 (총 아이템 = 씬 개수 + “추가” 1)
@@ -248,7 +278,7 @@ export default React.memo(function SceneCarousel({
       {canSlide && (
         <button
           onClick={() => setStart((s) => Math.max(0, s - 1))}
-          disabled={start === 0}
+          disabled={startClamped === 0}
           style={{
             position: "absolute",
             left: `${dims.leftBtnX}px`,
@@ -259,13 +289,17 @@ export default React.memo(function SceneCarousel({
             borderRadius: "50%",
             border: "1px solid #cfcfe6",
             background: "#fff",
+            backgroundImage: leftArrowBg,
+            backgroundRepeat: "no-repeat",
+            backgroundPosition: "center",
             boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             fontSize: 26,
             lineHeight: "1",
-            cursor: start === 0 ? "not-allowed" : "pointer",
+            color: "transparent",
+            cursor: startClamped === 0 ? "not-allowed" : "pointer",
             zIndex: 1,
           }}
           aria-label="이전"
@@ -275,7 +309,7 @@ export default React.memo(function SceneCarousel({
         </button>
       )}
 
-      <div style={{ display: "flex", justifyContent: "center", gap: dims.gap }}>
+      <div style={{ display: "flex", justifyContent: "center", gap: dims.gap, paddingLeft: BTN_SIZE + 24, paddingRight: BTN_SIZE + 24 }}>
         {visibleItems.map((item) =>
           item.isAdd ? (
             <button
@@ -305,7 +339,7 @@ export default React.memo(function SceneCarousel({
       {canSlide && (
         <button
           onClick={() => setStart((s) => Math.min(total - VISIBLE, s + 1))}
-          disabled={start >= total - VISIBLE}
+          disabled={startClamped >= total - VISIBLE}
           style={{
             position: "absolute",
             right: `${dims.rightBtnX}px`,
@@ -316,13 +350,17 @@ export default React.memo(function SceneCarousel({
             borderRadius: "50%",
             border: "1px solid #cfcfe6",
             background: "#fff",
+            backgroundImage: rightArrowBg,
+            backgroundRepeat: "no-repeat",
+            backgroundPosition: "center",
             boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             fontSize: 26,
             lineHeight: "1",
-            cursor: start >= total - VISIBLE ? "not-allowed" : "pointer",
+            color: "transparent",
+            cursor: startClamped >= total - VISIBLE ? "not-allowed" : "pointer",
             zIndex: 1,
           }}
           aria-label="다음"

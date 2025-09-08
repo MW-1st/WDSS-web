@@ -316,10 +316,19 @@ export default function EditorPage({ projectId = DUMMY }) {
             scene_num,
           }
       );
-      const created = data.scene || {};
-      const nextScenes = [...scenes, created];
+      const createdRaw = data.scene || data || {};
+      const createdId = createdRaw.id ?? createdRaw.scene_id ?? createdRaw.sceneId;
+      const createdNorm = {
+        ...createdRaw,
+        id: createdId,
+        project_id: createdRaw.project_id ?? projectIdReady,
+        scene_num: createdRaw.scene_num ?? scene_num,
+        name: createdRaw.name || `Scene ${createdRaw.scene_num ?? scene_num}`,
+        imageUrl: getImageUrl(createdRaw.s3_key),
+      };
+      const nextScenes = [...scenes, createdNorm];
       setScenes(nextScenes);
-      setSelectedId(created.id);
+      if (createdId) setSelectedId(createdId);
 
       const nextTotal = nextScenes.length + 1;
       if (nextTotal > VISIBLE) setStart(nextTotal - VISIBLE);
@@ -339,6 +348,23 @@ export default function EditorPage({ projectId = DUMMY }) {
     if (idx < start) setStart(idx);
     if (idx >= start + VISIBLE) setStart(idx - VISIBLE + 1);
   };
+
+  // scenes/selectedId 변경 시 선택 유효성 보정
+  useEffect(() => {
+    if (!Array.isArray(scenes)) return;
+
+    if (scenes.length === 0) {
+      if (selectedId != null) setSelectedId(null);
+      return;
+    }
+
+    const exists = selectedId != null && scenes.some((s) => s.id === selectedId);
+    if (!exists) {
+      // 새로 추가/기존 삭제 등으로 현재 선택이 유효하지 않으면 마지막 항목으로 보정
+      const lastId = scenes[scenes.length - 1]?.id ?? null;
+      if (lastId !== selectedId) setSelectedId(lastId);
+    }
+  }, [scenes, selectedId]);
 
   // + 카드까지 포함
   const items = useMemo(
