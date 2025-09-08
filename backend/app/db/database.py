@@ -79,6 +79,20 @@ async def _ensure_schema(conn: asyncpg.Connection) -> None:
             statements = [s.strip() for s in sql_text.split(";") if s.strip()]
             for stmt in statements:
                 await conn.execute(stmt)
+        else:
+            # Ensure new columns exist for evolving schema without full migrations
+            has_verified_col = await conn.fetchval(
+                """
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'users' AND column_name = 'is_email_verified'
+                )
+                """
+            )
+            if not has_verified_col:
+                await conn.execute(
+                    "ALTER TABLE users ADD COLUMN is_email_verified boolean NOT NULL DEFAULT false"
+                )
         _schema_ready = True
     except Exception:
         # Do not block request if introspection fails; let route raise on actual use
