@@ -7,7 +7,14 @@ from fastapi import HTTPException, Depends, APIRouter, UploadFile, File
 
 from app.db.database import get_conn
 from app.dependencies import get_current_user
-from app.schemas import SceneCreate, SceneUpdate, SceneResponse, Scene, ScenesResponse
+from app.schemas import (
+    SceneCreate,
+    SceneUpdate,
+    SceneResponse,
+    Scene,
+    ScenesResponse,
+    UserResponse,
+)
 
 from app.config import ORIGINALS_DIR, PROCESSED_DIR, TMP_DIR
 from app.schemas import TransformOptions
@@ -17,7 +24,7 @@ router = APIRouter()
 
 
 @router.get("", response_model=ScenesResponse)
-async def get_scenes(project_id: str, user: dict = Depends(get_current_user)):
+async def get_scenes(project_id: str, user: UserResponse = Depends(get_current_user)):
     """씬 목록 조회"""
     try:
         uuid.UUID(project_id)  # UUID 유효성 검사
@@ -52,6 +59,7 @@ async def get_scenes(project_id: str, user: dict = Depends(get_current_user)):
                     project_id=str(scene["project_id"]),
                     scene_num=scene["scene_num"],
                     s3_key=scene["s3_key"],
+                    display_url=get_display_url(scene["s3_key"]),
                     # created_at=None,  # DB에 created_at, updated_at이 없으므로 None
                     # updated_at=None,
                 )
@@ -62,7 +70,9 @@ async def get_scenes(project_id: str, user: dict = Depends(get_current_user)):
 
 @router.post("", response_model=SceneResponse)
 async def create_scene(
-    project_id: str, scene_data: SceneCreate, user: dict = Depends(get_current_user)
+    project_id: str,
+    scene_data: SceneCreate,
+    user: UserResponse = Depends(get_current_user),
 ):
     """빈 씬 생성"""
     try:
@@ -124,15 +134,14 @@ async def create_scene(
                     project_id=project_id,
                     scene_num=scene["scene_num"],
                     s3_key=scene["s3_key"],
-                    # created_at=None,
-                    # updated_at=None,
+                    display_url=get_display_url(scene["s3_key"]),
                 ),
             )
 
 
 @router.get("/{scene_id}", response_model=SceneResponse)
 async def get_scene(
-    project_id: str, scene_id: str, user: dict = Depends(get_current_user)
+    project_id: str, scene_id: str, user: UserResponse = Depends(get_current_user)
 ):
     """씬 정보 조회"""
     try:
@@ -163,8 +172,7 @@ async def get_scene(
                 project_id=str(scene["project_id"]),
                 scene_num=scene["scene_num"],
                 s3_key=scene["s3_key"],
-                # created_at=None,
-                # updated_at=None,
+                display_url=get_display_url(scene["s3_key"]),
             ),
         )
 
@@ -174,7 +182,7 @@ async def update_scene(
     project_id: str,
     scene_id: str,
     scene_data: SceneUpdate,
-    user: dict = Depends(get_current_user),
+    user: UserResponse = Depends(get_current_user),
 ):
     """씬 업데이트"""
     try:
@@ -223,13 +231,14 @@ async def update_scene(
                 project_id=project_id,
                 scene_num=scene["scene_num"],
                 s3_key=scene["s3_key"],
+                display_url=get_display_url(scene["s3_key"]),
             ),
         )
 
 
 @router.delete("/{scene_id}")
 async def delete_scene(
-    project_id: str, scene_id: str, user: dict = Depends(get_current_user)
+    project_id: str, scene_id: str, user: UserResponse = Depends(get_current_user)
 ):
     """씬 삭제"""
     try:
@@ -433,3 +442,16 @@ async def re_transform_from_original(
         raise HTTPException(
             status_code=500, detail=f"Image re-transformation failed: {e}"
         )
+
+
+def get_display_url(original_s3_key: str) -> str:
+    """원본 경로를 표시용 경로로 변환"""
+    if not original_s3_key:
+        return None
+
+    if original_s3_key.startswith("originals/"):
+        return original_s3_key.replace("originals/", "processed/").replace(
+            ".png", ".svg"
+        )
+
+    return original_s3_key

@@ -13,7 +13,11 @@ app = FastAPI()
 # CORS for local dev (Vite on 5173)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "*"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://3.85.51.152:5173",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -56,7 +60,7 @@ app.mount(
 
 app.mount(
     "/originals",
-    StaticFiles(directory="processed"),
+    StaticFiles(directory="originals"),
     name="originals",
 )
 

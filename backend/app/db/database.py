@@ -4,10 +4,22 @@ import asyncpg
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 from asyncpg import exceptions as pgexc
+from dotenv import load_dotenv
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL", "postgresql://postgres:1234@localhost:5432/wdss"
-)
+load_dotenv()
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+if not DATABASE_URL:
+    DB_HOST = os.getenv("DB_HOST", "localhost")
+    DB_PORT = os.getenv("DB_PORT", "5432")
+    DB_NAME = os.getenv("DB_NAME", "wdss")
+    DB_USER = os.getenv("DB_USER", "postgres")
+    DB_PASSWORD = os.getenv("DB_PASSWORD", "1234")
+    DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 _pool: asyncpg.Pool | None = None
 _schema_ready: bool = False
@@ -72,7 +84,7 @@ async def _ensure_schema(conn: asyncpg.Connection) -> None:
             "SELECT to_regclass('public.auth_credentials')"
         )
         if users_exists is None or creds_exists is None:
-            sql_path = os.path.join(os.path.dirname(__file__), "WDSS.sql")
+            sql_path = os.path.join(os.path.dirname(__file__), "db", "WDSS.sql")
             with open(sql_path, "r", encoding="utf-8") as f:
                 sql_text = f.read()
             # Execute statements individually to satisfy asyncpg

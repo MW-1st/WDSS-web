@@ -10,7 +10,7 @@
   color: #fff; /* 글씨를 흰색으로 바꿔야 잘 보임 */
   border-radius: 12px;
 
-  background-image: url("/public/img/banner.png"); /* 이미지 경로 */
+  background-image: url("/img/banner.png"); /* 이미지 경로 */
   background-size: cover; /* 꽉 차게 */
   background-position: center; /* 중앙 정렬 */
   background-repeat: no-repeat;
