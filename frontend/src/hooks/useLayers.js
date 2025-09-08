@@ -129,56 +129,43 @@ const useLayers = () => {
 
   // 드래그 앤 드롭으로 레이어 순서 변경
   const reorderLayers = useCallback((draggedLayerId, targetLayerId) => {
-    console.log('useLayers reorderLayers called:', draggedLayerId, 'to', targetLayerId);
+    // 배경 레이어는 드래그하거나 다른 레이어의 타겟이 될 수 없음 (순서 고정)
+    if (draggedLayerId === 'background' || targetLayerId === 'background') {
+      return;
+    }
+
     setLayers(prev => {
-      console.log('Previous layers:', prev.map(l => ({ id: l.id, name: l.name, zIndex: l.zIndex })));
-      
-      // UI 표시 순서와 동일하게 정렬 (높은 zIndex가 위에, 낮은 zIndex가 아래)
-      const sortedLayers = [...prev].sort((a, b) => b.zIndex - a.zIndex);
-      const draggedIndex = sortedLayers.findIndex(layer => layer.id === draggedLayerId);
-      const targetIndex = sortedLayers.findIndex(layer => layer.id === targetLayerId);
-      
-      console.log('Sorted layers:', sortedLayers.map(l => ({ id: l.id, name: l.name, zIndex: l.zIndex })));
-      console.log('Dragged index:', draggedIndex, 'Target index:', targetIndex);
-      
-      if (draggedIndex === -1 || targetIndex === -1) {
-        console.log('Layer not found - draggedIndex:', draggedIndex, 'targetIndex:', targetIndex);
-        return prev;
+      const layersWithoutBg = prev.filter(l => l.id !== 'background');
+      const backgroundLayer = prev.find(l => l.id === 'background');
+
+      // UI에 표시되는 순서대로 정렬 (zIndex가 높은 것이 위)
+      const sortedLayers = [...layersWithoutBg].sort((a, b) => b.zIndex - a.zIndex);
+
+      const draggedIndex = sortedLayers.findIndex(l => l.id === draggedLayerId);
+      const targetIndex = sortedLayers.findIndex(l => l.id === targetLayerId);
+
+      if (draggedIndex === -1 || targetIndex === -1 || draggedIndex === targetIndex) {
+        return prev; // 변경 필요 없음
       }
-      
-      if (draggedIndex === targetIndex) {
-        console.log('Same position, no change needed');
-        return prev;
+
+      // 배열에서 드래그된 아이템을 제거하고 타겟 위치에 삽입
+      const reordered = Array.from(sortedLayers);
+      const [draggedItem] = reordered.splice(draggedIndex, 1);
+      reordered.splice(targetIndex, 0, draggedItem);
+
+      // zIndex를 UI 순서에 맞게 재할당
+      // reordered 배열의 인덱스가 0일수록 UI에서 위에 있으므로 zIndex가 높아야 함
+      const updatedLayers = reordered.map((layer, index) => ({
+        ...layer,
+        zIndex: reordered.length - index,
+      }));
+
+      // 배경 레이어가 있으면 zIndex: 0으로 다시 추가
+      if (backgroundLayer) {
+        updatedLayers.push({ ...backgroundLayer, zIndex: 0 });
       }
-      
-      // 드래그된 레이어를 배열에서 제거
-      const draggedLayer = sortedLayers[draggedIndex];
-      const newOrder = [...sortedLayers];
-      newOrder.splice(draggedIndex, 1); // 드래그된 레이어 제거
-      
-      // 타겟 레이어의 위치를 찾기
-      const targetLayerInNewOrder = newOrder.find(layer => layer.id === targetLayerId);
-      const targetLayerNewIndex = newOrder.indexOf(targetLayerInNewOrder);
-      
-      // 드래그된 레이어를 타겟 레이어의 자리에 삽입 (방향 관계없이 동일하게)
-      newOrder.splice(targetLayerNewIndex, 0, draggedLayer);
-      
-      console.log('New order:', newOrder.map(l => ({ id: l.id, name: l.name })));
-      
-      // zIndex 재할당 - UI 표시 순서와 일치하도록
-      const newLayers = [...prev];
-      newOrder.forEach((layer, index) => {
-        const layerInNew = newLayers.find(l => l.id === layer.id);
-        if (layerInNew) {
-          // 첫 번째 레이어(UI 맨 위)가 가장 높은 zIndex를 가지도록
-          const newZIndex = newOrder.length - 1 - index;
-          console.log(`Setting ${layer.name} zIndex from ${layerInNew.zIndex} to ${newZIndex} (UI index: ${index})`);
-          layerInNew.zIndex = newZIndex;
-        }
-      });
-      
-      console.log('Final new layers:', newLayers.map(l => ({ id: l.id, name: l.name, zIndex: l.zIndex })));
-      return newLayers;
+
+      return updatedLayers;
     });
   }, []);
 
