@@ -34,6 +34,7 @@ export default function Canvas({
   const [drawingColor, setDrawingColor] = useState(externalDrawingColor);
   const eraseHandlers = useRef({});
   const [isDragOver, setIsDragOver] = useState(false);
+  const [canvasRevision, setCanvasRevision] = useState(0);
 
   // 레이어 관리 훅
   const {
@@ -62,6 +63,23 @@ export default function Canvas({
   useEffect(() => {
     layersRef.current = layers;
   }, [layers]);
+
+  const getSortedLayersRef = useRef(getSortedLayers);
+  useEffect(() => {
+    getSortedLayersRef.current = getSortedLayers;
+  }, [getSortedLayers]);
+
+  // [중요] 레이어 상태 동기화를 위한 중앙 집중식 Effect
+  // layers 배열(순서, zIndex 등 포함)이 변경될 때마다 캔버스 객체들의 순서를 재정렬합니다.
+  // 이것이 캔버스와 레이어 패널의 상태를 일치시키는 가장 확실한 방법입니다.
+  useEffect(() => {
+    if (fabricCanvas.current) {
+      console.log('🔄 [Sync Effect] Layer state changed, reordering canvas objects...');
+      // getSortedLayers는 layers 상태에 의존하므로, 이 effect가 실행될 때는 항상 최신 상태를 반영합니다.
+      const sortedLayers = getSortedLayers();
+      fabricLayerUtils.reorderObjectsByLayers(fabricCanvas.current, sortedLayers);
+    }
+  }, [layers, canvasRevision]); // 'layers' 또는 'canvasRevision' 상태가 변경될 때마다 실행
 
   // Use useLayoutEffect to initialize the canvas
   useLayoutEffect(() => {
@@ -270,6 +288,9 @@ export default function Canvas({
         if (activeLayer) {
           fabricLayerUtils.assignObjectToLayer(path, activeLayer.id, activeLayer.name);
           console.log('✅ Path assigned to layer:', activeLayer.name);
+          setCanvasRevision(c => c + 1); // 캔버스 변경을 알림
+
+          
         } else {
           console.error('❌ Path assignment failed - no active layer found!');
           console.log('Debug info:', {
@@ -404,6 +425,7 @@ export default function Canvas({
           console.log(`총 ${addedCount}개의 circle을 캔버스에 추가했습니다`);
           console.log("캔버스 객체 개수:", canvas.getObjects().length);
 
+          setCanvasRevision(c => c + 1); // 캔버스 변경을 알림
           canvas.renderAll();
         })
         .catch((err) => {
@@ -570,10 +592,12 @@ export default function Canvas({
       const continueDraw = (e) => {
         if (!isDrawing) return;
         drawDotAtPoint(e);
+        canvas.requestRenderAll(); // 실시간 피드백을 위해 최적화된 렌더링 호출
       };
 
       const stopDraw = () => {
         isDrawing = false;
+        setCanvasRevision(c => c + 1); // 캔버스 변경을 알림
       };
 
       const drawDotAtPoint = (e) => {
@@ -582,8 +606,6 @@ export default function Canvas({
         const currentActiveLayerId = activeLayerIdRef.current;
         const currentLayers = layersRef.current;
         const activeLayer = currentLayers.find(layer => layer.id === currentActiveLayerId);
-
-        console.log('🎨 Dot created - using activeLayerId:', currentActiveLayerId, 'layer:', activeLayer?.name);
 
         // 새로운 도트 생성 (SVG circle과 같은 크기 2px 사용)
         const dotRadius = 1;
@@ -606,7 +628,8 @@ export default function Canvas({
         }
 
         canvas.add(newDot);
-        canvas.renderAll();
+        // 연속적인 드로잉 중에는 매번 renderAll을 호출하지 않습니다.
+        // 렌더링은 continueDraw와 stopDraw에서 관리합니다.
       };
 
       // 고정 크기 브러시 커서 생성
@@ -974,13 +997,9 @@ export default function Canvas({
 
         canvas.add(img);
         canvas.setActiveObject(img);
+        setCanvasRevision(c => c + 1); // 캔버스 변경을 알림
         
-        // 레이어 순서에 맞게 캔버스 객체 재정렬
-        setTimeout(() => {
-          const sortedLayers = getSortedLayers();
-          fabricLayerUtils.reorderObjectsByLayers(canvas, sortedLayers);
-          console.log('🔄 Canvas objects reordered after image added');
-        }, 10);
+        
         
         canvas.renderAll();
       })
@@ -1150,6 +1169,7 @@ export default function Canvas({
     canvas.getObjects().forEach((obj) => canvas.remove(obj));
     canvas.backgroundColor = "#fafafa";
     canvas.renderAll();
+    setCanvasRevision(c => c + 1); // 캔버스 변경을 알림
   };
 
   // 원본 캔버스 상태 저장 및 복원 기능
@@ -1213,6 +1233,8 @@ export default function Canvas({
     if (fabricCanvas.current) {
       // 먼저 캔버스에서 해당 레이어의 모든 객체 삭제
       fabricLayerUtils.deleteLayerObjects(fabricCanvas.current, layerId);
+      // 캔버스 변경을 알림 (객체 삭제 후)
+      setCanvasRevision(c => c + 1);
       // 그다음 레이어 상태에서 삭제
       deleteLayer(layerId);
     }
@@ -1257,19 +1279,7 @@ export default function Canvas({
         renameLayer,
         toggleVisibility: handleLayerVisibilityChange,
         toggleLock: handleLayerLockChange,
-        reorderLayers: (draggedLayerId, targetLayerId) => {
-          console.log('Canvas reorderLayers called:', draggedLayerId, targetLayerId);
-          reorderLayers(draggedLayerId, targetLayerId);
-          
-          // 레이어 순서가 변경되면 캔버스 객체도 재정렬 (상태 업데이트 대기)
-          if (fabricCanvas.current) {
-            setTimeout(() => {
-              const sortedLayers = getSortedLayers();
-              console.log('🔄 Reordering canvas objects after layer reorder');
-              fabricLayerUtils.reorderObjectsByLayers(fabricCanvas.current, sortedLayers);
-            }, 50);
-          }
-        }
+        reorderLayers: reorderLayers,
       };
     }
   }, [externalStageRef, getSortedLayers, activeLayerId, setActiveLayerId, createLayer, 
