@@ -14,6 +14,7 @@ from app.schemas import (
     Scene,
     ScenesResponse,
     UserResponse,
+    ScenePatch,
 )
 
 from app.config import ORIGINALS_DIR, PROCESSED_DIR, TMP_DIR
@@ -234,6 +235,85 @@ async def update_scene(
                 display_url=get_display_url(scene["s3_key"]),
             ),
         )
+
+
+# 초기화
+@router.patch("/{scene_id}", response_model=SceneResponse)
+async def patch_scene(
+    project_id: str,
+    scene_id: str,
+    patch_data: ScenePatch,  # 새로운 스키마
+    user: UserResponse = Depends(get_current_user),
+):
+    """씬 상태 변경 (초기화 등)"""
+    try:
+        uuid.UUID(project_id)
+        uuid.UUID(scene_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid ID format")
+
+    if patch_data.status == "reset":
+        # 초기화 로직
+        async with get_conn() as conn:
+            async with conn.transaction():
+                # 씬 존재 여부 확인 및 현재 scene_num 조회
+                existing_scene = await conn.fetchrow(
+                    """
+                    SELECT s.id, s.scene_num, s.s3_key
+                    FROM project_scenes ps
+                             JOIN scene s ON ps.scene_id = s.id
+                    WHERE s.id = $1
+                      AND ps.project_id = $2
+                    """,
+                    scene_id,
+                    project_id,
+                )
+
+                if not existing_scene:
+                    raise HTTPException(status_code=404, detail="Scene not found")
+
+                # DB에서 s3_key를 NULL로 초기화
+                await conn.execute(
+                    """
+                    UPDATE scene
+                    SET s3_key = NULL
+                    WHERE id = $1
+                    """,
+                    scene_id,
+                )
+
+                # 연관된 파일들 삭제
+                original_file = os.path.join(ORIGINALS_DIR, f"{scene_id}.png")
+                processed_file = os.path.join(PROCESSED_DIR, f"{scene_id}.svg")
+
+                # originals 폴더의 파일 삭제
+                if os.path.exists(original_file):
+                    try:
+                        os.remove(original_file)
+                    except OSError as e:
+                        # 파일 삭제 실패시 로그는 남기되 작업은 계속 진행
+                        print(f"Failed to remove original file {original_file}: {e}")
+
+                # processed 폴더의 파일 삭제
+                if os.path.exists(processed_file):
+                    try:
+                        os.remove(processed_file)
+                    except OSError as e:
+                        # 파일 삭제 실패시 로그는 남기되 작업은 계속 진행
+                        print(f"Failed to remove processed file {processed_file}: {e}")
+
+        return SceneResponse(
+            success=True,
+            scene=Scene(
+                id=scene_id,
+                project_id=project_id,
+                scene_num=existing_scene["scene_num"],  # 기존 값 유지
+                s3_key=None,
+                display_url=None,
+            ),
+        )
+
+    raise HTTPException(status_code=400, detail="Invalid status")
 
 
 @router.delete("/{scene_id}")
