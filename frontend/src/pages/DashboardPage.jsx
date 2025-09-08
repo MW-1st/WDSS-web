@@ -50,6 +50,7 @@ export default function DashboardPage() {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingProject, setEditingProject] = useState(null);
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -68,22 +69,8 @@ export default function DashboardPage() {
     })();
   }, [isAuthenticated]);
 
-  const handleCreateProject = async () => {
-    try {
-      const newProjectData = {
-        project_name: "새 프로젝트",
-        format: "dsj",
-        max_scene: 15,
-        max_speed: 6.0,
-        max_accel: 3.0,
-        min_separation: 2.0,
-      };
-      const res = await client.post("/projects", newProjectData);
-      const projectId = res.data.project.id;
-      navigate(`/projects/${projectId}`);
-    } catch (error) {
-      console.error("Project creation failed:", error);
-    }
+  const handleCreateProject = () => {
+    setCreating(true);
   };
 
   const handleProjectClick = (projectId) => {
@@ -205,6 +192,18 @@ export default function DashboardPage() {
           project={editingProject}
           onClose={closeSettings}
           onSaved={handleSaved}
+        />
+      )}
+      {creating && (
+        <ProjectSettingsModal
+          mode="create"
+          project={null}
+          onClose={() => setCreating(false)}
+          onSaved={(created) => {
+            setProjects((prev) => [created, ...prev]);
+            setCreating(false);
+            navigate(`/projects/${created.id}`);
+          }}
         />
       )}
     </>
