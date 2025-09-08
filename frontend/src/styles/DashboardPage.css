@@ -167,3 +167,24 @@
   border-radius: 12px;
   color: #6c757d;
 }
+
+/* Banner hero: fixed-height wrapper with object-fit cover background */
+.hero {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.hero-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center; /* 필요시 center 20% 등으로 변경 */
+}
+.hero .dashboard-header {
+  position: relative;
+  z-index: 1;
+  background: transparent !important;
+  background-image: none !important;
+}
