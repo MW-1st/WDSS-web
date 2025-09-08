@@ -6,6 +6,8 @@ from app.db.database import init_db, close_db
 from starlette.middleware.base import BaseHTTPMiddleware
 from app.config import create_upload_directories
 
+# 애플리케이션 생성 전에 디렉토리 생성
+create_upload_directories()
 app = FastAPI()
 
 # CORS for local dev (Vite on 5173)
