@@ -42,7 +42,7 @@ CREATE TABLE "jwt_blocklist" (
 CREATE TABLE "project" (
   "id" uuid PRIMARY KEY,
   "user_id" uuid,
-  "project_name" TYPE VARCHAR(64);
+  "project_name" varchar(64),
   "format" char(64) DEFAULT 'dsj',
   "max_scene" int,
   "max_drone" int,
