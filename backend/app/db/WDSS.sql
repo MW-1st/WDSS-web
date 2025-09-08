@@ -45,6 +45,7 @@ CREATE TABLE "project" (
   "project_name" VARCHAR(64),
   "format" char(64) DEFAULT 'dsj',
   "max_scene" int,
+  "max_drone" int,
   "max_speed" float,
   "max_accel" float,
   "min_separation" float,

@@ -62,6 +62,7 @@ async def create_new_project(
     - **project_name**: 프로젝트의 이름
     - **format**: 포맷 (기본값: "dsj")
     - **max_scene**: 최대 씬 개수
+    - **max_drone**: 최대 드론 개수
     - **max_speed**: 드론의 최대 속도 (m/s)
     - **max_accel**: 드론의 최대 가속도 (m/s²)
     - **min_separation**: 드론 간 최소 안전 이격 거리 (m)
@@ -155,7 +156,7 @@ async def export_project_to_json(
     # 프로젝트 정보 가져오기 (JSON 메타데이터용)
     project = await conn.fetchrow(
         """
-              SELECT project_name, format, max_scene, max_speed, max_accel, min_separation
+              SELECT project_name, format, max_scene, max_drone, max_speed, max_accel, min_separation
               FROM project
               WHERE id = $1
               """,
@@ -239,7 +240,7 @@ async def export_project_to_json(
         "show": {
             "show_name": project["project_name"] or "Untitled Show",
             "max_scene": int(project["max_scene"] or 1),
-            "max_drone": int(project["max_scene"] or 1),  # DB의 max_scene 값 사용
+            "max_drone": int(project["max_drone"] or 1),  # DB의 max_scene 값 사용
         },
         "constraints": {
             "max_speed": float(project["max_speed"] or 6.0),

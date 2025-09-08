@@ -19,8 +19,8 @@ async def create_project(
 ) -> dict:
     """DB에 새 프로젝트를 생성합니다."""
     query = """
-        INSERT INTO project (project_name, format, max_scene, max_speed, max_accel, min_separation, user_id)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        INSERT INTO project (project_name, format, max_scene, max_drone, max_speed, max_accel, min_separation, user_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING *
     """
     new_project = await conn.fetchrow(
@@ -28,6 +28,7 @@ async def create_project(
         project_data.project_name,
         project_data.format,
         project_data.max_scene,
+        project_data.max_drone,
         project_data.max_speed,
         project_data.max_accel,
         project_data.min_separation,
