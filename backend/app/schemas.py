@@ -1,7 +1,7 @@
 import datetime
 import uuid
-from pydantic import BaseModel, EmailStr, Field
-from typing import Optional, List
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
+from typing import Optional, List, Any
 
 
 class Token(BaseModel):
@@ -152,3 +152,42 @@ class ProjectDetailDataResponse(SuccessResponse):
     """상세 프로젝트 데이터를 포함하는 성공 응답 모델"""
 
     project: ProjectDetailResponse
+
+
+# schemas.py에서 Scene 관련 스키마 수정
+class SceneCreate(BaseModel):
+    scene_num: int
+
+
+class SceneUpdate(BaseModel):
+    s3_key: Optional[str] = None
+
+
+class Scene(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    project_id: str
+    scene_num: int
+    s3_key: Optional[str] = None
+
+
+class SceneResponse(BaseModel):
+    success: bool
+    scene: Scene
+
+
+class ScenesResponse(BaseModel):
+    success: bool
+    scenes: List[Scene]
+
+
+class DeleteImageRequest(BaseModel):
+    imageUrl: str
+
+
+class TransformOptions(BaseModel):
+    target_dots: int | None = 2000
+    color_r: int | None = 0
+    color_g: int | None = 0
+    color_b: int | None = 0

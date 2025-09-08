@@ -1017,34 +1017,83 @@ export default function Canvas({
 
   // 외부에서 사용할 수 있도록 ref에 함수 등록
   useEffect(() => {
-    if (externalStageRef && externalStageRef.current) {
-      externalStageRef.current.getCurrentCanvasAsSvg = getCurrentCanvasAsSvg;
-      externalStageRef.current.exportCanvasAsImage = exportCanvasAsImage;
-      externalStageRef.current.exportDrawnLinesOnly = exportDrawnLinesOnly;
-      externalStageRef.current.hasDrawnContent = hasDrawnContent;
-      externalStageRef.current.clear = clearCanvas;
-      externalStageRef.current.applyDrawingMode = (mode, color) => {
-        // 색상 정보를 명시적으로 전달받아 사용
-        const currentColor = color || externalDrawingColor;
-        console.log('applyDrawingMode with color:', mode, currentColor);
-        applyDrawingMode(mode, currentColor);
-      };
-      externalStageRef.current.setDrawingMode = (mode) => {
-        setDrawingMode(mode);
-        // 현재 색상을 명시적으로 전달
-        setTimeout(() => {
-          externalStageRef.current.applyDrawingMode(mode, drawingColor);
-        }, 10);
-      };
-      externalStageRef.current.setDrawingColor = (color) => {
-        setDrawingColor(color);
-        updateBrushColor(color);
-      };
-      // 원본 상태 관리 함수 추가
-      externalStageRef.current.saveOriginalCanvasState = saveOriginalCanvasState;
-      externalStageRef.current.restoreOriginalCanvasState = restoreOriginalCanvasState;
-    }
-  }, [externalStageRef]); // drawingColor는 의존성에서 제거하여 무한 루프 방지
+  if (externalStageRef && externalStageRef.current) {
+    externalStageRef.current.getCurrentCanvasAsSvg = getCurrentCanvasAsSvg;
+    externalStageRef.current.exportCanvasAsImage = exportCanvasAsImage;
+    externalStageRef.current.exportDrawnLinesOnly = exportDrawnLinesOnly;
+    externalStageRef.current.hasDrawnContent = hasDrawnContent;
+    externalStageRef.current.clear = clearCanvas;
+
+    // 누락된 loadImageFromUrl 메서드 추가
+    externalStageRef.current.loadImageFromUrl = (url) => {
+      console.log("loadImageFromUrl 호출됨:", url);
+      if (!fabricCanvas.current) return;
+
+      const canvas = fabricCanvas.current;
+
+      if (url.endsWith(".svg")) {
+        fetch(url)
+          .then(response => response.text())
+          .then(svgText => {
+            // 기존 SVG 요소들 제거
+            const existingSvgObjects = canvas.getObjects()
+              .filter(obj => obj.customType === "svgDot" || obj.type === "image");
+            existingSvgObjects.forEach(obj => canvas.remove(obj));
+
+            // SVG 파싱
+            const parser = new DOMParser();
+            const svgDoc = parser.parseFromString(svgText, "image/svg+xml");
+            const circles = svgDoc.querySelectorAll("circle");
+
+            circles.forEach((circleEl) => {
+              const cx = parseFloat(circleEl.getAttribute('cx') || '0');
+              const cy = parseFloat(circleEl.getAttribute('cy') || '0');
+              const r = parseFloat(circleEl.getAttribute('r') || '2');
+              const originalFill = circleEl.getAttribute('fill') || '#000000';
+
+              const fabricCircle = new Circle({
+                left: cx - r,
+                top: cy - r,
+                radius: r,
+                fill: originalFill,
+                selectable: false,
+                evented: true,
+                customType: "svgDot",
+                originalCx: cx,
+                originalCy: cy,
+                originalFill: originalFill,
+                hoverCursor: 'crosshair',
+                moveCursor: 'crosshair'
+              });
+
+              canvas.add(fabricCircle);
+            });
+
+            canvas.renderAll();
+          })
+          .catch(err => console.error("SVG 로드 실패:", err));
+      }
+    };
+
+    externalStageRef.current.applyDrawingMode = (mode, color) => {
+      const currentColor = color || externalDrawingColor;
+      console.log('applyDrawingMode with color:', mode, currentColor);
+      applyDrawingMode(mode, currentColor);
+    };
+    externalStageRef.current.setDrawingMode = (mode) => {
+      setDrawingMode(mode);
+      setTimeout(() => {
+        externalStageRef.current.applyDrawingMode(mode, drawingColor);
+      }, 10);
+    };
+    externalStageRef.current.setDrawingColor = (color) => {
+      setDrawingColor(color);
+      updateBrushColor(color);
+    };
+    externalStageRef.current.saveOriginalCanvasState = saveOriginalCanvasState;
+    externalStageRef.current.restoreOriginalCanvasState = restoreOriginalCanvasState;
+  }
+}, [externalStageRef]);
 
   return (
     <div
