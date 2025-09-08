@@ -7,6 +7,8 @@ import ObjectPropertiesPanel from "../components/ObjectPropertiesPanel.jsx";
 import client from "../api/client";
 import { useUnity } from "../contexts/UnityContext.jsx";
 import { useParams } from "react-router-dom";
+import { CiSettings } from "react-icons/ci";
+import ProjectSettingsModal from "../components/ProjectSettingsModal";
 
 const VISIBLE = 4;
 const DUMMY = "11111111-1111-1111-1111-111111111111";
@@ -32,6 +34,7 @@ export default function EditorPage({ projectId = DUMMY }) {
 
   const [scenes, setScenes] = useState([]);
   const [projectName, setProjectName] = useState("");
+  const [projectMeta, setProjectMeta] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
   const [start, setStart] = useState(0);
 
@@ -56,8 +59,19 @@ export default function EditorPage({ projectId = DUMMY }) {
   const [drawingColor, setDrawingColor] = useState("#222222");
   const [selectedObject, setSelectedObject] = useState(null);
 
-  const { isUnityVisible, showUnity, hideUnity } = useUnity();
 
+  // 프로젝트 설정 모달 상태
+  const [editingProject, setEditingProject] = useState(null);
+  const openProjectSettings = () => {
+    if (projectMeta) setEditingProject(projectMeta);
+  };
+  const closeProjectSettings = () => setEditingProject(null);
+  const handleSettingsSaved = (updated) => {
+    setProjectMeta(updated);
+    if (updated?.project_name) setProjectName(updated.project_name);
+  };
+
+  // 색상이 변경될 때 즉시 캔버스에 반영
 
   useEffect(() => {
     stageRef.current?.setDrawingColor?.(drawingColor);
@@ -84,9 +98,19 @@ export default function EditorPage({ projectId = DUMMY }) {
     if (!pid) return;
     (async () => {
       try {
-        const { data: proj } = await client.get(`/projects/${pid}`);
-        if (proj?.project_name) setProjectName(proj.project_name);
-      } catch {}
+
+        const { data } = await client.get(`/projects/${pid}`);
+        const p = data?.project ?? data;
+        if (p?.project_name) setProjectName(p.project_name);
+        if (p) setProjectMeta(p);
+      } catch (e) {
+        // Leave default if fetch fails
+        console.warn(
+          "Failed to load project info",
+          e?.response?.data || e?.message
+        );
+      }
+
     })();
   }, [pid]);
 
@@ -527,29 +551,55 @@ export default function EditorPage({ projectId = DUMMY }) {
       >
         {/* 내부에서만 스크롤 */}
         <div style={{ height: "100%", overflowY: "auto", padding: 16 }}>
-          <EditorToolbar
-            pid={pid}
-            selectedId={selectedId}
-            imageUrl={imageUrl}
-            targetDots={targetDots}
-            setTargetDots={setTargetDots}
-            processing={processing}
-            onTransform={handleTransform}
-            isUnityVisible={isUnityVisible}
-            showUnity={showUnity}
-            hideUnity={hideUnity}
-            onImageDragStart={(u) => console.log("Image drag:", u)}
-            drawingMode={drawingMode}
-            eraserSize={eraserSize}
-            drawingColor={drawingColor}
-            onModeChange={handleModeChange}
-            onColorChange={handleColorChange}
-            onColorPreview={handleColorPreview}
-            onClearAll={handleClearAll}
-            stageRef={stageRef}
-            layout="sidebar"
-            onGalleryStateChange={setGalleryOpen}
-          />
+        <EditorToolbar
+          pid={pid}
+          selectedId={selectedId}
+          imageUrl={imageUrl}
+          targetDots={targetDots}
+          setTargetDots={setTargetDots}
+          processing={processing}
+          onTransform={handleTransform}
+          isUnityVisible={isUnityVisible}
+          showUnity={showUnity}
+          hideUnity={hideUnity}
+          onImageDragStart={(imageUrl) =>
+            console.log("Image drag started:", imageUrl)
+          }
+          drawingMode={drawingMode}
+          eraserSize={eraserSize}
+          drawingColor={drawingColor}
+          onModeChange={handleModeChange}
+          onColorChange={handleColorChange}
+          onColorPreview={handleColorPreview}
+          onClearAll={handleClearAll}
+          stageRef={stageRef} // stageRef prop 전달
+          layout="sidebar"
+          onGalleryStateChange={setGalleryOpen}
+        />
+        <div style={{ marginTop: "auto" }}>
+          <button
+            type="button"
+            title="프로젝트 설정"
+            aria-label="프로젝트 설정"
+            onClick={openProjectSettings}
+            disabled={!projectMeta}
+            style={{
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              padding: 8,
+              border: "1px solid #e5e7eb",
+              borderRadius: 8,
+              background: "#f9fafb",
+              color: "#374151",
+              cursor: projectMeta ? "pointer" : "not-allowed",
+            }}
+          >
+            <CiSettings size={20} />
+          </button>
+
         </div>
       </aside>
 
@@ -614,6 +664,14 @@ export default function EditorPage({ projectId = DUMMY }) {
           />
         </div>
       </aside>
+
+      {editingProject && (
+        <ProjectSettingsModal
+          project={editingProject}
+          onClose={closeProjectSettings}
+          onSaved={handleSettingsSaved}
+        />
+      )}
     </div>
   );
 }

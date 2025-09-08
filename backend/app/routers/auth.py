@@ -18,6 +18,7 @@ from app.core import config
 from app.db.database import get_conn
 from app.db.user import get_user_by_username
 from app.dependencies import get_current_user
+from app.utils.mailer import send_email
 
 router = APIRouter()
 
@@ -91,7 +92,7 @@ async def register(payload: RegisterRequest):
         try:
             async with conn.transaction():  # ← 트랜잭션으로 묶기
                 await conn.execute(
-                    "INSERT INTO users (id, email, username, status) VALUES ($1, $2, $3, 'ACTIVE')",
+                    "INSERT INTO users (id, email, username, status, is_email_verified) VALUES ($1, $2, $3, 'ACTIVE', FALSE)",
                     user_id,
                     str(payload.email),
                     payload.username,
@@ -107,6 +108,22 @@ async def register(payload: RegisterRequest):
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Email or username already exists",
             )
+
+    # Send verification email (non-blocking if SMTP not configured)
+    verify_token = security.create_email_verification_token(user_id)
+    verify_link = f"{config.BACKEND_BASE_URL}/auth/verify?token={verify_token}"
+    subject = "Verify your email"
+    body = (
+        "Welcome to WDSS!\n\n"
+        "Please verify your email address by clicking the link below:\n"
+        f"{verify_link}\n\n"
+        f"This link expires in {config.EMAIL_VERIFY_EXPIRE_HOURS} hours.\n"
+        "If you did not sign up, you can safely ignore this email."
+    )
+    try:
+        send_email(str(payload.email), subject, body)
+    except Exception:
+        pass
 
     return RegisterResponse(id=user_id, email=payload.email, username=payload.username)
 
@@ -127,3 +144,20 @@ async def logout(response: Response):
 
     # 2. 성공 메시지를 반환합니다.
     return {"message": "Successfully logged out"}
+
+
+@router.get("/verify", response_model=MessageResponse)
+async def verify_email(token: str):
+    """Verify email by validating token and updating user record."""
+    try:
+        user_id = security.decode_email_verification_token(token)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid or expired token")
+
+    async with get_conn() as conn:
+        await conn.execute(
+            "UPDATE users SET is_email_verified = TRUE WHERE id = $1",
+            user_id,
+        )
+
+    return MessageResponse(success=True, message="Email verified successfully")
