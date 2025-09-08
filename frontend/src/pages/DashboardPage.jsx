@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import "../styles/DashboardPage.css"; // 스타일 import
 import "../styles/DashboardPage.css";
 import { CiMenuBurger } from "react-icons/ci";
+import { TiDelete } from "react-icons/ti";
 import ProjectSettingsModal from "../components/ProjectSettingsModal";
 
 
@@ -100,6 +101,19 @@ export default function DashboardPage() {
     setProjects((prev) => prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)));
   };
 
+  const handleDeleteProject = async (e, projectId, projectName) => {
+    e.stopPropagation();
+    const ok = window.confirm(`프로젝트 "${projectName}"를 삭제할까요? 이 작업은 되돌릴 수 없습니다.`);
+    if (!ok) return;
+    try {
+      await client.delete(`/projects/${projectId}`);
+      setProjects((prev) => prev.filter((p) => p.id !== projectId));
+    } catch (err) {
+      console.error("Failed to delete project:", err);
+      alert("프로젝트 삭제에 실패했습니다.");
+    }
+  };
+
   const formatDate = (dateString) => {
     const options = { year: "numeric", month: "long", day: "numeric" };
     return new Date(dateString).toLocaleDateString("ko-KR", options);
@@ -147,6 +161,15 @@ export default function DashboardPage() {
                       (e.key === "Enter" || e.key === " ") && handleProjectClick(project.id)
                     }
                   >
+                    {/* Hover delete button */}
+                    <button
+                      className="project-delete-btn"
+                      title="프로젝트 삭제"
+                      aria-label={`삭제: ${project.project_name}`}
+                      onClick={(e) => handleDeleteProject(e, project.id, project.project_name)}
+                    >
+                      <TiDelete size={22} />
+                    </button>
                     <div className="card-thumbnail">
                       <ProjectIcon />
                     </div>
@@ -187,4 +210,3 @@ export default function DashboardPage() {
     </>
   );
 }
-

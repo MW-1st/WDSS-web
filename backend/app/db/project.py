@@ -96,7 +96,30 @@ async def delete_project_by_id(
     """프로젝트 ID로 특정 프로젝트를 삭제합니다."""
     # 참고: ON DELETE CASCADE 제약조건이 설정되어 있다면 project 삭제 시 project_scenes의 관련 데이터도 자동 삭제됩니다.
     # 그렇지 않다면, project_scenes 테이블의 데이터를 먼저 삭제하는 로직이 필요합니다.
-    result = await conn.execute(
-        "DELETE FROM project WHERE id = $1 AND user_id = $2", project_id, user_id
-    )
+    async with conn.transaction():
+        # Remove project-scene relations first to satisfy FK constraints
+        await conn.execute(
+            "DELETE FROM project_scenes WHERE project_id = $1",
+            project_id,
+        )
+
+        # Cleanup orphan scenes that are no longer referenced by any project
+        await conn.execute(
+            """
+            DELETE FROM scene
+            WHERE id IN (
+                SELECT s.id
+                FROM scene s
+                LEFT JOIN project_scenes ps ON s.id = ps.scene_id
+                WHERE ps.scene_id IS NULL
+            )
+            """
+        )
+
+        # Finally delete the project (permission scoped by user_id)
+        result = await conn.execute(
+            "DELETE FROM project WHERE id = $1 AND user_id = $2",
+            project_id,
+            user_id,
+        )
     return result == "DELETE 1"
