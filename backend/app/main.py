@@ -23,23 +23,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-# CORS 헤더를 추가하는 미들웨어
-class CORSStaticFilesMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        response = await call_next(request)
-
-        # /uploads 경로에 대해 CORS 헤더 추가
-        if request.url.path.startswith("/uploads/"):
-            response.headers["Access-Control-Allow-Origin"] = "*"
-            response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
-            response.headers["Access-Control-Allow-Headers"] = "*"
-        return response
-
-
-# CORS 미들웨어 추가
-app.add_middleware(CORSStaticFilesMiddleware)
-
 # Routers
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(project.router, prefix="/projects", tags=["project"])
