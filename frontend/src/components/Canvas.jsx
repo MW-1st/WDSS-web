@@ -583,12 +583,13 @@ export default function Canvas({
   useEffect(() => {
     if (externalDrawingMode !== drawingMode) {
       setDrawingMode(externalDrawingMode);
-      // 현재 색상을 유지하면서 모드만 적용
+      // 현재 색상을 유지하면서 모드만 적용 (픽셀 지우개 모드는 예외)
       setTimeout(() => {
-        applyDrawingMode(externalDrawingMode, drawingColor);
+        applyDrawingMode(externalDrawingMode, externalDrawingMode === "pixelErase" ? null : drawingColor);
       }, 10);
     }
-  }, [externalDrawingMode, drawingColor]); // drawingColor를 의존성으로 다시 추가
+    // 픽셀 지우개 모드에서는 색상 변경으로 인한 재실행 방지
+  }, [externalDrawingMode, drawingMode === "pixelErase" ? null : drawingColor]);
 
   // 외부에서 eraserSize가 변경될 때 반응
   useEffect(() => {
@@ -602,9 +603,12 @@ export default function Canvas({
     console.log('외부 색상 변경:', externalDrawingColor, '현재 내부 색상:', drawingColor);
     if (externalDrawingColor !== drawingColor) {
       setDrawingColor(externalDrawingColor);
-      updateBrushColor(externalDrawingColor);
+      // 픽셀 지우개 모드가 아닐 때만 브러시 색상 업데이트
+      if (drawingMode !== "pixelErase") {
+        updateBrushColor(externalDrawingColor);
+      }
     }
-  }, [externalDrawingColor]);
+  }, [externalDrawingColor, drawingMode]);
 
   // 외부에서 activeLayerId가 변경될 때 반응
   useEffect(() => {
@@ -633,6 +637,12 @@ export default function Canvas({
     
     console.log('updateBrushColor 호출됨:', color);
     
+    // 픽셀 지우개 모드일 때는 색상을 변경하지 않음 (항상 배경색 사용)
+    if (drawingMode === "pixelErase") {
+      console.log('픽셀 지우개 모드에서는 색상 변경 무시');
+      return;
+    }
+    
     // 현재 그리기 브러시가 있다면 색상 업데이트
     if (canvas.freeDrawingBrush) {
       console.log('브러시 색상 업데이트:', canvas.freeDrawingBrush.color, '->', color);
@@ -647,12 +657,16 @@ export default function Canvas({
 
     const canvas = fabricCanvas.current;
 
-    const currentColor = colorOverride || drawingColor;
+    // 픽셀 지우개 모드일 때는 항상 배경색 사용
+    const currentColor = mode === "pixelErase" ? "#fafafa" : (colorOverride || drawingColor);
     console.log('applyDrawingMode 호출:', mode, '사용할 색상:', currentColor);
     
     // 이전 이벤트 리스너 정리
     if (eraseHandlers.current.wheelHandler) {
       canvas.off("mouse:wheel", eraseHandlers.current.wheelHandler);
+    }
+    if (eraseHandlers.current.pathCreatedHandler) {
+      canvas.off("path:created", eraseHandlers.current.pathCreatedHandler);
     }
     if (eraseHandlers.current.startErase) {
       canvas.off("mouse:down", eraseHandlers.current.startErase);
@@ -959,10 +973,13 @@ export default function Canvas({
       canvas.skipTargetFind = true; // 픽셀 지우개 모드에서는 대상 찾기 건너뛰기
 
       // 픽셀 지우개용 브러시 설정 (배경색으로 칠하기)
+      const backgroundColor = "#fafafa"; // 실제 캔버스 배경색 사용
       const eraserBrush = new PencilBrush(canvas);
       eraserBrush.width = eraserSize;
-      eraserBrush.color = canvas.backgroundColor || "#fafafa";
+      eraserBrush.color = backgroundColor;
       canvas.freeDrawingBrush = eraserBrush;
+      
+      console.log('픽셀 지우개 브러시 설정 - 배경색:', backgroundColor, '실제 캔버스 배경색:', canvas.backgroundColor);
 
       // 원형 커서 생성 함수
       const createPixelEraserCursor = (size) => {
@@ -1009,6 +1026,10 @@ export default function Canvas({
 
           if (canvas.freeDrawingBrush) {
             canvas.freeDrawingBrush.width = newSize;
+            // 픽셀 지우개 모드에서는 항상 배경색 유지
+            const backgroundColor = "#fafafa"; // 실제 캔버스 배경색 사용
+            canvas.freeDrawingBrush.color = backgroundColor;
+            console.log('픽셀 지우개 크기 변경 - 배경색 유지:', backgroundColor);
           }
 
           const newPixelEraserCursor = createPixelEraserCursor(newSize);
@@ -1021,9 +1042,23 @@ export default function Canvas({
         });
       };
 
-      eraseHandlers.current = { wheelHandler };
+      // 픽셀 지우개로 그린 패스를 선택 불가능하게 만들기
+      const pathCreatedHandler = (e) => {
+        if (e.path) {
+          e.path.set({
+            selectable: false,
+            evented: false,
+            excludeFromExport: false, // 내보내기에서는 제외하지 않음
+            isEraserPath: true // 지우개 패스임을 표시
+          });
+          console.log('픽셀 지우개 패스 생성 - 선택 불가능으로 설정');
+        }
+      };
+
+      eraseHandlers.current = { wheelHandler, pathCreatedHandler };
 
       canvas.on("mouse:wheel", wheelHandler);
+      canvas.on("path:created", pathCreatedHandler);
     }
   };
 
@@ -1432,7 +1467,13 @@ export default function Canvas({
       };
       externalStageRef.current.setDrawingColor = (color) => {
         setDrawingColor(color);
-        updateBrushColor(color);
+        // 현재 drawingMode 상태를 직접 확인 (클로저 문제 해결)
+        setDrawingMode(currentMode => {
+          if (currentMode !== "pixelErase") {
+            updateBrushColor(color);
+          }
+          return currentMode; // 상태는 변경하지 않고 현재 값 확인만
+        });
       };
       // 원본 상태 관리 함수 추가
       externalStageRef.current.saveOriginalCanvasState = saveOriginalCanvasState;
