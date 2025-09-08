@@ -34,6 +34,8 @@ export default function Canvas({
   const [drawingMode, setDrawingMode] = useState(externalDrawingMode);
   const [eraserSize, setEraserSize] = useState(externalEraserSize);
   const [drawingColor, setDrawingColor] = useState(externalDrawingColor);
+  const currentColorRef = useRef(externalDrawingColor);
+  useEffect(() => { currentColorRef.current = externalDrawingColor; }, [externalDrawingColor]);
   const eraseHandlers = useRef({});
   const selectionHandlers = useRef({});
   const onSelectionChangeRef = useRef(onSelectionChange);
@@ -682,6 +684,7 @@ export default function Canvas({
     const canvas = fabricCanvas.current;
 
     const currentColor = colorOverride || drawingColor;
+    currentColorRef.current = currentColor;
     console.log('applyDrawingMode 호출:', mode, '사용할 색상:', currentColor);
     
     // 이전 이벤트 리스너 정리
@@ -762,11 +765,11 @@ export default function Canvas({
           left: pointer.x - dotRadius,
           top: pointer.y - dotRadius,
           radius: dotRadius,
-          fill: currentColor, // 현재 색상 사용
+          fill: currentColorRef.current || currentColor, // 현재 색상 사용
           selectable: false,
           evented: true,
           customType: 'drawnDot', // 그려진 도트로 구분
-          originalFill: currentColor, // 원본 색상 정보 보존
+          originalFill: currentColorRef.current || currentColor, // 원본 색상 정보 보존
           hoverCursor: 'crosshair',
           moveCursor: 'crosshair'
         });

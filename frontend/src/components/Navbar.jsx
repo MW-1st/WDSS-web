@@ -209,9 +209,9 @@ export default function Navbar({ transparent: propTransparent = false }) {
           </Link>
           <Link
             className="hover:underline underline-offset-4 decoration-2"
-            to="/editor"
+            to=""
           >
-            Editor
+            Introduce
           </Link>
           {!isAuthenticated && (
             <Link

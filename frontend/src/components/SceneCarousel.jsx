@@ -2,7 +2,6 @@ import React from "react";
 import { useParams } from "react-router-dom";
 import client from "../api/client";
 import { getImageUrl } from "../utils/imageUtils";
-import { MdDelete } from "react-icons/md";
 
 const VISIBLE = 4;
 const BTN_SIZE = 48;
@@ -12,7 +11,7 @@ function clamp(n, min, max) {
 }
 
 export default React.memo(function SceneCarousel({
-  projectId: projectIdProp,      // ?�선?�위 1
+  projectId: projectIdProp,      // 우선순위 1
   scenes,                        // [{id, name, preview, project_id?}, ...]
   setScenes,
   selectedId,
@@ -22,10 +21,10 @@ export default React.memo(function SceneCarousel({
   onAddScene,
   compact = false,
 }) {
-  // URL ?�라미터 ?�선?�위 2 (????지??
+  // URL 파라미터 우선순위 2 (둘 다 지원)
   const { projectId: projectIdFromUrl, project_id: projectIdFromUrl2 } = useParams();
 
-  // ?�에??추론 ?�선?�위 3
+  // 씬에서 추론 우선순위 3
   const projectIdFromScenes = React.useMemo(() => {
     const found = scenes.find((s) => s.project_id || s.projectId);
     return found ? (found.project_id ?? found.projectId) : undefined;
@@ -54,9 +53,9 @@ export default React.memo(function SceneCarousel({
     const containerW = el.getBoundingClientRect().width;
 
     // Slightly smaller thumbnails to make room for external arrows
-    const MIN_W = compact ? 170 : 200;
-    const MAX_W = compact ? 230 : 260;
-    const GAP = compact ? 22 : 36;
+    const MIN_W = compact ? 150 : 180;
+    const MAX_W = compact ? 200 : 220;
+    const GAP = compact ? 24 : 40;
 
     // Reserve space for navigation buttons on both sides
     const RESERVED_SIDE = BTN_SIZE + 20; // px
@@ -109,10 +108,10 @@ export default React.memo(function SceneCarousel({
     if (idx >= start + VISIBLE) setStart(idx - VISIBLE + 1);
   };
 
-  // ---------- ?�버 ?�신 ?�틸 (axios client ?�용) ----------
+  // ---------- 서버 통신 유틸 (axios client 사용) ----------
   const fetchScenes = async () => {
-    if (!projectId) throw new Error("project_id가 비어?�습?�다");
-    // Swagger: GET /projects/{project_id}/scenes/  (?�레?�링 ?�래??O)
+    if (!projectId) throw new Error("project_id가 비어있습니다");
+    // Swagger: GET /projects/{project_id}/scenes/  (트레일링 슬래시 O)
     const { data } = await client.get(`/projects/${projectId}/scenes`);
     const mapped = Array.isArray(data)
       ? data.map((s, i) => ({
@@ -128,7 +127,7 @@ export default React.memo(function SceneCarousel({
 
   // Unified fetch that tolerates API shape and normalizes fields
   const fetchScenesNormalized = async () => {
-    if (!projectId) throw new Error("project_id가 비어?�습?�다");
+    if (!projectId) throw new Error("project_id가 비어있습니다");
     const { data } = await client.get(`/projects/${projectId}/scenes`);
     const list = Array.isArray(data) ? data : (data?.scenes ?? []);
     const mapped = list.map((s, i) => ({
@@ -144,8 +143,8 @@ export default React.memo(function SceneCarousel({
   };
 
   const deleteSceneOnServer = async (sceneId) => {
-    if (!projectId) throw new Error("project_id가 비어?�습?�다");
-    // Swagger: DELETE /projects/{project_id}/scenes/{scene_id} (보통 ?�래??X)
+    if (!projectId) throw new Error("project_id가 비어있습니다");
+    // Swagger: DELETE /projects/{project_id}/scenes/{scene_id} (보통 슬래시 X)
     await client.delete(`/projects/${projectId}/scenes/${sceneId}`);
     return true;
   };
@@ -163,24 +162,24 @@ export default React.memo(function SceneCarousel({
     if (item.isAdd) return;
 
     if (!projectId) {
-      alert("??��???�패?�습?�다.\n?�인: project_id가 비어?�습?�다.\n?�결: SceneCarousel??projectId�?prop?�로 ?�기거나, URL??/projects/:project_id ?�태�??�달?�세??");
+      alert("삭제에 실패했습니다.\n원인: project_id가 비어있습니다.\n해결: SceneCarousel에 projectId를 prop으로 넘기거나, URL에 /projects/:project_id 형태로 전달하세요.");
       return;
     }
 
-    if (!window.confirm(`"${item.name ?? "Scene"}" ?�을 ??��?�까??`)) return;
+    if (!window.confirm(`"${item.name ?? "Scene"}" 씬을 삭제할까요?`)) return;
 
     try {
-      // 1) ?�버???�제 ??��
+      // 1) 서버에 실제 삭제
       await deleteSceneOnServer(item.id);
 
-      // 2) ??��????기�? ?�웃 ?�택 준�??�조???�에 계산)
+      // 2) 삭제된 씬 기준 이웃 선택 준비(재조회 전에 계산)
       const neighbor = selectedId === item.id ? pickNeighbor(item.id, scenes) : selectedId;
 
-      // 3) ?�버?�서 최신 목록 ?�시 받아??반영
+      // 3) 서버에서 최신 목록 다시 받아서 반영
       const newList = await fetchScenesNormalized();
       onSelectScene?.(neighbor && newList.some((x) => x.id === neighbor) ? neighbor : newList[0]?.id ?? null);
 
-      // 4) start 보정 (�??�이??= ??개수 + ?�추가??1)
+      // 4) start 보정 (총 아이템 = 씬 개수 + “추가” 1)
       const totalNext = newList.length + 1;
       const maxStart = Math.max(0, totalNext - VISIBLE);
       if (start > maxStart) setStart(maxStart);
@@ -191,12 +190,12 @@ export default React.memo(function SceneCarousel({
         err?.response?.data?.detail ||
         err?.response?.data?.message ||
         err.message ||
-        "?????�는 ?�류";
+        "알 수 없는 오류";
       alert(
         [
-          "??��???�패?�습?�다.",
-          `?�인: ${status ? status + " " : ""}${msg}`,
-          `?�인: project_id=${projectId}, scene_id=${item.id}`,
+          "삭제에 실패했습니다.",
+          `원인: ${status ? status + " " : ""}${msg}`,
+          `확인: project_id=${projectId}, scene_id=${item.id}`,
         ].join("\n")
       );
     }
@@ -245,8 +244,8 @@ export default React.memo(function SceneCarousel({
         <button
           type="button"
           onClick={(e) => handleDeleteClick(e, item)}
-          aria-label="????��"
-          title="????��"
+          aria-label="씬 삭제"
+          title="씬 삭제"
           style={{
             position: "absolute",
             top: 6,
@@ -264,12 +263,12 @@ export default React.memo(function SceneCarousel({
             lineHeight: "1",
             cursor: "pointer",
           }}
-        >\r\n          <MdDelete size={16} color="#6b7280" />\r\n        </button>
+        >
+          🗑
+        </button>
       </div>
     );
   };
-
-  const NAV_PAD = (compact ? 40 : BTN_SIZE) + 18;
 
   return (
     <section
@@ -285,8 +284,8 @@ export default React.memo(function SceneCarousel({
             left: `${dims.leftBtnX}px`,
             top: "50%",
             transform: "translateY(-50%)",
-            width: (compact ? 40 : BTN_SIZE),
-            height: (compact ? 40 : BTN_SIZE),
+            width: BTN_SIZE,
+            height: BTN_SIZE,
             borderRadius: "50%",
             border: "1px solid #cfcfe6",
             background: "#fff",
@@ -303,21 +302,21 @@ export default React.memo(function SceneCarousel({
             cursor: startClamped === 0 ? "not-allowed" : "pointer",
             zIndex: 1,
           }}
-          aria-label="?�전"
-          title="?�전"
+          aria-label="이전"
+          title="이전"
         >
-          ??
+          ‹
         </button>
       )}
 
-      <div style={{ display: "flex", justifyContent: "center", gap: dims.gap, paddingLeft: NAV_PAD, paddingRight: NAV_PAD }}>
+      <div style={{ display: "flex", justifyContent: "center", gap: dims.gap, paddingLeft: BTN_SIZE + 24, paddingRight: BTN_SIZE + 24 }}>
         {visibleItems.map((item) =>
           item.isAdd ? (
             <button
               key="__ADD__"
               onClick={onAddScene}
-              aria-label="??추�??�기"
-              title="??추�??�기"
+              aria-label="씬 추가하기"
+              title="씬 추가하기"
               style={{
                 width: dims.thumbW,
                 height: dims.thumbH,
@@ -346,8 +345,8 @@ export default React.memo(function SceneCarousel({
             right: `${dims.rightBtnX}px`,
             top: "50%",
             transform: "translateY(-50%)",
-            width: (compact ? 40 : BTN_SIZE),
-            height: (compact ? 40 : BTN_SIZE),
+            width: BTN_SIZE,
+            height: BTN_SIZE,
             borderRadius: "50%",
             border: "1px solid #cfcfe6",
             background: "#fff",
@@ -364,14 +363,12 @@ export default React.memo(function SceneCarousel({
             cursor: startClamped >= total - VISIBLE ? "not-allowed" : "pointer",
             zIndex: 1,
           }}
-          aria-label="?�음"
-          title="?�음"
+          aria-label="다음"
+          title="다음"
         >
-          ??
+          ›
         </button>
       )}
     </section>
   );
 });
-
-
