@@ -51,6 +51,18 @@ export default function Canvas({
     getSortedLayers
   } = useLayers();
 
+  // 클로저(closure) 문제 해결을 위한 ref
+  // 이벤트 핸들러가 항상 최신 값을 참조하도록 보장
+  const activeLayerIdRef = useRef(activeLayerId);
+  useEffect(() => {
+    activeLayerIdRef.current = activeLayerId;
+  }, [activeLayerId]);
+
+  const layersRef = useRef(layers);
+  useEffect(() => {
+    layersRef.current = layers;
+  }, [layers]);
+
   // Use useLayoutEffect to initialize the canvas
   useLayoutEffect(() => {
     if (!canvasRef.current) return;
@@ -247,80 +259,41 @@ export default function Canvas({
 
     // 패스 생성 이벤트 리스너 (그리기 모드에서 레이어 정보 할당)
     const handlePathCreated = (e) => {
-      console.log('🎨 PATH CREATED EVENT FIRED! 🎨');
-      
       const path = e.path;
       if (path) {
-        // 클로저 문제 해결: 최신 상태를 externalStageRef에서 가져오기
-        let currentActiveLayerId = null;
-        let currentLayers = [];
-        
-        if (externalStageRef?.current?.layers) {
-          try {
-            currentActiveLayerId = externalStageRef.current.layers.getActiveLayerId();
-            currentLayers = externalStageRef.current.layers.getLayers();
-            console.log('🔄 Latest from stageRef - activeLayerId:', currentActiveLayerId);
-            console.log('🔄 Latest from stageRef - layers:', currentLayers.map(l => ({ id: l.id, name: l.name })));
-          } catch (error) {
-            console.warn('Error getting latest state from stageRef:', error);
-          }
-        }
-        
-        // 폴백: 클로저 상태 사용
-        if (!currentActiveLayerId) {
-          currentActiveLayerId = activeLayerId;
-          currentLayers = layers;
-          console.log('📦 Using closure state - activeLayerId:', currentActiveLayerId);
-        }
-        
+        // 클로저 문제를 피하기 위해 ref에서 최신 값을 가져옴
+        const currentActiveLayerId = activeLayerIdRef.current;
+        const currentLayers = layersRef.current;
         const activeLayer = currentLayers.find(layer => layer.id === currentActiveLayerId);
-        console.log('🎯 Active layer found:', activeLayer);
+        console.log('🎨 Path created - using activeLayerId:', currentActiveLayerId, 'layer:', activeLayer?.name);
         
         if (activeLayer) {
-          console.log('✅ Assigning path to layer:', activeLayer.id, activeLayer.name);
           fabricLayerUtils.assignObjectToLayer(path, activeLayer.id, activeLayer.name);
-          
-          // 할당 후 확인
-          console.log('📝 Path after assignment - layerId:', path.layerId, 'layerName:', path.layerName);
-          
-          // 레이어 순서에 맞게 캔버스 객체 재정렬
-          setTimeout(() => {
-            const sortedLayers = getSortedLayers();
-            fabricLayerUtils.reorderObjectsByLayers(canvas, sortedLayers);
-            console.log('🔄 Canvas objects reordered after path creation');
-          }, 10);
+          console.log('✅ Path assigned to layer:', activeLayer.name);
         } else {
-          console.warn('❌ No active layer found - using fallback');
-          const fallbackLayer = currentLayers.find(l => l.type === 'drawing');
-          if (fallbackLayer) {
-            fabricLayerUtils.assignObjectToLayer(path, fallbackLayer.id, fallbackLayer.name);
-            console.log('🔄 Fallback layer assigned:', fallbackLayer.id, fallbackLayer.name);
-          }
+          console.error('❌ Path assignment failed - no active layer found!');
+          console.log('Debug info:', {
+            refActiveLayerId: currentActiveLayerId,
+            externalActiveLayerId,
+            internalActiveLayerId: activeLayerId,
+            availableLayers: currentLayers.map(l => ({id: l.id, name: l.name, type: l.type}))
+          });
         }
-      } else {
-        console.warn('❌ No path in path:created event');
       }
-      console.log('🏁 PATH CREATED DEBUG END');
     };
 
     // 객체 추가 이벤트 리스너 (모든 객체에 대해 레이어 할당)
     const handleObjectAdded = (e) => {
-      console.log('Object added event:', e);
       const obj = e.target;
       if (obj && !obj.layerId) { // 레이어 정보가 없는 객체만 처리
-        // 이미지와 동일한 로직: getActiveLayer() 사용
-        const activeLayer = getActiveLayer();
-        console.log('Active layer for object:', activeLayer);
+        // 클로저 문제를 피하기 위해 ref에서 최신 값을 가져옴
+        const currentActiveLayerId = activeLayerIdRef.current;
+        const currentLayers = layersRef.current;
+        const activeLayer = currentLayers.find(layer => layer.id === currentActiveLayerId);
+        
         if (activeLayer) {
           fabricLayerUtils.assignObjectToLayer(obj, activeLayer.id, activeLayer.name);
-          console.log('Layer assigned to object:', activeLayer.id, activeLayer.name);
-          
-          // 레이어 순서에 맞게 캔버스 객체 재정렬
-          setTimeout(() => {
-            const sortedLayers = getSortedLayers();
-            fabricLayerUtils.reorderObjectsByLayers(canvas, sortedLayers);
-            console.log('🔄 Canvas objects reordered after object added');
-          }, 10);
+          console.log('Object assigned to layer:', activeLayer.name);
         }
       }
     };
@@ -605,7 +578,12 @@ export default function Canvas({
 
       const drawDotAtPoint = (e) => {
         const pointer = canvas.getPointer(e.e);
-        const activeLayer = getActiveLayer();
+        // 클로저 문제를 피하기 위해 ref에서 최신 값을 가져옴
+        const currentActiveLayerId = activeLayerIdRef.current;
+        const currentLayers = layersRef.current;
+        const activeLayer = currentLayers.find(layer => layer.id === currentActiveLayerId);
+
+        console.log('🎨 Dot created - using activeLayerId:', currentActiveLayerId, 'layer:', activeLayer?.name);
 
         // 새로운 도트 생성 (SVG circle과 같은 크기 2px 사용)
         const dotRadius = 1;
@@ -985,8 +963,11 @@ export default function Canvas({
           centeredRotation: true,
         });
 
-        // 드롭된 이미지는 활성 레이어에 할당
-        const activeLayer = getActiveLayer();
+        // 드롭된 이미지는 활성 레이어에 할당  
+        const currentActiveLayerId = externalActiveLayerId;
+        const activeLayer = layers.find(layer => layer.id === currentActiveLayerId);
+        console.log('🖼️ Image dropped - using activeLayerId:', currentActiveLayerId, 'layer:', activeLayer?.name);
+        
         if (activeLayer) {
           fabricLayerUtils.assignObjectToLayer(img, activeLayer.id, activeLayer.name);
         }
@@ -1280,10 +1261,13 @@ export default function Canvas({
           console.log('Canvas reorderLayers called:', draggedLayerId, targetLayerId);
           reorderLayers(draggedLayerId, targetLayerId);
           
-          // 레이어 순서가 변경되면 캔버스 객체도 재정렬
+          // 레이어 순서가 변경되면 캔버스 객체도 재정렬 (상태 업데이트 대기)
           if (fabricCanvas.current) {
-            const sortedLayers = getSortedLayers();
-            fabricLayerUtils.reorderObjectsByLayers(fabricCanvas.current, sortedLayers);
+            setTimeout(() => {
+              const sortedLayers = getSortedLayers();
+              console.log('🔄 Reordering canvas objects after layer reorder');
+              fabricLayerUtils.reorderObjectsByLayers(fabricCanvas.current, sortedLayers);
+            }, 50);
           }
         }
       };

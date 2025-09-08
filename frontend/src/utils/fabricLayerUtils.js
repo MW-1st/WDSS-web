@@ -235,52 +235,21 @@ export const deleteLayerObjects = (canvas, layerId) => {
  * @param {Array} layerOrder - zIndex 순으로 정렬된 레이어 배열
  */
 export const reorderObjectsByLayers = (canvas, layerOrder) => {
-  console.log('=== reorderObjectsByLayers DEBUG ===');
-  console.log('Input layerOrder:', layerOrder.map(l => ({ id: l.id, name: l.name, zIndex: l.zIndex })));
-  
   const allObjects = canvas.getObjects();
-  console.log('Current canvas objects:', allObjects.map(obj => ({ 
-    layerId: obj.layerId, 
-    layerName: obj.layerName,
-    type: obj.type 
-  })));
-  
   const orderedObjects = [];
   
-  // 레이어 순서를 역순으로 처리 (UI에서 위에 있는 레이어가 Canvas에서도 위에 오도록)
-  const reversedOrder = [...layerOrder].reverse();
-  console.log('Reversed layerOrder:', reversedOrder.map(l => ({ id: l.id, name: l.name, zIndex: l.zIndex })));
-  
-  reversedOrder.forEach(layer => {
+  // 레이어 순서대로 객체 정렬 (높은 zIndex부터 - UI 상단 레이어부터)
+  layerOrder.forEach(layer => {
     const layerObjects = allObjects.filter(obj => obj.layerId === layer.id);
-    console.log(`Layer ${layer.name} has ${layerObjects.length} objects`);
     orderedObjects.push(...layerObjects);
   });
   
-  // 레이어가 할당되지 않은 객체들도 추가
+  // 레이어가 할당되지 않은 객체들은 맨 아래에
   const unassignedObjects = allObjects.filter(obj => !obj.layerId);
-  orderedObjects.push(...unassignedObjects);
+  orderedObjects.unshift(...unassignedObjects);
   
-  // 캔버스에서 모든 객체 제거
+  // 캔버스 재구성
   canvas.clear();
-  
-  // 순서대로 다시 추가
-  console.log('Final ordered objects:', orderedObjects.map(obj => ({ 
-    layerId: obj.layerId, 
-    layerName: obj.layerName,
-    type: obj.type 
-  })));
-  
-  orderedObjects.forEach(obj => {
-    canvas.add(obj);
-  });
-  
-  console.log('After reordering - canvas objects:', canvas.getObjects().map(obj => ({ 
-    layerId: obj.layerId, 
-    layerName: obj.layerName,
-    type: obj.type 
-  })));
-  console.log('=== reorderObjectsByLayers DEBUG END ===');
-  
+  orderedObjects.forEach(obj => canvas.add(obj));
   canvas.renderAll();
 };
