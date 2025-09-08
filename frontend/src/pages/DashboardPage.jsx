@@ -51,6 +51,21 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [editingProject, setEditingProject] = useState(null);
   const [creating, setCreating] = useState(false);
+  const [bannerUrl, setBannerUrl] = useState("/img/banner_01.png");
+
+  // Pick a random banner when the dashboard mounts
+  useEffect(() => {
+    const candidates = [
+      "/img/banner_01.png",
+      "/img/banner_02.png",
+      "/img/banner_03.png",
+      "/img/banner_04.png",
+      "/img/banner_05.png",
+    ];
+    const idx = Math.floor(Math.random() * candidates.length);
+    setBannerUrl(candidates[idx]);
+  }, []);
+
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -117,7 +132,9 @@ export default function DashboardPage() {
   return (
     <>
       <div className="dashboard-container">
-        <header className="dashboard-header">
+        <div className="hero" style={{ height: 240 }}>
+          <img src={bannerUrl} alt="banner" className="hero-bg" />
+          <header className="dashboard-header">
           <h2 className="welcome-message">{user.username}님 안녕하세요</h2>
           <p className="welcome-sub-message">새 작업을 시작하거나 기존 프로젝트를 확인하세요.</p>
 
@@ -127,7 +144,8 @@ export default function DashboardPage() {
               <span>새 프로젝트 생성</span>
             </button>
           </div>
-        </header>
+          </header>
+        </div>
 
         <main className="dashboard-main">
           <section className="section">
