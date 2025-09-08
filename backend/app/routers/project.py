@@ -190,9 +190,9 @@ async def export_project_to_json(
         # scene_holder 계산: 다음 씬까지의 간격
         if i < len(scenes) - 1:  # 마지막 씬이 아닌 경우
             next_scene_num = scenes[i + 1]["scene_num"]
-            scene_holder = next_scene_num - scene_num
+            scene_holder = next_scene_num - scene_num - 1
         else:  # 마지막 씬인 경우
-            scene_holder = 1  # 기본값 또는 DB에서 설정된 기본 지속시간
+            scene_holder = 0  # 기본값 또는 DB에서 설정된 기본 지속시간
 
         # processed 파일 경로
         processed_path = os.path.join(PROCESSED_DIR, f"{scene_id}.svg")
