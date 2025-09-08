@@ -1,23 +1,44 @@
-import { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import { useState, useEffect } from "react";
+import { useAuth } from "../contexts/AuthContext";
 import client from "../api/client.js";
 import { useNavigate } from "react-router-dom";
+import "../DashboardPage.css";
+import { CiMenuBurger } from "react-icons/ci";
+import ProjectSettingsModal from "../components/ProjectSettingsModal";
 
-// 아이콘을 위한 간단한 SVG 컴포넌트 (파일 상단에 추가)
 const PlusIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
     <line x1="12" y1="5" x2="12" y2="19"></line>
     <line x1="5" y1="12" x2="19" y2="12"></line>
   </svg>
 );
 
 const ProjectIcon = () => (
-    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#e0e0e0" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
-        <polyline points="13 2 13 9 20 9"></polyline>
-    </svg>
+  <svg
+    width="48"
+    height="48"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="#e0e0e0"
+    strokeWidth="1"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
+    <polyline points="13 2 13 9 20 9"></polyline>
+  </svg>
 );
-
 
 export default function DashboardPage() {
   const { isAuthenticated, user } = useAuth();
@@ -25,40 +46,40 @@ export default function DashboardPage() {
 
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [editingProject, setEditingProject] = useState(null);
 
   useEffect(() => {
-    if (isAuthenticated) {
-      const fetchProjects = async () => {
-        try {
-          const response = await client.get('/projects');
-          setProjects(response.data.projects);
-        } catch (error) {
-          console.error("Failed to fetch projects:", error);
-        } finally {
-          setLoading(false);
-        }
-      };
-      fetchProjects();
-    } else {
+    if (!isAuthenticated) {
       setLoading(false);
+      return;
     }
+    (async () => {
+      try {
+        const res = await client.get("/projects");
+        setProjects(res.data.projects);
+      } catch (err) {
+        console.error("Failed to fetch projects:", err);
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [isAuthenticated]);
 
   const handleCreateProject = async () => {
     try {
-        const newProjectData = {
-          project_name: "새로운 프로젝트",
-          format: "dsj",
-          max_scene: 15,
-          max_speed: 6.0,
-          max_accel: 3.0,
-          min_separation: 2.0
-        };
-        const response = await client.post('/projects', newProjectData);
-        const projectId = response.data.project.id;
-        navigate(`/projects/${projectId}`);
+      const newProjectData = {
+        project_name: "새 프로젝트",
+        format: "dsj",
+        max_scene: 15,
+        max_speed: 6.0,
+        max_accel: 3.0,
+        min_separation: 2.0,
+      };
+      const res = await client.post("/projects", newProjectData);
+      const projectId = res.data.project.id;
+      navigate(`/projects/${projectId}`);
     } catch (error) {
-        console.error("Project creation failed:", error);
+      console.error("Project creation failed:", error);
     }
   };
 
@@ -66,161 +87,102 @@ export default function DashboardPage() {
     navigate(`/projects/${projectId}`);
   };
 
-  // 날짜 포맷팅 함수
+  const openSettings = (e, project) => {
+    e.stopPropagation();
+    setEditingProject(project);
+  };
+
+  const closeSettings = () => setEditingProject(null);
+
+  const handleSaved = (updated) => {
+    setProjects((prev) => prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)));
+  };
+
   const formatDate = (dateString) => {
-    const options = { year: 'numeric', month: 'long', day: 'numeric' };
-    return new Date(dateString).toLocaleDateString('ko-KR', options);
+    const options = { year: "numeric", month: "long", day: "numeric" };
+    return new Date(dateString).toLocaleDateString("ko-KR", options);
   };
 
   if (!isAuthenticated) {
     return (
-      <div style={styles.container}>
+      <div className="dashboard-container">
         <p>로그인이 필요합니다.</p>
       </div>
     );
   }
 
   return (
-    <div style={styles.container}>
-      {/* --- 헤더 --- */}
-      <header style={styles.header}>
-        <h2 style={styles.welcomeMessage}>{user.username}님, 안녕하세요!</h2>
-        <p style={styles.welcomeSubMessage}>새로운 작업을 시작하거나 기존 프로젝트를 확인하세요.</p>
-      </header>
+    <>
+      <div className="dashboard-container">
+        <header className="dashboard-header">
+          <h2 className="welcome-message">{user.username}님 안녕하세요</h2>
+          <p className="welcome-sub-message">새 작업을 시작하거나 기존 프로젝트를 확인하세요.</p>
 
-      {/* --- 새 프로젝트 생성 섹션 --- */}
-      <div style={styles.actions}>
-        <button onClick={handleCreateProject} style={styles.createButton}>
-          <PlusIcon />
-          <span>새 프로젝트 생성</span>
-        </button>
+          <div className="dashboard-actions">
+            <button onClick={handleCreateProject} className="create-button">
+              <PlusIcon />
+              <span>새 프로젝트 생성</span>
+            </button>
+          </div>
+        </header>
+
+        <main className="dashboard-main">
+          <section className="section">
+            <h3 className="section-title">내 워크스페이스</h3>
+
+            {loading ? (
+              <p>프로젝트를 불러오는 중입니다...</p>
+            ) : projects.length > 0 ? (
+              <div className="project-grid">
+                {projects.map((project) => (
+                  <div
+                    key={project.id}
+                    className="project-card"
+                    onClick={() => handleProjectClick(project.id)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) =>
+                      (e.key === "Enter" || e.key === " ") && handleProjectClick(project.id)
+                    }
+                  >
+                    <div className="card-thumbnail">
+                      <ProjectIcon />
+                    </div>
+                    <div className="card-body">
+                      <div className="flex items-start justify-between gap-2">
+                        <h4 className="card-title">{project.project_name}</h4>
+                        <button
+                          className="shrink-0 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded p-1"
+                          title="프로젝트 설정"
+                          onClick={(e) => openSettings(e, project)}
+                          aria-label={`설정: ${project.project_name}`}
+                        >
+                          <CiMenuBurger size={18} />
+                        </button>
+                      </div>
+                      <p className="card-date">생성일 {formatDate(project.created_at)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="empty-state">
+                <p>아직 생성된 프로젝트가 없네요.</p>
+                <p>'새 프로젝트 생성' 버튼을 눌러 프로젝트를 시작해보세요!</p>
+              </div>
+            )}
+          </section>
+        </main>
       </div>
 
-      {/* --- 프로젝트 목록 섹션 --- */}
-      <main style={styles.mainContent}>
-        <h3 style={styles.sectionTitle}>내 워크스페이스</h3>
-        {loading ? (
-          <p>프로젝트를 불러오는 중입니다...</p>
-        ) : projects.length > 0 ? (
-          <div style={styles.projectGrid}>
-            {projects.map((project) => (
-              <div
-                key={project.id}
-                style={styles.projectCard}
-                onClick={() => handleProjectClick(project.id)}
-              >
-                <div style={styles.cardThumbnail}>
-                  <ProjectIcon />
-                </div>
-                <div style={styles.cardBody}>
-                  <h4 style={styles.cardTitle}>{project.project_name}</h4>
-                  <p style={styles.cardDate}>생성일: {formatDate(project.created_at)}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div style={styles.emptyState}>
-            <p>아직 생성된 프로젝트가 없네요.</p>
-            <p>'새 프로젝트 생성' 버튼을 눌러 첫 프로젝트를 시작해보세요!</p>
-          </div>
-        )}
-      </main>
-    </div>
+      {editingProject && (
+        <ProjectSettingsModal
+          project={editingProject}
+          onClose={closeSettings}
+          onSaved={handleSaved}
+        />
+      )}
+    </>
   );
 }
 
-// --- 스타일 객체 (CSS-in-JS) ---
-const styles = {
-  container: {
-    padding: '24px 48px',
-    fontFamily: "'Pretendard', sans-serif", // (선택) Pretendard 같은 깔끔한 폰트 추천
-    backgroundColor: '#f8f9fa',
-    minHeight: '100vh',
-  },
-  header: {
-    marginBottom: '24px',
-  },
-  welcomeMessage: {
-    fontSize: '2.25rem',
-    fontWeight: '700',
-    color: '#212529',
-    margin: '0 0 8px 0',
-  },
-  welcomeSubMessage: {
-    fontSize: '1rem',
-    color: '#6c757d',
-    margin: 0,
-  },
-  actions: {
-    marginBottom: '40px',
-  },
-  createButton: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '12px 24px',
-    fontSize: '1rem',
-    fontWeight: '600',
-    color: '#fff',
-    backgroundColor: '#007bff',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    boxShadow: '0 4px 6px rgba(0, 123, 255, 0.1)',
-    transition: 'all 0.2s ease',
-  },
-  mainContent: {},
-  sectionTitle: {
-    fontSize: '1.5rem',
-    fontWeight: '600',
-    color: '#343a40',
-    borderBottom: '1px solid #dee2e6',
-    paddingBottom: '12px',
-    marginBottom: '24px',
-  },
-  projectGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-    gap: '24px',
-  },
-  projectCard: {
-    backgroundColor: '#fff',
-    borderRadius: '12px',
-    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)',
-    overflow: 'hidden',
-    cursor: 'pointer',
-    transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  cardThumbnail: {
-    backgroundColor: '#f1f3f5',
-    height: '160px',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cardBody: {
-    padding: '16px 20px',
-    flexGrow: 1,
-  },
-  cardTitle: {
-    fontSize: '1.1rem',
-    fontWeight: '600',
-    margin: '0 0 8px 0',
-    color: '#212529',
-  },
-  cardDate: {
-    fontSize: '0.875rem',
-    color: '#868e96',
-    margin: 0,
-  },
-  emptyState: {
-    textAlign: 'center',
-    padding: '48px',
-    backgroundColor: '#fff',
-    borderRadius: '12px',
-    color: '#6c757d',
-  }
-};

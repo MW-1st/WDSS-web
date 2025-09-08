@@ -2,10 +2,13 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import EditorToolbar from "../components/EditorToolbar.jsx";
 import MainCanvasSection from "../components/MainCanvasSection.jsx";
 import SceneCarousel from "../components/SceneCarousel.jsx";
+]import ObjectPropertiesPanel from "../components/ObjectPropertiesPanel.jsx";
 import client from "../api/client";
 import { getImageUrl } from '../utils/imageUtils';
 import { useUnity } from "../contexts/UnityContext.jsx";
 import { useParams } from "react-router-dom";
+import { CiSettings } from "react-icons/ci";
+import ProjectSettingsModal from "../components/ProjectSettingsModal";
 
 const VISIBLE = 4;
 const THUMB_W = 200;
@@ -36,6 +39,7 @@ export default function EditorPage({ projectId = DUMMY }) {
   const [pid, setPid] = useState(project_id);
   const [scenes, setScenes] = useState([]);
   const [projectName, setProjectName] = useState("");
+  const [projectMeta, setProjectMeta] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
   const [start, setStart] = useState(0);
 
@@ -43,7 +47,7 @@ export default function EditorPage({ projectId = DUMMY }) {
   // const [imageUrl, setImageUrl] = useState(""); // 현재 표시되는 이미지 (변환된 결과)
   const [processing, setProcessing] = useState(false);
   const [targetDots, setTargetDots] = useState(2000);
-  
+
   // 원본 캔버스 상태 관리
   // const [originalCanvasState, setOriginalCanvasState] = useState(null);
   const stageRef = useRef(null);
@@ -52,6 +56,18 @@ export default function EditorPage({ projectId = DUMMY }) {
   const [drawingMode, setDrawingMode] = useState("draw");
   const [eraserSize, setEraserSize] = useState(20);
   const [drawingColor, setDrawingColor] = useState('#222222');
+  const [selectedObject, setSelectedObject] = useState(null);
+
+  // 프로젝트 설정 모달 상태
+  const [editingProject, setEditingProject] = useState(null);
+  const openProjectSettings = () => {
+    if (projectMeta) setEditingProject(projectMeta);
+  };
+  const closeProjectSettings = () => setEditingProject(null);
+  const handleSettingsSaved = (updated) => {
+    setProjectMeta(updated);
+    if (updated?.project_name) setProjectName(updated.project_name);
+  };
 
   const selectedScene = useMemo(
   () => scenes.find((s) => s.id === selectedId) || null,
@@ -61,7 +77,8 @@ export default function EditorPage({ projectId = DUMMY }) {
   // 방금 삭제한 상태들 대신, 아래 두 줄로 정보를 파생시킵니다.
   const imageUrl = selectedScene?.displayUrl || getImageUrl(selectedScene?.s3_key) || "";
   const originalCanvasState = selectedScene ? selectedScene.originalCanvasState : null;
-  
+
+
   // 색상이 변경될 때 즉시 캔버스에 반영
   useEffect(() => {
     if (stageRef.current && stageRef.current.setDrawingColor) {
@@ -102,8 +119,10 @@ export default function EditorPage({ projectId = DUMMY }) {
     // Load project meta (name)
     (async () => {
       try {
-        const { data: proj } = await client.get(`/projects/${pid}`);
-        if (proj?.project_name) setProjectName(proj.project_name);
+        const { data } = await client.get(`/projects/${pid}`);
+        const p = data?.project ?? data;
+        if (p?.project_name) setProjectName(p.project_name);
+        if (p) setProjectMeta(p);
       } catch (e) {
         // Leave default if fetch fails
         console.warn(
@@ -188,11 +207,21 @@ export default function EditorPage({ projectId = DUMMY }) {
   }, 500);
 
   // Canvas → 변경 반영
-  const handleSceneChange = React.useCallback((id, patch) => {
-    setScenes((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
-    saveDebounced(id, patch.data, patch.preview, imageUrl, originalCanvasState);
-  }, [saveDebounced, imageUrl, originalCanvasState, setScenes]);
-
+  const handleSceneChange = React.useCallback(
+    (id, patch) => {
+      setScenes((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, ...patch } : s))
+      );
+      saveDebounced(
+        id,
+        patch.data,
+        patch.preview,
+        imageUrl,
+        originalCanvasState
+      );
+    },
+    [saveDebounced, imageUrl, originalCanvasState, setScenes]
+  );
 
   // + 생성
   const handleAddScene = async () => {
@@ -245,237 +274,21 @@ export default function EditorPage({ projectId = DUMMY }) {
   const end = Math.min(start + VISIBLE, total);
   const visibleItems = items.slice(start, end);
 
-  // // 이미지 변환 핸들러
-  // const handleTransform = async () => {
-  //   // 사전 조건 확인: 씬 선택 및 캔버스 준비 여부
-  //   if (!selectedId) {
-  //     alert("먼저 씬을 추가하거나 선택해 주세요.");
-  //     return;
-  //   }
-  //   if (!pid) {
-  //     alert("프로젝트 ID가 없습니다. 페이지를 새로고침해 주세요.");
-  //     return;
-  //   }
-  //   if (!stageRef.current) {
-  //     alert("캔버스가 아직 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.");
-  //     return;
-  //   }
-  //
-  //   console.log("Transform 시작 - pid:", pid, "selectedId:", selectedId);
-  //   console.log("originalCanvasState:", originalCanvasState);
-  //
-  //   try {
-  //     setProcessing(true);
-  //
-  //     // 캔버스에 내용이 있는지 확인
-  //     const hasContent = stageRef.current.hasDrawnContent && stageRef.current.hasDrawnContent();
-  //
-  //     if (!hasContent) {
-  //       alert("변환할 내용이 없습니다. 먼저 이미지를 추가하거나 그림을 그려주세요.");
-  //       setProcessing(false);
-  //       return;
-  //     }
-  //
-  //     // 첫 번째 변환인지 확인 (원본 상태가 없는 경우)
-  //     if (!originalCanvasState) {
-  //       console.log("첫 번째 변환: 현재 캔버스 상태를 원본으로 저장");
-  //       // 현재 캔버스 상태를 원본으로 저장
-  //       const currentState = stageRef.current.saveOriginalCanvasState();
-  //       if (currentState) {
-  //         // setOriginalCanvasState(currentState);
-  //       }
-  //     } else {
-  //       console.log("기존 원본 상태로 복원하여 변환");
-  //       // 원본 상태로 복원
-  //       stageRef.current.restoreOriginalCanvasState(originalCanvasState);
-  //       // 잠시 기다려서 복원 완료 후 진행
-  //       await new Promise(resolve => setTimeout(resolve, 100));
-  //     }
-  //
-  //     // 현재 캔버스 내용을 이미지로 변환 (원본 상태에서)
-  //     const canvasImage = stageRef.current.exportCanvasAsImage();
-  //
-  //     if (!canvasImage) {
-  //       alert("캔버스 이미지를 생성할 수 없습니다.");
-  //       setProcessing(false);
-  //       return;
-  //     }
-  //
-  //     console.log("원본 상태에서 캔버스를 변환합니다");
-  //     const canvas = document.createElement('canvas');
-  //     const ctx = canvas.getContext('2d');
-  //     const img = new Image();
-  //
-  //       img.onload = async () => {
-  //         canvas.width = img.width;
-  //         canvas.height = img.height;
-  //         ctx.drawImage(img, 0, 0);
-  //
-  //         // 캔버스를 blob으로 변환
-  //         canvas.toBlob(async (blob) => {
-  //           console.log("Generated blob:", blob);
-  //           console.log("Blob size:", blob.size);
-  //           console.log("Blob type:", blob.type);
-  //
-  //           // File 객체로 변환 (ImageUpload와 동일한 방식)
-  //           const file = new File([blob], "canvas_drawing.png", {
-  //             type: "image/png",
-  //           });
-  //           console.log("Created file:", file);
-  //
-  //           const fd = new FormData();
-  //           fd.append("image", file);
-  //
-  //           try {
-  //             // 먼저 캔버스 이미지를 업로드
-  //             console.log("캔버스 이미지를 업로드합니다");
-  //             console.log("pid:", pid, "selectedId:", selectedId);
-  //             console.log(
-  //               "pid type:",
-  //               typeof pid,
-  //               "selectedId type:",
-  //               typeof selectedId
-  //             );
-  //             console.log(
-  //               "업로드 URL:",
-  //               `/image/upload`
-  //             );
-  //
-  //             // project_id와 scene_id 모두 UUID로 유지
-  //             const projectId = pid; // UUID 형식 그대로 사용
-  //             const sceneId = selectedId; // UUID 형식 그대로 사용
-  //             console.log(
-  //               "Using - projectId (UUID):",
-  //               projectId,
-  //               "sceneId (UUID):",
-  //               sceneId
-  //             );
-  //             const uploadResp = await client.post(
-  //               `/image/upload`,
-  //               fd
-  //             );
-  //             const uploadedImagePath = uploadResp.data?.image_url;
-  //
-  //             if (!uploadedImagePath) {
-  //               alert("캔버스 이미지 업로드에 실패했습니다.");
-  //               setProcessing(false);
-  //               return;
-  //             }
-  //
-  //             console.log("업로드된 이미지:", uploadedImagePath);
-  //
-  //             // 캔버스 이미지를 직접 변환 API로 전달
-  //             console.log("캔버스 이미지를 직접 변환 API로 전달");
-  //             const transformFd = new FormData();
-  //
-  //             transformFd.append('file', file);
-  //
-  //             // RGB 색상으로 변환
-  //             const hexToRgb = (hex) => {
-  //               const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  //               if (result) {
-  //                 return {
-  //                   r: parseInt(result[1], 16),
-  //                   g: parseInt(result[2], 16),
-  //                   b: parseInt(result[3], 16)
-  //                 };
-  //               }
-  //               return { r: 0, g: 0, b: 0 };
-  //             };
-  //
-  //             const rgbColor = hexToRgb(drawingColor);
-  //             console.log("전송할 색상 정보:", rgbColor);
-  //             const resp = await client.post(
-  //               `/image/process?target_dots=${encodeURIComponent(targetDots)}&color_r=${rgbColor.r}&color_g=${rgbColor.g}&color_b=${rgbColor.b}`,
-  //               transformFd,
-  //               {
-  //                 headers: {
-  //                   "Content-Type": "multipart/form-data",
-  //                 },
-  //               }
-  //             );
-  //             let outputUrl = resp.data?.output_url || "";
-  //             console.log("변환 완료, 서버 응답:", resp.data);
-  //             console.log("새로운 SVG URL:", outputUrl);
-  //
-  //             if (!outputUrl) {
-  //               alert("서버에서 변환된 이미지 URL을 받지 못했습니다.");
-  //               setProcessing(false);
-  //               return;
-  //             }
-  //
-  //             // 먼저 캔버스 초기화 (기존 내용 제거)
-  //             if (stageRef.current && stageRef.current.clear) {
-  //               stageRef.current.clear();
-  //             }
-  //
-  //             let finalUrl;
-  //             if (outputUrl.startsWith("http")) {
-  //               finalUrl = outputUrl;
-  //             } else {
-  //               const base = client.defaults.baseURL?.replace(/\/$/, "") || "";
-  //               const path = String(outputUrl).replace(/\\\\/g, "/");
-  //               finalUrl = `${base}/${path.replace(/^\//, "")}`;
-  //             }
-  //
-  //             console.log("최종 이미지 URL:", finalUrl);
-  //             // setImageUrl(finalUrl);
-  //
-  //
-  //             // 변환된 이미지 URL과 원본 캔버스 상태를 현재 씬에 저장
-  //             if (selectedId && pid) {
-  //               saveDebounced(selectedId, selectedScene?.drones, selectedScene?.preview, finalUrl, originalCanvasState);
-  //             }
-  //           } catch (e) {
-  //             console.error("Canvas transform error", e);
-  //             console.error("Full error object:", e);
-  //             console.error("Error response:", e.response);
-  //             console.error("Error status:", e.response?.status);
-  //             console.error("Error data:", e.response?.data);
-  //             console.error("Error headers:", e.response?.headers);
-  //             console.error("Request URL:", e.config?.url);
-  //             console.error("Request method:", e.config?.method);
-  //             console.error("Request data:", e.config?.data);
-  //
-  //             let errorMsg =
-  //               e.response?.data?.detail ||
-  //               e.response?.data?.message ||
-  //               e.message;
-  //             if (typeof errorMsg === "object") {
-  //               errorMsg = JSON.stringify(errorMsg);
-  //             }
-  //             alert(`캔버스 변환 중 오류가 발생했습니다: ${errorMsg}`);
-  //           } finally {
-  //             setProcessing(false);
-  //           }
-  //         }, "image/png");
-  //       };
-  //
-  //       img.src = canvasImage;
-  //
-  //     // 변환된 이미지 URL을 현재 씬에 저장은 각 분기에서 처리
-  //   } catch (e) {
-  //     console.error("Transform error", e);
-  //     console.error("Error details:", e.response?.data || e.message);
-  //     alert(
-  //       `이미지 변환 중 오류가 발생했습니다: ${
-  //         e.response?.data?.message || e.message
-  //       }`
-  //     );
-  //     setProcessing(false);
-  //   }
-  // };
-
+  // 이미지 변환 핸들러
   const handleTransform = async () => {
-  // 1. 사전 조건 확인
-  if (!selectedId || !pid) {
-    alert("먼저 씬을 추가하거나 선택해 주세요.");
-    return;
-  }
-  if (!stageRef.current) {
-    alert("캔버스가 아직 준비되지 않았습니다.");
-    return;
-  }
+    // 사전 조건 확인: 씬 선택 및 캔버스 준비 여부
+    if (!selectedId) {
+      alert("먼저 씬을 추가하거나 선택해 주세요.");
+      return;
+    }
+    if (!pid) {
+      alert("프로젝트 ID가 없습니다. 페이지를 새로고침해 주세요.");
+      return;
+    }
+    if (!stageRef.current) {
+      alert("캔버스가 아직 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.");
+      return;
+    }
 
   setProcessing(true);
 
@@ -509,7 +322,7 @@ export default function EditorPage({ projectId = DUMMY }) {
       console.log("원본이 없어 최초 생성을 요청합니다.");
       const hasContent = stageRef.current.hasDrawnContent && stageRef.current.hasDrawnContent();
       if (!hasContent) {
-        alert("변환할 내용이 없습니다.");
+        alert("변환할 내용이 없습니다. 먼저 이미지를 추가하거나 그림을 그려주세요.");
         setProcessing(false);
         return;
       }
@@ -613,18 +426,21 @@ export default function EditorPage({ projectId = DUMMY }) {
   const closeButtonStyle = { ...buttonStyle, backgroundColor: "#dc3545" };
 
   // 캔버스 핸들러 함수들
-  const handleModeChange = React.useCallback((mode) => {
-    setDrawingMode(mode);
-    if (stageRef.current && stageRef.current.setDrawingMode) {
-      stageRef.current.setDrawingMode(mode);
-      // 모드 변경 후 현재 색상을 다시 설정하여 유지
-      setTimeout(() => {
-        if (stageRef.current && stageRef.current.setDrawingColor) {
-          stageRef.current.setDrawingColor(drawingColor);
-        }
-      }, 20); 
-    }
-  }, [drawingColor]);
+  const handleModeChange = React.useCallback(
+    (mode) => {
+      setDrawingMode(mode);
+      if (stageRef.current && stageRef.current.setDrawingMode) {
+        stageRef.current.setDrawingMode(mode);
+        // 모드 변경 후 현재 색상을 다시 설정하여 유지
+        setTimeout(() => {
+          if (stageRef.current && stageRef.current.setDrawingColor) {
+            stageRef.current.setDrawingColor(drawingColor);
+          }
+        }, 20);
+      }
+    },
+    [drawingColor]
+  );
 
   const handleClearAll = React.useCallback(() => {
     if (stageRef.current && stageRef.current.clear) {
@@ -652,6 +468,37 @@ export default function EditorPage({ projectId = DUMMY }) {
     if (stageRef.current && stageRef.current.setDrawingColor) {
       stageRef.current.setDrawingColor(color);
     }
+  }, []);
+
+  // Change fill color for single or multi-selection
+  const handleSelectedFillChange = React.useCallback((hex) => {
+    const canvas = stageRef.current;
+    if (!canvas) return;
+    const active = canvas.getActiveObject && canvas.getActiveObject();
+    if (!active) return;
+
+    const applyFill = (obj) => {
+      if (
+        obj?.customType === "svgDot" ||
+        obj?.customType === "drawnDot" ||
+        obj?.type === "circle"
+      ) {
+        obj.set({ fill: hex, originalFill: hex });
+        // Also apply stroke when appropriate (paths/lines or when no fill)
+        if ((obj.type === "path" || obj.type === "line" || !obj.fill) && ("stroke" in obj)) {
+          obj.set({ stroke: hex });
+        }
+      }
+    };
+
+    if (((active?.type && active.type.toLowerCase() === "activeselection") || active?.type === "group")) {
+      (active._objects || active.getObjects?.() || []).forEach(applyFill);
+    } else {
+      applyFill(active);
+    }
+
+    canvas.renderAll && canvas.renderAll();
+    setSelectedObject((prev) => (prev ? { ...prev, fill: hex } : prev));
   }, []);
 
   // Bridge editor controls to navbar via window for project routes
@@ -702,6 +549,8 @@ export default function EditorPage({ projectId = DUMMY }) {
           height: "100vh",
           overflowY: "auto",
           background: "#fff",
+          display: "flex",
+          flexDirection: "column",
         }}
       >
         <EditorToolbar
@@ -728,6 +577,30 @@ export default function EditorPage({ projectId = DUMMY }) {
           stageRef={stageRef} // stageRef prop 전달
           layout="sidebar"
         />
+        <div style={{ marginTop: "auto" }}>
+          <button
+            type="button"
+            title="프로젝트 설정"
+            aria-label="프로젝트 설정"
+            onClick={openProjectSettings}
+            disabled={!projectMeta}
+            style={{
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              padding: 8,
+              border: "1px solid #e5e7eb",
+              borderRadius: 8,
+              background: "#f9fafb",
+              color: "#374151",
+              cursor: projectMeta ? "pointer" : "not-allowed",
+            }}
+          >
+            <CiSettings size={20} />
+          </button>
+        </div>
       </aside>
       <div style={{ flex: 1 }}>
         {/* 업로드 및 도구 바 */}
@@ -742,6 +615,7 @@ export default function EditorPage({ projectId = DUMMY }) {
           eraserSize={eraserSize}
           drawingColor={drawingColor}
           onModeChange={handleModeChange}
+          onSelectionChange={setSelectedObject}
         />
 
         {/* 씬 캐러셀 */}
@@ -754,6 +628,32 @@ export default function EditorPage({ projectId = DUMMY }) {
           onSelectScene={handleSelect}
         />
       </div>
+      <aside
+        style={{
+          width: 260,
+          borderLeft: "1px solid #eee",
+          padding: 16,
+          position: "sticky",
+          top: 0,
+          alignSelf: "flex-start",
+          height: "100vh",
+          overflowY: "auto",
+          background: "#fff",
+        }}
+      >
+        <ObjectPropertiesPanel
+          selection={selectedObject}
+          onChangeFill={handleSelectedFillChange}
+        />
+      </aside>
+
+      {editingProject && (
+        <ProjectSettingsModal
+          project={editingProject}
+          onClose={closeProjectSettings}
+          onSaved={handleSettingsSaved}
+        />
+      )}
     </div>
   );
 }

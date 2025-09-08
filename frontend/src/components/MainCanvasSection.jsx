@@ -9,6 +9,7 @@ function MainCanvasSection({
   eraserSize,
   drawingColor,
   onModeChange,
+  onSelectionChange,
 }) {
   return (
     <section style={{
@@ -43,6 +44,7 @@ function MainCanvasSection({
               eraserSize={eraserSize}
               drawingColor={drawingColor}
               onModeChange={onModeChange}
+              onSelectionChange={onSelectionChange}
             />
           ) : (
             <div style={{ color: "#666", fontSize: 14 }}>

@@ -34,3 +34,25 @@ def create_access_token(subject: str | Any, expires_delta: Optional[timedelta] =
 
 def decode_token(token: str) -> dict:
     return jwt.decode(token, key=config.SECRET_KEY, algorithms=[config.ALGORITHM])
+
+
+def create_email_verification_token(user_id: str) -> str:
+    """Create a short-lived token for email verification."""
+    expire = datetime.now(tz=timezone.utc) + timedelta(hours=config.EMAIL_VERIFY_EXPIRE_HOURS)
+    to_encode = {
+        "exp": expire,
+        "sub": str(user_id),
+        "purpose": "email-verify",
+    }
+    return jwt.encode(to_encode, config.SECRET_KEY, algorithm=config.ALGORITHM)
+
+
+def decode_email_verification_token(token: str) -> str:
+    """Validate token and return the user_id (sub) if valid and purpose matches."""
+    payload = decode_token(token)
+    if payload.get("purpose") != "email-verify":
+        raise jwt.InvalidTokenError("Invalid token purpose")
+    sub = payload.get("sub")
+    if not sub:
+        raise jwt.InvalidTokenError("Token missing subject")
+    return str(sub)
