@@ -121,30 +121,6 @@ export default function Navbar({ transparent: propTransparent = false }) {
           </div>
 
           <div className="flex flex-1 justify-between">
-            {/* Slider + Transform */}
-            <div className="flex items-center gap-10">
-              <div>
-                <input
-                  type="range"
-                  min={100}
-                  max={10000}
-                  step={10}
-                  value={Number(localDots) || 0}
-                  onChange={handleRangeChange}
-                  onMouseUp={commitDots}
-                  onTouchEnd={commitDots}
-                  onPointerUp={commitDots}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onPointerMove={(e) => e.stopPropagation()}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onTouchStart={(e) => e.stopPropagation()}
-                  className="w-56 cursor-pointer"
-                />
-                <span className="text-sm text-gray-600 min-w-[42px] text-right">
-                  {localDots}
-                </span>
-              </div>
-
               <button
                 onClick={() => api?.handleTransform && api.handleTransform()}
                 disabled={editorState.processing || !editorState.selectedId}
@@ -163,7 +139,7 @@ export default function Navbar({ transparent: propTransparent = false }) {
               >
                 변환
               </button>
-            </div>
+
 
             {/* JSON + Unity */}
             <div className="flex items-center gap-2">

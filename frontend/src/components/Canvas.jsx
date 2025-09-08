@@ -47,6 +47,7 @@ export default function Canvas({
   const [isDragOver, setIsDragOver] = useState(false);
   const [canvasRevision, setCanvasRevision] = useState(0);
   const [deleteIconPos, setDeleteIconPos] = useState(null);
+  const maxDroneWarningShownRef = useRef(false);
 
   // 레이어 관리 훅
   const {
@@ -766,16 +767,54 @@ export default function Canvas({
 
       const continueDraw = (e) => {
         if (!isDrawing) return;
+
+        // 최대 개수 체크를 continueDraw에서도 해야 함
+        const currentDots = canvas.getObjects().filter(obj =>
+          obj.customType === 'svgDot' || obj.customType === 'drawnDot'
+        );
+        const maxDrone = window.editorAPI?.targetDots || 2000;
+
+        // 최대 개수에 도달했으면 더 이상 그리지 않음
+        if (currentDots.length >= maxDrone) {
+          return;
+        }
+
         drawDotAtPoint(e);
         canvas.requestRenderAll(); // 실시간 피드백을 위해 최적화된 렌더링 호출
       };
 
       const stopDraw = () => {
         isDrawing = false;
+
+        // 드로잉 세션이 끝났으므로 경고 플래그 리셋
+        maxDroneWarningShownRef.current = false;
+
         setCanvasRevision(c => c + 1); // 캔버스 변경을 알림
       };
 
       const drawDotAtPoint = (e) => {
+        // 현재 도트 개수 확인
+        const allObjects = canvas.getObjects();
+        const currentDots = allObjects.filter(obj =>
+          obj.customType === 'svgDot' || obj.customType === 'drawnDot'
+        );
+        console.log('전체 객체 수:', allObjects.length);
+        console.log('인식된 도트 수:', currentDots.length);
+        console.log('객체 타입들:', allObjects.map(obj => ({type: obj.type, customType: obj.customType})));
+
+        const maxDrone = window.editorAPI?.targetDots || 2000;
+        console.log('최대 드론 수:', maxDrone);
+
+        // 최대 개수에 도달한 경우 새 도트를 추가하지 않고 경고만 표시
+        if (currentDots.length >= maxDrone) {
+          // 한 번만 경고 표시하기 위한 플래그 체크
+          if (!maxDroneWarningShownRef.current) {
+            alert(`최대 드론 개수(${maxDrone}개)에 도달했습니다. 더 이상 추가할 수 없습니다.`);
+            maxDroneWarningShownRef.current = true;
+          }
+          return; // 새 도트 추가하지 않고 함수 종료
+        }
+
         const pointer = canvas.getPointer(e.e);
         // 클로저 문제를 피하기 위해 ref에서 최신 값을 가져옴
         const currentActiveLayerId = activeLayerIdRef.current;

@@ -84,6 +84,7 @@ export default function EditorPage({ projectId = DUMMY }) {
   const handleSettingsSaved = (updated) => {
     setProjectMeta(updated);
     if (updated?.project_name) setProjectName(updated.project_name);
+    if (updated?.max_drone) setTargetDots(updated.max_drone);
   };
 
   const selectedScene = useMemo(
@@ -216,7 +217,10 @@ export default function EditorPage({ projectId = DUMMY }) {
         const {data} = await client.get(`/projects/${pid}`);
         const p = data?.project ?? data;
         if (p?.project_name) setProjectName(p.project_name);
-        if (p) setProjectMeta(p);
+        if (p) {
+          setProjectMeta(p);
+          if (p.max_drone) setTargetDots(p.max_drone);
+        }
       } catch (e) {
         console.warn(
             "Failed to load project info",
