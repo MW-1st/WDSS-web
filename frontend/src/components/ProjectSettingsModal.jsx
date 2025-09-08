@@ -149,6 +149,7 @@ export default function ProjectSettingsModal({ project, onClose, onSaved, mode: 
               className="w-full rounded border border-gray-300 px-3 py-2"
               placeholder="dsj"
             />
+            <p className="mt-1 text-xs text-gray-500">기본 format은 'dsj' 입니다</p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -226,4 +227,3 @@ export default function ProjectSettingsModal({ project, onClose, onSaved, mode: 
     </div>
   );
 }
-
