@@ -9,7 +9,7 @@ async def get_projects_by_user_id(
 ) -> List[dict]:
     """사용자 ID로 프로젝트 목록을 조회합니다."""
     rows = await conn.fetch(
-        "SELECT * FROM project WHERE user_id = $1 ORDER BY updated_at DESC", user_id
+        "SELECT * FROM project WHERE user_id = $1 AND max_drone IS NOT NULL ORDER BY updated_at DESC", user_id
     )
     return [dict(row) for row in rows]
 
