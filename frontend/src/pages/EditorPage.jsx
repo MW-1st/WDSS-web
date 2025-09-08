@@ -276,7 +276,7 @@ export default function EditorPage({ projectId = DUMMY }) {
   const saveDebounced = useDebounced(async (scene_id, drones, preview, imageUrl, originalCanvasState) => {
     if (!pid) return;
     try {
-      const {data} = await client.post(`/projects/${pid}/scenes/${scene_id}`, {
+      const {data} = await client.put(`/projects/${pid}/scenes/${scene_id}`, {
         // s3_key: imageUrl
       });
       const saved = data.scene || {};
@@ -417,7 +417,7 @@ export default function EditorPage({ projectId = DUMMY }) {
         console.log("원본이 존재하여 재변환을 요청합니다.");
         const rgbColor = hexToRgb(drawingColor);
         const resp = await client.post(
-            `/projects/${pid}/scenes/${selectedId}/transformations`,
+            `/projects/${pid}/scenes/${selectedId}/processed`,
             {
               target_dots: targetDots,
               color_r: rgbColor.r,
