@@ -3,8 +3,10 @@ import client from "../api/client.js";
 import { getImageUrl } from '../utils/imageUtils';
 
 export default function ImageGallery({ onImageDragStart }) {
+  
   const [uploadedImages, setUploadedImages] = useState([]);
   const [loading, setLoading] = useState(false);
+  
 
   // // localStorage에서 이미지 목록 로드
   // useEffect(() => {
