@@ -100,6 +100,69 @@ export default React.memo(function SceneCarousel({
   const end = Math.min(startClamped + VISIBLE, total);
   const visibleItems = items.slice(startClamped, end);
 
+  // ---- Drag & Drop reordering ----
+  const [draggingId, setDraggingId] = React.useState(null);
+  const [overId, setOverId] = React.useState(null);
+  const [overSide, setOverSide] = React.useState('before'); // 'before' | 'after'
+  const autoScrollRef = React.useRef(null);
+
+  const findIndexById = React.useCallback((id) => scenes.findIndex((s) => s.id === id), [scenes]);
+
+  // Move item to an absolute index in the array AFTER removal
+  const moveItemTo = React.useCallback((list, from, to) => {
+    if (from === to || from < 0 || to < 0 || from >= list.length || to > list.length) return list;
+    const next = list.slice();
+    const [spliced] = next.splice(from, 1);
+    // to is based on array after removal when from < to -> decrement to
+    const adjTo = from < to ? to - 1 : to;
+    next.splice(adjTo, 0, spliced);
+    return next;
+  }, []);
+
+  const persistOrder = React.useCallback(async (ordered) => {
+    if (!projectId) return;
+    try {
+      await Promise.all(
+        ordered.map((s, i) =>
+          client.post(`/projects/${projectId}/scenes/${s.id}`, { scene_num: i + 1 }).catch(() => null)
+        )
+      );
+    } catch (e) {
+      // no-op; 이미 낙관적으로 UI 반영
+    }
+  }, [projectId]);
+
+  const handleDropReorder = React.useCallback(async (srcId, dstId, side = 'before') => {
+    if (!srcId || !dstId || srcId === dstId) return;
+    const from = findIndexById(srcId);
+    let to = findIndexById(dstId);
+    if (side === 'after') to = to + 1;
+    if (from === -1 || to === -1) return;
+    const next = moveItemTo(scenes, from, to);
+    setScenes(next);
+    // 선택 유지
+    onSelectScene?.(selectedId ?? next[0]?.id ?? null);
+    // 서버 반영 (scene_num 갱신)
+    persistOrder(next);
+  }, [findIndexById, moveItemTo, scenes, setScenes, onSelectScene, selectedId, persistOrder]);
+
+  // Auto-scroll while dragging over left/right nav buttons
+  const stopAutoScroll = React.useCallback(() => {
+    if (autoScrollRef.current) {
+      clearInterval(autoScrollRef.current);
+      autoScrollRef.current = null;
+    }
+  }, []);
+
+  const startAutoScroll = React.useCallback((dir) => {
+    if (autoScrollRef.current) return;
+    autoScrollRef.current = setInterval(() => {
+      setStart((s) => clamp(s + dir, 0, Math.max(0, (scenes.length + 1) - VISIBLE)));
+    }, 150);
+  }, [setStart, scenes.length]);
+
+  React.useEffect(() => () => stopAutoScroll(), [stopAutoScroll]);
+
   const handleSelect = (id) => {
     if (id === "__ADD__") return;
     onSelectScene?.(id);
@@ -203,10 +266,38 @@ export default React.memo(function SceneCarousel({
 
   const Thumb = ({ item }) => {
     const isSelected = selectedId === item.id;
+    const elRef = React.useRef(null);
     return (
       <div
+        ref={elRef}
         role="button"
         tabIndex={0}
+        draggable={!item.isAdd}
+        onDragStart={(e) => {
+          if (item.isAdd) return;
+          setDraggingId(item.id);
+          e.dataTransfer.effectAllowed = "move";
+          e.dataTransfer.setData("text/plain", item.id);
+        }}
+        onDragOver={(e) => {
+          if (draggingId && !item.isAdd) {
+            e.preventDefault();
+            const rect = elRef.current?.getBoundingClientRect();
+            if (rect) {
+              const side = (e.clientX - rect.left) > rect.width / 2 ? 'after' : 'before';
+              setOverSide(side);
+            }
+            setOverId(item.id);
+          }
+        }}
+        onDragLeave={() => setOverId(null)}
+        onDrop={(e) => {
+          e.preventDefault();
+          const src = e.dataTransfer.getData("text/plain") || draggingId;
+          setOverId(null);
+          setDraggingId(null);
+          if (src && item.id) handleDropReorder(src, item.id, overSide);
+        }}
         onClick={() => handleSelect(item.id)}
         onKeyDown={(ev) => (ev.key === "Enter" || ev.key === " ") && handleSelect(item.id)}
         title={item.name}
@@ -225,6 +316,20 @@ export default React.memo(function SceneCarousel({
           outline: "none",
         }}
       >
+        {overId === item.id && (
+          <span
+            aria-hidden
+            style={{
+              position: 'absolute',
+              top: 0,
+              bottom: 0,
+              width: 4,
+              background: '#94a3b8',
+              left: overSide === 'before' ? 0 : 'auto',
+              right: overSide === 'after' ? 0 : 'auto',
+            }}
+          />
+        )}
         <span
           style={{
             position: "absolute",
@@ -304,6 +409,10 @@ export default React.memo(function SceneCarousel({
           }}
           aria-label="이전"
           title="이전"
+          onDragEnter={(e) => { e.preventDefault(); startAutoScroll(-1); }}
+          onDragOver={(e) => { e.preventDefault(); }}
+          onDragLeave={stopAutoScroll}
+          onDrop={stopAutoScroll}
         >
           ‹
         </button>
@@ -365,6 +474,10 @@ export default React.memo(function SceneCarousel({
           }}
           aria-label="다음"
           title="다음"
+          onDragEnter={(e) => { e.preventDefault(); startAutoScroll(1); }}
+          onDragOver={(e) => { e.preventDefault(); }}
+          onDragLeave={stopAutoScroll}
+          onDrop={stopAutoScroll}
         >
           ›
         </button>
