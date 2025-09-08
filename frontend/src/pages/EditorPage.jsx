@@ -88,7 +88,8 @@ export default function EditorPage({ projectId = DUMMY }) {
       [scenes, selectedId]
   );
 
-  const imageUrl = selectedScene?.displayUrl || getImageUrl(selectedScene?.s3_key) || "";
+  // 방금 삭제한 상태(const [originalCanvasState, setOriginalCanvasState],const [imageUrl, setImageUrl])들 대신, 아래 두 줄로 정보를 파생시킵니다.
+  const imageUrl = getImageUrl(selectedScene?.display_url || selectedScene?.s3_key) || "";
   const originalCanvasState = selectedScene ? selectedScene.originalCanvasState : null;
   
   // 레이어 상태를 업데이트하는 함수
@@ -233,7 +234,7 @@ export default function EditorPage({ projectId = DUMMY }) {
             list.map((s, i) => ({
               ...s,
               name: s.name || `Scene ${s.scene_num ?? i + 1}`,
-              imageUrl: getImageUrl(s.s3_key),
+              imageUrl: getImageUrl(s.display_url || s.s3_key),
             }))
         );
         if (list[0]) setSelectedId(list[0].id);
@@ -431,7 +432,7 @@ export default function EditorPage({ projectId = DUMMY }) {
               if (scene.id === selectedId) {
                 const updatedScene = {
                   ...scene,
-                  displayUrl: finalUrl,
+                  display_url: finalUrl,
                 };
                 if (newS3Key) {
                   updatedScene.s3_key = newS3Key;

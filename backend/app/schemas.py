@@ -165,11 +165,11 @@ class SceneUpdate(BaseModel):
 
 class Scene(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
     id: str
     project_id: str
     scene_num: int
     s3_key: Optional[str] = None
+    display_url: Optional[str] = None
 
 
 class SceneResponse(BaseModel):
