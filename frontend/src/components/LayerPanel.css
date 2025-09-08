@@ -1,6 +1,8 @@
 .layer-panel {
-  width: 280px;
-  height: 400px;
+  width: 100%;
+  height: auto;
+  min-height: 300px;
+  max-height: 60vh;
   background: #f8f9fa;
   border: 1px solid #dee2e6;
   border-radius: 8px;
@@ -300,8 +302,8 @@
 /* 반응형 */
 @media (max-width: 768px) {
   .layer-panel {
-    width: 240px;
-    height: 300px;
+    min-height: 250px;
+    max-height: 50vh;
   }
   
   .layer-item {
