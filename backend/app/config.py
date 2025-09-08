@@ -9,6 +9,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 UPLOAD_DIRECTORY = BASE_DIR / "uploads"
 ORIGINALS_DIR = BASE_DIR / "originals"
 PROCESSED_DIR = BASE_DIR / "processed"
+SVG_JSON_DIR = BASE_DIR / "svg_json"
 TMP_DIR = BASE_DIR / "tmp"
 
 
@@ -19,3 +20,4 @@ def create_upload_directories():
     ORIGINALS_DIR.mkdir(exist_ok=True)
     PROCESSED_DIR.mkdir(exist_ok=True)
     TMP_DIR.mkdir(exist_ok=True)
+    SVG_JSON_DIR.mkdir(exist_ok=True)
