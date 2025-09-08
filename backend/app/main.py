@@ -56,7 +56,7 @@ app.mount(
 
 app.mount(
     "/originals",
-    StaticFiles(directory="processed"),
+    StaticFiles(directory="originals"),
     name="originals",
 )
 
