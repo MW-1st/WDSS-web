@@ -17,7 +17,6 @@ app.add_middleware(
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://3.85.51.152:5173",
-        "*",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -46,9 +45,7 @@ app.add_middleware(CORSStaticFilesMiddleware)
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(project.router, prefix="/projects", tags=["project"])
 # app.include_router(image.router, prefix="/images", tags=["image"])
-app.include_router(
-    scene.router, prefix="/projects/{project_id}/scenes", tags=["scenes"]
-)
+app.include_router(scene.router, prefix="/projects", tags=["scenes"])
 
 app.include_router(image_router.router)
 app.include_router(websocket.router)
