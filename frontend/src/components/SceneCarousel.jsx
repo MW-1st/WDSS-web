@@ -99,7 +99,7 @@ export default React.memo(function SceneCarousel({
   const fetchScenes = async () => {
     if (!projectId) throw new Error("project_id가 비어있습니다");
     // Swagger: GET /projects/{project_id}/scenes/  (트레일링 슬래시 O)
-    const { data } = await client.get(`/projects/${projectId}/scenes/`);
+    const { data } = await client.get(`/projects/${projectId}/scenes`);
     const mapped = Array.isArray(data)
       ? data.map((s, i) => ({
           id: s.id,
