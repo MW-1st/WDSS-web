@@ -27,7 +27,8 @@ export default function Canvas({
   drawingColor: externalDrawingColor = '#222222',
   activeLayerId: externalActiveLayerId,
   onModeChange,
-  onSelectionChange
+  onSelectionChange,
+  onPanChange
 }) {
   const canvasRef = useRef(null);
   const fabricCanvas = useRef(null);
@@ -200,6 +201,7 @@ export default function Canvas({
         obj.selectable = false;
         obj.evented = false;
       });
+      try { onPanChange && onPanChange(true); } catch {}
     };
 
     const exitPanMode = () => {
@@ -223,6 +225,7 @@ export default function Canvas({
           obj.evented = true;
         }
       });
+      try { onPanChange && onPanChange(false); } catch {}
     };
 
     const handleKeyDown = (e) => {
@@ -416,6 +419,11 @@ export default function Canvas({
     
     document.addEventListener('keydown', handleKeyDown, { capture: true });
     document.addEventListener('keyup', handleKeyUp, { capture: true });
+    
+    // Expose minimal pan controls for external UI
+    canvas.enterPanMode = enterPanMode;
+    canvas.exitPanMode = exitPanMode;
+    canvas.getPanMode = () => isPanMode;
     
     // 캔버스 경계 추가
     addCanvasBoundary();

@@ -12,13 +12,16 @@ function MainCanvasSection({
   activeLayerId,
   onModeChange,
   onSelectionChange,
+  onPanChange,
 }) {
   return (
-    <section style={{
-      display: "flex",
-      justifyContent: "center",
-      padding: "24px 0 32px"
-    }}>
+    <section
+      style={{
+        display: "flex",
+        justifyContent: "center",
+        padding: "24px 0 32px",
+      }}
+    >
       <div style={{ width: "70%", maxWidth: 980 }}>
         <div
           style={{
@@ -48,6 +51,7 @@ function MainCanvasSection({
               activeLayerId={activeLayerId}
               onModeChange={onModeChange}
               onSelectionChange={onSelectionChange}
+              onPanChange={onPanChange}
             />
           ) : (
             <div style={{ color: "#666", fontSize: 14 }}>

@@ -10,6 +10,8 @@ import { getImageUrl } from '../utils/imageUtils';
 import { useUnity } from "../contexts/UnityContext.jsx";
 import { useParams } from "react-router-dom";
 import { CiSettings } from "react-icons/ci";
+import { LuMousePointer } from "react-icons/lu";
+import { IoHandRightOutline } from "react-icons/io5";
 import ProjectSettingsModal from "../components/ProjectSettingsModal";
 
 const VISIBLE = 4;
@@ -65,6 +67,7 @@ export default function EditorPage({ projectId = DUMMY }) {
   const [eraserSize, setEraserSize] = useState(20);
   const [drawingColor, setDrawingColor] = useState('#222222');
   const [selectedObject, setSelectedObject] = useState(null);
+  const [isPanMode, setIsPanMode] = useState(false);
   
   // 레이어 관련 상태
   const [canvasReady, setCanvasReady] = useState(false);
@@ -767,6 +770,51 @@ export default function EditorPage({ projectId = DUMMY }) {
             }}
         >
           <div style={{height: "100%", overflowY: "auto", padding: 16}}>
+            {/* Pointer (click) and Hand (pan) tools */}
+            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+              <button
+                onClick={() => {
+                  setDrawingMode("select");
+                  const c = stageRef?.current;
+                  if (c && typeof c.exitPanMode === 'function') c.exitPanMode();
+                }}
+                title="클릭 도구 (V)"
+                aria-label="클릭 도구"
+                style={{
+                  border: "1px solid #ccc",
+                  padding: "8px 12px",
+                  borderRadius: 6,
+                  cursor: "pointer",
+                  background: drawingMode === 'select' && !isPanMode ? '#007bff' : '#f8f9fa',
+                  color: drawingMode === 'select' && !isPanMode ? 'white' : 'black',
+                }}
+              >
+                <LuMousePointer size={18} />
+              </button>
+              <button
+                onClick={() => {
+                  const c = stageRef?.current;
+                  if (!c) return;
+                  if (typeof c.getPanMode === 'function' && c.getPanMode()) {
+                    if (typeof c.exitPanMode === 'function') c.exitPanMode();
+                  } else {
+                    if (typeof c.enterPanMode === 'function') c.enterPanMode();
+                  }
+                }}
+                title="이동 도구 (Space)"
+                aria-label="이동 도구"
+                style={{
+                  border: "1px solid #ccc",
+                  padding: "8px 12px",
+                  borderRadius: 6,
+                  cursor: "pointer",
+                  background: isPanMode ? '#007bff' : '#f8f9fa',
+                  color: isPanMode ? 'white' : 'black',
+                }}
+              >
+                <IoHandRightOutline size={18} />
+              </button>
+            </div>
             <EditorToolbar
                 pid={pid}
                 selectedId={selectedId}
@@ -844,6 +892,7 @@ export default function EditorPage({ projectId = DUMMY }) {
               activeLayerId={activeLayerIdState}
               onModeChange={handleModeChange}
               onSelectionChange={setSelectedObject}
+              onPanChange={setIsPanMode}
           />
 
           {/* 씬 캐러셀 */}

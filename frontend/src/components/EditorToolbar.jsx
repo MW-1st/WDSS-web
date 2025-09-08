@@ -4,7 +4,9 @@ import ImageTransformControls from "../components/ImageTransformControls.jsx";
 import UnitySimulatorControls from "../components/UnitySimulatorControls.jsx";
 import CanvasTools from "../components/CanvasTools.jsx";
 import { FaImage } from "react-icons/fa";
-import PortalPopover from "./PortalPopover.jsx"; 
+import { LuMousePointer } from "react-icons/lu";
+import { IoHandRightOutline } from "react-icons/io5";
+import PortalPopover from "./PortalPopover.jsx";
 const Inner = ({
   onImageDragStart,
   drawingMode,
@@ -39,10 +41,14 @@ const Inner = ({
 
   React.useEffect(() => {
     if (!galleryHovered) return;
-    const el = btnRef.current; if (!el) return;
+    const el = btnRef.current;
+    if (!el) return;
     const update = () => {
       const r = el.getBoundingClientRect();
-      setTooltipPos({ top: Math.round(r.top + r.height / 2), left: Math.round(r.right + 8) });
+      setTooltipPos({
+        top: Math.round(r.top + r.height / 2),
+        left: Math.round(r.right + 8),
+      });
     };
     update();
     window.addEventListener("scroll", update, true);
@@ -130,7 +136,6 @@ const Inner = ({
               gap: 6,
               background: "#f8f9fa",
             }}
-
           >
             <FaImage />
           </button>
@@ -180,7 +185,10 @@ const EditorToolbar = React.memo(function EditorToolbar(props) {
   const { layout = "full" } = props;
   if (layout === "sidebar") {
     return (
-      <div className="editor-sidebar" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div
+        className="editor-sidebar"
+        style={{ display: "flex", flexDirection: "column", gap: 12 }}
+      >
         <Inner {...props} />
       </div>
     );
