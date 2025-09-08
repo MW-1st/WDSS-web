@@ -279,7 +279,7 @@ export default function EditorPage({ projectId = DUMMY }) {
   const saveDebounced = useDebounced(async (scene_id, drones, preview, imageUrl, originalCanvasState) => {
     if (!pid) return;
     try {
-      const {data} = await client.post(`/projects/${pid}/scenes/${scene_id}`, {
+      const {data} = await client.put(`/projects/${pid}/scenes/${scene_id}`, {
         // s3_key: imageUrl
       });
       const saved = data.scene || {};
@@ -309,6 +309,12 @@ export default function EditorPage({ projectId = DUMMY }) {
   // + 생성
   const handleAddScene = async () => {
     try {
+      // 최대 씬 개수 제한 (프로젝트 설정)
+      const maxScenes = projectMeta?.max_scene ?? projectMeta?.maxScenes ?? null;
+      if (Number.isFinite(maxScenes) && maxScenes !== null && scenes.length >= maxScenes) {
+        alert(`씬은 최대 ${maxScenes}개까지만 생성할 수 있어요.`);
+        return;
+      }
       const projectIdReady = await ensureProjectId();
       console.log("확인된 Project ID:", projectIdReady);
       const numericSceneNums = (scenes || [])
@@ -420,7 +426,7 @@ export default function EditorPage({ projectId = DUMMY }) {
         console.log("원본이 존재하여 재변환을 요청합니다.");
         const rgbColor = hexToRgb(drawingColor);
         const resp = await client.post(
-            `/projects/${pid}/scenes/${selectedId}/transformations`,
+            `/projects/${pid}/scenes/${selectedId}/processed`,
             {
               target_dots: targetDots,
               color_r: rgbColor.r,
@@ -533,18 +539,36 @@ export default function EditorPage({ projectId = DUMMY }) {
       [drawingColor]
   );
 
-  const handleClearAll = React.useCallback(() => {
-    if (stageRef.current && stageRef.current.clear) {
-      if (
-          confirm(
-              "캔버스의 모든 내용을 지우시겠습니까? 이 작업은 되돌릴 수 없습니다."
-          )
-      ) {
-        stageRef.current.clear();
-        console.log("캔버스 전체가 초기화되었습니다");
-      }
-    }
-  }, []);
+const handleClearAll = React.useCallback(async () => {
+ if (stageRef.current && stageRef.current.clear) {
+   if (
+       confirm(
+           "캔버스의 모든 내용을 지우시겠습니까? 이 작업은 되돌릴 수 없습니다."
+       )
+   ) {
+     try {
+       // 1. 캔버스 초기화
+       stageRef.current.clear();
+       console.log("캔버스가 초기화되었습니다");
+
+       // 2. 서버에 씬 초기화 요청
+       const response = await client.patch(`/projects/${pid}/scenes/${selectedId}`, {
+         status: 'reset'
+       });
+
+       console.log("서버 씬 초기화 완료:", response.data);
+
+       // 3. 성공 메시지 (선택사항)
+       // alert("씬이 완전히 초기화되었습니다.");
+
+     } catch (error) {
+       console.error("씬 초기화 중 오류 발생:", error);
+       // 에러 처리 - 사용자에게 알림
+       alert("씬 초기화 중 오류가 발생했습니다. 다시 시도해주세요.");
+     }
+   }
+ }
+}, [client, pid, selectedId]); // client, projectId, sceneId를 dependency에 추가
 
   const handleColorChange = React.useCallback((color) => {
     setDrawingColor(color);

@@ -182,6 +182,10 @@ class ScenesResponse(BaseModel):
     scenes: List[Scene]
 
 
+class ScenePatch(BaseModel):
+    status: str
+
+
 class DeleteImageRequest(BaseModel):
     imageUrl: str
 

@@ -53,6 +53,7 @@ function MainCanvasSection({
               onSelectionChange={onSelectionChange}
               onPanChange={onPanChange}
             />
+
           ) : (
             <div style={{ color: "#666", fontSize: 14 }}>
               아래 + 카드로 새 씬을 추가하세요
@@ -63,5 +64,6 @@ function MainCanvasSection({
     </section>
   );
 }
+
 
 export default React.memo(MainCanvasSection);

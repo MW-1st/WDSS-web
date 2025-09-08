@@ -35,6 +35,8 @@ export default function Canvas({
   const [drawingMode, setDrawingMode] = useState(externalDrawingMode);
   const [eraserSize, setEraserSize] = useState(externalEraserSize);
   const [drawingColor, setDrawingColor] = useState(externalDrawingColor);
+  const currentColorRef = useRef(externalDrawingColor);
+  useEffect(() => { currentColorRef.current = externalDrawingColor; }, [externalDrawingColor]);
   const eraseHandlers = useRef({});
   const selectionHandlers = useRef({});
   const onSelectionChangeRef = useRef(onSelectionChange);
@@ -88,7 +90,7 @@ export default function Canvas({
     }
   }, [layers, canvasRevision]); // 'layers' 또는 'canvasRevision' 상태가 변경될 때마다 실행
 
-  // Use useLayoutEffect to initialize the canvas
+  // Use useLayoutEffect to initialize the canvas (once)
   useLayoutEffect(() => {
     if (!canvasRef.current) return;
 
@@ -455,7 +457,41 @@ export default function Canvas({
       document.removeEventListener('keyup', handleKeyUp, { capture: true });
       canvas.dispose();
     };
-  }, [width, height, externalStageRef]);
+  }, [externalStageRef]);
+
+  // Resize with zoom: keep object positions, zoom the viewport to match new size
+  const baseSizeRef = useRef({ w: width, h: height });
+  useEffect(() => {
+    const canvas = fabricCanvas.current;
+    if (!canvas) return;
+
+    const base = baseSizeRef.current || { w: width, h: height };
+    // Update physical canvas size
+    canvas.setWidth(width);
+    canvas.setHeight(height);
+
+    // Compute zoom so that base content fits new canvas
+    const zx = width / (base.w || 1);
+    const zy = height / (base.h || 1);
+    const z = Math.min(zx, zy);
+    canvas.setZoom(z);
+
+    // Center content by adjusting viewport transform translation
+    const vpt = canvas.viewportTransform || [z, 0, 0, z, 0, 0];
+    vpt[0] = z; vpt[3] = z;
+    vpt[4] = (width - base.w * z) / 2;
+    vpt[5] = (height - base.h * z) / 2;
+    canvas.setViewportTransform(vpt);
+
+    // Ensure clipPath matches new canvas bounds if present
+    if (canvas.clipPath) {
+      try {
+        canvas.clipPath.set({ width, height });
+      } catch (_) {}
+    }
+
+    canvas.requestRenderAll();
+  }, [width, height]);
 
   // Delete key to remove current selection in select mode
   useEffect(() => {
@@ -593,7 +629,7 @@ export default function Canvas({
         canvas.renderAll();
       });
     }
-  }, [imageUrl, width, height]);
+  }, [imageUrl]);
 
   // 외부에서 drawingMode가 변경될 때 반응
   useEffect(() => {
@@ -664,6 +700,7 @@ export default function Canvas({
     const canvas = fabricCanvas.current;
 
     const currentColor = colorOverride || drawingColor;
+    currentColorRef.current = currentColor;
     console.log('applyDrawingMode 호출:', mode, '사용할 색상:', currentColor);
     
     // 이전 이벤트 리스너 정리
@@ -744,11 +781,11 @@ export default function Canvas({
           left: pointer.x - dotRadius,
           top: pointer.y - dotRadius,
           radius: dotRadius,
-          fill: currentColor, // 현재 색상 사용
+          fill: currentColorRef.current || currentColor, // 현재 색상 사용
           selectable: false,
           evented: true,
           customType: 'drawnDot', // 그려진 도트로 구분
-          originalFill: currentColor, // 원본 색상 정보 보존
+          originalFill: currentColorRef.current || currentColor, // 원본 색상 정보 보존
           hoverCursor: 'crosshair',
           moveCursor: 'crosshair'
         });
@@ -1175,7 +1212,7 @@ export default function Canvas({
     console.log('getCurrentCanvasAsSvg - 총 객체 수:', objects.length);
     
     objects.forEach((obj, index) => {
-      console.log(`객체 ${index}: type=${obj.type}, customType=${obj.customType}, fill=${obj.fill}, stroke=${obj.stroke}`);
+      // console.log(`객체 ${index}: type=${obj.type}, customType=${obj.customType}, fill=${obj.fill}, stroke=${obj.stroke}`);
       
       if (obj.customType === 'svgDot' || obj.customType === 'drawnDot') {
         // 도트의 중심점 계산
