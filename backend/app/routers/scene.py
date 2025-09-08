@@ -177,7 +177,7 @@ async def get_scene(
         )
 
 
-@router.post("/{scene_id}", response_model=SceneResponse)
+@router.put("/{scene_id}", response_model=SceneResponse)
 async def update_scene(
     project_id: str,
     scene_id: str,
@@ -386,7 +386,7 @@ async def create_original_and_transform(
             os.remove(temp_processed_path)
 
 
-@router.post("/{scene_id}/transformations")
+@router.post("/{scene_id}/processed")
 async def re_transform_from_original(
     project_id: uuid.UUID,
     scene_id: uuid.UUID,
@@ -442,6 +442,15 @@ async def re_transform_from_original(
         raise HTTPException(
             status_code=500, detail=f"Image re-transformation failed: {e}"
         )
+
+
+@router.put("/{scene_id}/processed")
+async def save_canvas_as_processed(
+    project_id: uuid.UUID,
+    scene_id: uuid.UUID,
+    svg_file: UploadFile = File(...),
+):
+    pass
 
 
 def get_display_url(original_s3_key: str) -> str:
