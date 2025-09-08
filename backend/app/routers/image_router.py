@@ -19,7 +19,7 @@ from app.routers.websocket import manager
 from starlette.responses import JSONResponse
 from app.dependencies import get_current_user
 from app.schemas import UserResponse, DeleteImageRequest
-from app.config import UPLOAD_DIRECTORY
+from app.config import UPLOAD_DIRECTORY, TMP_DIR, SVG_JSON_DIR
 
 router = APIRouter(prefix="/image", tags=["image"])
 
@@ -257,18 +257,9 @@ async def svg_to_json_endpoint(
     max_accel: float = 3.0,
     min_separation: float = 2.0,
 ):
-    """
-    Accepts an SVG file, converts coordinates to DSJ JSON, saves to backend/svg_json,
-    and returns the downloadable URL under /svg-json/*.
-    """
-    backend_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-    tmp_dir = os.path.join(backend_root, "tmp")
-    out_dir = os.path.join(backend_root, "svg_json")
-    os.makedirs(tmp_dir, exist_ok=True)
-    os.makedirs(out_dir, exist_ok=True)
 
     ext = os.path.splitext(file.filename or "")[1].lower() or ".svg"
-    temp_path = os.path.join(tmp_dir, f"tmp_{uuid.uuid4().hex}{ext}")
+    temp_path = os.path.join(TMP_DIR, f"tmp_{uuid.uuid4().hex}{ext}")
 
     with open(temp_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
@@ -304,7 +295,7 @@ async def svg_to_json_endpoint(
         base = os.path.splitext(os.path.basename(file.filename or "import.svg"))[0]
         safe_base = base or "svg"
         out_name = f"{safe_base}_{ts}_{uuid.uuid4().hex[:6]}.json"
-        out_path = os.path.join(out_dir, out_name)
+        out_path = os.path.join(SVG_JSON_DIR, out_name)
 
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
