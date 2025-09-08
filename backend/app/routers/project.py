@@ -254,7 +254,7 @@ async def export_project_to_json(
     from datetime import datetime
 
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    out_name = f"project_{project_id}_{ts}.json"
+    out_name = f"{project_id}_{ts}.json"
     out_path = os.path.join(SVG_JSON_DIR, out_name)
 
     with open(out_path, "w", encoding="utf-8") as f:
