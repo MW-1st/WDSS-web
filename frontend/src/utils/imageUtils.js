@@ -5,9 +5,7 @@ export const getImageUrl = (s3_key) => {
     return s3_key;
   }
 
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-
-  // s3_key가 'api/uploads/...'로 시작한다면 'api/'를 제거
-  const cleanPath = s3_key.replace(/^\/api\//, '');
-  return `${baseUrl}/${cleanPath}`;
+  // Vite 프록시를 사용하도록 상대 경로로 반환
+  const cleanPath = s3_key.replace(/^\/api\//, '').replace(/^\//, '');
+  return `/${cleanPath}`;
 };
