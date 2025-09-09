@@ -15,6 +15,7 @@ import {
   Rect,
 } from "fabric";
 import useLayers from "../hooks/useLayers";
+import { useAutoSave } from '../hooks/useAutoSave';
 import * as fabricLayerUtils from "../utils/fabricLayerUtils";
 
 export default function Canvas({
@@ -28,7 +29,8 @@ export default function Canvas({
   activeLayerId: externalActiveLayerId,
   onModeChange,
   onSelectionChange,
-  onPanChange
+  onPanChange,
+  scene
 }) {
   const canvasRef = useRef(null);
   const fabricCanvas = useRef(null);
@@ -49,6 +51,8 @@ export default function Canvas({
   const [deleteIconPos, setDeleteIconPos] = useState(null);
   const maxDroneWarningShownRef = useRef(false);
 
+  const sceneId = scene?.id;
+
   // 레이어 관리 훅
   const {
     layers,
@@ -64,6 +68,27 @@ export default function Canvas({
     getLayer,
     getSortedLayers
   } = useLayers();
+
+  // 자동저장 커스텀 훅 사용
+  const {
+    triggerAutoSave,
+    saveImmediately,
+    loadSavedState,
+    setEnabled: setAutoSaveEnabled,
+    isAutoSaveEnabled,
+    isSaving,
+    lastSaveTime,
+    saveError
+  } = useAutoSave(sceneId, fabricCanvas, {
+    enabled: true,
+    delay: 1500,
+    onSave: ({ sceneId, objectCount, manual }) => {
+      console.log(`✅ Canvas saved${manual ? ' (manual)' : ''}: ${sceneId} (${objectCount} objects)`);
+    },
+    onError: (error) => {
+      console.error('💾 Save failed:', error.message);
+    }
+  });
 
   // 클로저(closure) 문제 해결을 위한 ref
   // 이벤트 핸들러가 항상 최신 값을 참조하도록 보장
@@ -334,6 +359,8 @@ export default function Canvas({
           fabricLayerUtils.assignObjectToLayer(path, activeLayer.id, activeLayer.name);
           console.log('✅ Path assigned to layer:', activeLayer.name);
           setCanvasRevision(c => c + 1); // 캔버스 변경을 알림
+
+          triggerAutoSave({ drawingMode: 'draw' });
         } else {
           console.error('❌ Path assignment failed - no active layer found!');
           console.log('Debug info:', {
@@ -464,6 +491,27 @@ export default function Canvas({
     // 캔버스 경계 추가
     addCanvasBoundary();
 
+    const handleObjectMoved = () => {
+      triggerAutoSave({ action: 'objectMoved' });
+    };
+
+    const handleObjectScaled = () => {
+      triggerAutoSave({ action: 'objectScaled' });
+    };
+
+    const handleObjectRotated = () => {
+      triggerAutoSave({ action: 'objectRotated' });
+    };
+
+    const handleObjectModified = () => {
+      triggerAutoSave({ action: 'objectModified' });
+    };
+
+    canvas.on('object:moved', handleObjectMoved);
+    canvas.on('object:scaled', handleObjectScaled);
+    canvas.on('object:rotated', handleObjectRotated);
+    canvas.on('object:modified', handleObjectModified);
+
     return () => {
       canvas.off('mouse:wheel', handleCanvasZoom);
       canvas.off('mouse:down', handleMouseDown);
@@ -479,6 +527,10 @@ export default function Canvas({
       canvas.off('object:rotating', handleTransforming);
       canvas.off('object:modified', handleModified);
       canvas.off('after:render', handleAfterRender);
+      canvas.off('object:moved', handleObjectMoved);
+      canvas.off('object:scaled', handleObjectScaled);
+      canvas.off('object:rotated', handleObjectRotated);
+      canvas.off('object:modified', handleObjectModified);
       document.removeEventListener('keydown', handleKeyDown, { capture: true });
       document.removeEventListener('keyup', handleKeyUp, { capture: true });
       canvas.dispose();
@@ -534,10 +586,11 @@ export default function Canvas({
       canvas.requestRenderAll();
       setDeleteIconPos(null);
       const cb = onSelectionChangeRef.current; if (cb) cb(null);
+      triggerAutoSave({ action: 'delete', deletedCount: activeObjects.length });
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [drawingMode]);
+  }, [drawingMode, triggerAutoSave]);
 
   // Effect for loading the background image
   useEffect(() => {
@@ -818,6 +871,7 @@ export default function Canvas({
         maxDroneWarningShownRef.current = false;
 
         setCanvasRevision(c => c + 1); // 캔버스 변경을 알림
+        triggerAutoSave({ drawingMode: 'brush' });
       };
 
       const drawDotAtPoint = (e) => {
@@ -970,6 +1024,7 @@ export default function Canvas({
 
       const stopErase = () => {
         isErasing = false;
+        triggerAutoSave({ drawingMode: 'erase' });
       };
 
       const eraseAtPoint = (e) => {
@@ -1019,6 +1074,7 @@ export default function Canvas({
 
         if (objectsToRemove.length > 0) {
           canvas.renderAll();
+          triggerAutoSave({ drawingMode: 'erase', erased: objectsToRemove.length });
         }
       };
 
@@ -1260,7 +1316,7 @@ export default function Canvas({
         canvas.add(img);
         canvas.setActiveObject(img);
         setCanvasRevision(c => c + 1); // 캔버스 변경을 알림
-        
+        triggerAutoSave({ action: 'imageDropped', imageUrl });
         canvas.renderAll();
       })
       .catch((err) => {
@@ -1278,8 +1334,11 @@ export default function Canvas({
         "캔버스의 모든 내용을 지우시겠습니까? 이 작업은 되돌릴 수 없습니다."
       )
     ) {
+      const canvas = fabricCanvas.current;
+      const objectCount = canvas.getObjects().length;
       clearCanvas();
       console.log("캔버스 전체가 초기화되었습니다");
+      triggerAutoSave({ action: 'clearAll', clearedCount: objectCount });
     }
   };
 
@@ -1619,6 +1678,7 @@ export default function Canvas({
             canvas.requestRenderAll();
             setDeleteIconPos(null);
             const cb = onSelectionChangeRef.current; if (cb) cb(null);
+            triggerAutoSave({ action: 'deleteButton', deletedCount: activeObjects.length });
           }}
           style={{
             position: 'absolute',
