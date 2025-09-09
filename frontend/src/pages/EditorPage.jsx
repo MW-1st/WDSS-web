@@ -54,6 +54,15 @@ export default function EditorPage({ projectId = DUMMY }) {
     localStorage.setItem("wdss:galleryOpen", JSON.stringify(galleryOpen));
   }, [galleryOpen]);
 
+  // Ensure gallery is closed on leaving the editor page
+  useEffect(() => {
+    return () => {
+      try {
+        localStorage.setItem("wdss:galleryOpen", JSON.stringify(false));
+      } catch (_) {}
+    };
+  }, []);
+
   // 이미지 변환 관련 상태
   const [processing, setProcessing] = useState(false);
   const [targetDots, setTargetDots] = useState(2000);
