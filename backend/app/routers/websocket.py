@@ -1,6 +1,7 @@
 import json # JSON 라이브러리 import
 from typing import List
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from pydantic import BaseModel
 
 # (ConnectionManager 클래스는 변경 없음)
 class ConnectionManager:
@@ -37,3 +38,10 @@ async def websocket_endpoint(websocket: WebSocket):
     except WebSocketDisconnect:
         manager.disconnect(websocket)
         await manager.broadcast("A client has left the chat")
+
+
+@router.post("/test/broadcast")
+async def test_broadcast():
+    test_message = "Test message from backend"
+    await manager.broadcast(test_message)
+    return {"status": "success", "message": "Test message broadcasted to all connected Unity clients"}
