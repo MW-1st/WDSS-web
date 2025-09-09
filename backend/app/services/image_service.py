@@ -45,6 +45,7 @@ def process_image(
     # 최소한의 모폴로지 연산
     kernel = np.ones((2, 2), np.uint8)
     edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)  # 끊어진 선만 연결
+    circle_radius = 2  # SVG 원 반지름(px)
 
     # step 자동 계산 (target_dots 지정 시 우선)
     h, w = edges.shape[:2]
@@ -59,20 +60,60 @@ def process_image(
     # 간단한 점 선택 (원래 방식)
     points: list[tuple[int, int]] = []  # (x, y)
     if target_dots and target_dots > 0:
-        coords = np.column_stack(np.where(edges != 0))  # (y, x)
-        total = int(coords.shape[0])
-        if total > 0:
-            replace = target_dots > total
-            idx = np.random.choice(total, size=target_dots, replace=replace)
-            sel = coords[idx]
-            points = [(int(x), int(y)) for (y, x) in sel]
-        else:
-            points = []
+        # 추정된 step 간격으로 그리드 형태 수집
+        for y in range(0, h, step):
+            for x in range(0, w, step):
+                if edges[y, x] != 0:
+                    points.append((x, y))
+        # 목표 개수보다 많으면 무작위로 일부만 추출(그리드 좌표 유지)
+        total = len(points)
+        if total > int(target_dots):
+            idx = np.random.choice(total, size=int(target_dots), replace=False)
+            points = [points[i] for i in idx]
     else:
         for y in range(0, h, step):
             for x in range(0, w, step):
                 if edges[y, x] != 0:
                     points.append((x, y))
+    # 최소 간격 유지(원 반지름 기준) + 중복 제거
+    def _enforce_min_distance(points_list, min_dist):
+        if not points_list or min_dist <= 1:
+            return points_list
+        cell = int(max(1, min_dist))
+        inv = 1.0 / float(cell)
+        grid = {}
+        accepted = []
+        min_sq = float(min_dist) * float(min_dist)
+
+        for (px, py) in points_list:
+            cx = int(px * inv)
+            cy = int(py * inv)
+            ok = True
+            for nx in (cx - 1, cx, cx + 1):
+                for ny in (cy - 1, cy, cy + 1):
+                    bucket = grid.get((nx, ny))
+                    if not bucket:
+                        continue
+                    for (ax, ay) in bucket:
+                        dx = ax - px
+                        dy = ay - py
+                        if (dx * dx + dy * dy) < min_sq:
+                            ok = False
+                            break
+                    if not ok:
+                        break
+                if not ok:
+                    break
+            if ok:
+                ipx = int(px)
+                ipy = int(py)
+                accepted.append((ipx, ipy))
+                grid.setdefault((cx, cy), []).append((ipx, ipy))
+        return accepted
+
+    if points:
+        points = list(dict.fromkeys(points))
+        points = _enforce_min_distance(points, circle_radius * 2)
     dot_count = len(points)
 
     # 출력 경로 준비 (backend/uploads)
@@ -188,7 +229,7 @@ def process_image(
             else:
                 actual_color = "#000"
 
-        circles.append(f'<circle cx="{x}" cy="{y}" r="2" fill="{actual_color}" />')
+        circles.append(f'<circle cx="{x}" cy="{y}" r="{circle_radius}" fill="{actual_color}" />')
 
     # SVG 저장 (비ASCII 경로 호환)
     svg_header = (
