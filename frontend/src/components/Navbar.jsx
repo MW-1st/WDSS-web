@@ -25,6 +25,11 @@ export default function Navbar({ transparent: propTransparent = false }) {
 
     const sceneId = editorState.selectedId;
 
+    // Export prerequisites and last JSON URL
+    const [transformClicked, setTransformClicked] = React.useState(false);
+    const [jsonBuilt, setJsonBuilt] = React.useState(false);
+    const [lastJsonUrl, setLastJsonUrl] = React.useState("");
+
     React.useEffect(() => {
       const handler = (e) => {
         const detail = e.detail || {};
@@ -94,7 +99,11 @@ export default function Navbar({ transparent: propTransparent = false }) {
           const full = json_url.startsWith("http")
             ? json_url
             : `${base}/${json_url.replace(/^\//, "")}`;
-          window.open(full, "_blank", "noopener");
+          try {
+            setJsonBuilt(true);
+            setLastJsonUrl(full);
+          } catch {}
+          // window.open(full, "_blank", "noopener");
 
           alert(
             unity_sent
@@ -123,7 +132,12 @@ export default function Navbar({ transparent: propTransparent = false }) {
 
           <div className="flex flex-1 justify-between">
             <button
-              onClick={() => api?.handleTransform && api.handleTransform()}
+              onClick={() => {
+                setTransformClicked(true);
+                setJsonBuilt(false);
+                setLastJsonUrl("");
+                api?.handleTransform && api.handleTransform();
+              }}
               disabled={editorState.processing || !editorState.selectedId}
               className={`px-3 py-1.5 rounded text-white ${
                 editorState.processing
@@ -148,6 +162,39 @@ export default function Navbar({ transparent: propTransparent = false }) {
                 className="px-3 py-1.5 rounded !bg-blue-600 hover:!bg-blue-700 text-white"
               >
                 JSON 파일로만들기
+              </button>
+
+              <button
+                onClick={() => {
+                  if (!transformClicked || !jsonBuilt) {
+                    alert(
+                      "먼저 '변환' 버튼과 'JSON 파일로만들기' 버튼을 순서대로 실행해 주세요."
+                    );
+                    return;
+                  }
+                  if (!lastJsonUrl) {
+                    alert(
+                      "다운로드할 JSON URL이 없습니다. 'JSON 파일로만들기'를 먼저 실행해 주세요."
+                    );
+                    return;
+                  }
+                  try {
+                    const a = document.createElement("a");
+                    a.href = lastJsonUrl;
+                    a.download = `${(
+                      editorState.projectName || "project"
+                    ).replace(/[^\\w.-]+/g, "_")}.json`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                  } catch (_) {
+                    window.open(lastJsonUrl, "_blank", "noopener");
+                  }
+                }}
+                className="px-3 py-1.5 rounded !bg-emerald-600 hover:!bg-emerald-700 text-white"
+                title="Export"
+              >
+                Export
               </button>
 
               {!isUnityVisible ? (
