@@ -10,6 +10,15 @@ const ColorPicker = React.memo(function ColorPicker({ color, onChange, onPreview
   const [isDraggingSaturation, setIsDraggingSaturation] = useState(false);
   const [isDraggingHue, setIsDraggingHue] = useState(false);
 
+  // Layout constants to keep picker compact and avoid horizontal scroll
+  const SV_WIDTH = 180;
+  const SV_HEIGHT = 130;
+  const HUE_WIDTH = 180;
+  const HUE_HEIGHT = 14;
+  const HANDLE_SIZE = 16;
+
+  const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+
   // HSV to RGB conversion
   const hsvToRgb = (h, s, v) => {
     const c = v * s;
@@ -282,16 +291,18 @@ const ColorPicker = React.memo(function ColorPicker({ color, onChange, onPreview
             border: '1px solid #ccc',
             borderRadius: '8px',
             padding: '12px',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            overflowX: 'hidden',
+            boxSizing: 'border-box'
           }}
         >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: HUE_WIDTH }}>
             {/* Saturation/Brightness canvas with handle */}
-            <div style={{ position: 'relative', width: 200, height: 150 }}>
+            <div style={{ position: 'relative', width: SV_WIDTH, height: SV_HEIGHT, overflow: 'hidden' }}>
               <canvas
                 ref={canvasRef}
-                width={200}
-                height={150}
+                width={SV_WIDTH}
+                height={SV_HEIGHT}
                 style={{
                   cursor: 'crosshair',
                   border: '1px solid #ddd',
@@ -308,10 +319,10 @@ const ColorPicker = React.memo(function ColorPicker({ color, onChange, onPreview
               <div
                 style={{
                   position: 'absolute',
-                  left: `${Math.max(0, Math.min(200 * currentHsv[1], 200)) - 8}px`,
-                  top: `${Math.max(0, Math.min(150 * (1 - currentHsv[2]), 150)) - 8}px`,
-                  width: 16,
-                  height: 16,
+                  left: `${clamp(SV_WIDTH * currentHsv[1] - HANDLE_SIZE / 2, 0, SV_WIDTH - HANDLE_SIZE)}px`,
+                  top: `${clamp(SV_HEIGHT * (1 - currentHsv[2]) - HANDLE_SIZE / 2, 0, SV_HEIGHT - HANDLE_SIZE)}px`,
+                  width: HANDLE_SIZE,
+                  height: HANDLE_SIZE,
                   borderRadius: '50%',
                   boxShadow: '0 0 0 2px #000, inset 0 0 0 2px #fff',
                   pointerEvents: 'none'
@@ -320,11 +331,11 @@ const ColorPicker = React.memo(function ColorPicker({ color, onChange, onPreview
             </div>
 
             {/* Hue bar with handle (horizontal) */}
-            <div style={{ position: 'relative', width: 200, height: 16 }}>
+            <div style={{ position: 'relative', width: HUE_WIDTH, height: HUE_HEIGHT, overflow: 'hidden' }}>
               <canvas
                 ref={hueCanvasRef}
-                width={200}
-                height={16}
+                width={HUE_WIDTH}
+                height={HUE_HEIGHT}
                 style={{
                   cursor: 'crosshair',
                   border: '1px solid #ddd',
@@ -341,9 +352,9 @@ const ColorPicker = React.memo(function ColorPicker({ color, onChange, onPreview
               <div
                 style={{
                   position: 'absolute',
-                  left: `${Math.max(0, Math.min(200 * (currentHsv[0] / 360), 200)) - 8}px`,
-                  top: '-6px',
-                  width: 16,
+                  left: `${clamp(HUE_WIDTH * (currentHsv[0] / 360) - HANDLE_SIZE / 2, 0, HUE_WIDTH - HANDLE_SIZE)}px`,
+                  top: `${-(28 - HUE_HEIGHT) / 2}px`,
+                  width: HANDLE_SIZE,
                   height: 28,
                   borderRadius: 14,
                   background: 'transparent',
@@ -418,8 +429,8 @@ const ColorPicker = React.memo(function ColorPicker({ color, onChange, onPreview
                   display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  background: '#f5f5f5',
-                  border: '1px solid #ccc',
+                  background: 'transparent',
+                  
                   borderRadius: 4,
                   cursor: 'pointer'
                 }}
@@ -433,7 +444,7 @@ const ColorPicker = React.memo(function ColorPicker({ color, onChange, onPreview
                   setIsOpen(false);
                 }}
                 style={{
-                  padding: '4px 8px',
+                  padding: '4px 4.2px',
                   backgroundColor: '#007bff',
                   color: 'white',
                   border: 'none',
