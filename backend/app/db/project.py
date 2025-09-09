@@ -9,7 +9,7 @@ async def get_projects_by_user_id(
 ) -> List[dict]:
     """사용자 ID로 프로젝트 목록을 조회합니다."""
     rows = await conn.fetch(
-        "SELECT * FROM project WHERE user_id = $1 ORDER BY updated_at DESC", user_id
+        "SELECT * FROM project WHERE user_id = $1 AND max_drone IS NOT NULL ORDER BY updated_at DESC", user_id
     )
     return [dict(row) for row in rows]
 
@@ -19,8 +19,8 @@ async def create_project(
 ) -> dict:
     """DB에 새 프로젝트를 생성합니다."""
     query = """
-        INSERT INTO project (project_name, format, max_scene, max_speed, max_accel, min_separation, user_id)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        INSERT INTO project (project_name, format, max_scene, max_drone, max_speed, max_accel, min_separation, user_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING *
     """
     new_project = await conn.fetchrow(
@@ -28,6 +28,7 @@ async def create_project(
         project_data.project_name,
         project_data.format,
         project_data.max_scene,
+        project_data.max_drone,
         project_data.max_speed,
         project_data.max_accel,
         project_data.min_separation,
@@ -96,7 +97,30 @@ async def delete_project_by_id(
     """프로젝트 ID로 특정 프로젝트를 삭제합니다."""
     # 참고: ON DELETE CASCADE 제약조건이 설정되어 있다면 project 삭제 시 project_scenes의 관련 데이터도 자동 삭제됩니다.
     # 그렇지 않다면, project_scenes 테이블의 데이터를 먼저 삭제하는 로직이 필요합니다.
-    result = await conn.execute(
-        "DELETE FROM project WHERE id = $1 AND user_id = $2", project_id, user_id
-    )
+    async with conn.transaction():
+        # Remove project-scene relations first to satisfy FK constraints
+        await conn.execute(
+            "DELETE FROM project_scenes WHERE project_id = $1",
+            project_id,
+        )
+
+        # Cleanup orphan scenes that are no longer referenced by any project
+        await conn.execute(
+            """
+            DELETE FROM scene
+            WHERE id IN (
+                SELECT s.id
+                FROM scene s
+                LEFT JOIN project_scenes ps ON s.id = ps.scene_id
+                WHERE ps.scene_id IS NULL
+            )
+            """
+        )
+
+        # Finally delete the project (permission scoped by user_id)
+        result = await conn.execute(
+            "DELETE FROM project WHERE id = $1 AND user_id = $2",
+            project_id,
+            user_id,
+        )
     return result == "DELETE 1"

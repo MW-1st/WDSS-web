@@ -13,29 +13,15 @@ app = FastAPI()
 # CORS for local dev (Vite on 5173)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "*"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://3.85.51.152:5173",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-# CORS 헤더를 추가하는 미들웨어
-class CORSStaticFilesMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        response = await call_next(request)
-
-        # /uploads 경로에 대해 CORS 헤더 추가
-        if request.url.path.startswith("/uploads/"):
-            response.headers["Access-Control-Allow-Origin"] = "*"
-            response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
-            response.headers["Access-Control-Allow-Headers"] = "*"
-
-        return response
-
-
-# CORS 미들웨어 추가
-app.add_middleware(CORSStaticFilesMiddleware)
 
 # Routers
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
@@ -56,7 +42,7 @@ app.mount(
 
 app.mount(
     "/originals",
-    StaticFiles(directory="processed"),
+    StaticFiles(directory="originals"),
     name="originals",
 )
 

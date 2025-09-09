@@ -1,5 +1,5 @@
 import React from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { useUnity } from "../contexts/UnityContext.jsx";
 import client from "../api/client";
@@ -11,6 +11,8 @@ export default function Navbar({ transparent: propTransparent = false }) {
 
   // ===== ① 에디터(프로젝트) 전용 Navbar =====
   if (location.pathname.startsWith("/projects")) {
+    const projectId = location.pathname.split("/")[2];
+
     const api = typeof window !== "undefined" ? window.editorAPI : undefined;
 
     const [editorState, setEditorState] = React.useState(() => ({
@@ -20,6 +22,13 @@ export default function Navbar({ transparent: propTransparent = false }) {
       selectedId: api?.selectedId || null,
       projectName: api?.projectName || "",
     }));
+
+    const sceneId = editorState.selectedId;
+
+    // Export prerequisites and last JSON URL
+    const [transformClicked, setTransformClicked] = React.useState(false);
+    const [jsonBuilt, setJsonBuilt] = React.useState(false);
+    const [lastJsonUrl, setLastJsonUrl] = React.useState("");
 
     React.useEffect(() => {
       const handler = (e) => {
@@ -51,112 +60,153 @@ export default function Navbar({ transparent: propTransparent = false }) {
 
     const handleJsonGeneration = async () => {
       try {
-        if (
-          !api?.stageRef?.current ||
-          !api.stageRef.current.getCurrentCanvasAsSvg
-        ) {
-          alert("캔버스가 준비되지 않았습니다.");
+        const pathSegments = location.pathname.split("/");
+        const projectId = pathSegments[2];
+
+        if (!projectId) {
+          alert("프로젝트 ID를 찾을 수 없습니다.");
           return;
         }
-        const canvasSvgData = api.stageRef.current.getCurrentCanvasAsSvg();
-        if (!canvasSvgData || canvasSvgData.totalDots === 0) {
-          alert("그릴 도트가 없습니다. 먼저 이미지 변환하거나 그림을 그려주세요.");
-          return;
+
+        // 현재 씬이 있고 수정사항이 있으면 먼저 저장
+        if (sceneId && api?.stageRef?.current?.getCurrentCanvasAsSvg) {
+          const canvasSvgData = api.stageRef.current.getCurrentCanvasAsSvg();
+          if (canvasSvgData && canvasSvgData.totalDots > 0) {
+            const svgBlob = new Blob([canvasSvgData.svgString], {
+              type: "image/svg+xml",
+            });
+
+            const saveFormData = new FormData();
+            saveFormData.append(
+              "svg_file",
+              new File([svgBlob], `${sceneId}.svg`, { type: "image/svg+xml" })
+            );
+
+            await client.put(
+              `/projects/${projectId}/scenes/${sceneId}/processed`,
+              saveFormData
+            );
+          }
         }
-        const svgBlob = new Blob([canvasSvgData.svgString], {
-          type: "image/svg+xml",
-        });
-        const fd = new FormData();
-        fd.append(
-          "file",
-          new File([svgBlob], "modified_canvas.svg", { type: "image/svg+xml" })
-        );
-        const jsonResp = await client.post("/image/svg-to-json", fd);
-        const jsonUrl = jsonResp.data?.json_url;
-        const unitySent = jsonResp.data?.unity_sent;
-        if (jsonUrl) {
+
+        // 모든 씬을 JSON으로 변환
+        const response = await client.post(`/projects/${projectId}/json`);
+        const { json_url, unity_sent, scenes_processed, total_scenes } =
+          response.data;
+
+        if (json_url) {
           const base = client.defaults.baseURL?.replace(/\/$/, "") || "";
-          const full = jsonUrl.startsWith("http")
-            ? jsonUrl
-            : `${base}/${jsonUrl.replace(/^\//, "")}`;
-          window.open(full, "_blank", "noopener");
+          const full = json_url.startsWith("http")
+            ? json_url
+            : `${base}/${json_url.replace(/^\//, "")}`;
+          try {
+            setJsonBuilt(true);
+            setLastJsonUrl(full);
+          } catch {}
+          // window.open(full, "_blank", "noopener");
+
           alert(
-            unitySent
-              ? `JSON 생성 및 Unity 전송 완료 (총 ${canvasSvgData.totalDots} 도트)`
-              : `JSON 생성 완료 (총 ${canvasSvgData.totalDots} 도트)`
+            unity_sent
+              ? `${scenes_processed}/${total_scenes}개 씬이 JSON으로 변환되고 Unity로 전송되었습니다!`
+              : `${scenes_processed}/${total_scenes}개 씬이 JSON으로 변환되었습니다!`
           );
         } else {
           alert("JSON 생성에 실패했습니다.");
         }
       } catch (e) {
-        console.error("SVG to JSON error", e);
-        alert("JSON 생성 중 오류가 발생했습니다.");
+        console.error("Export all scenes error", e);
+        alert("전체 프로젝트 내보내기 중 오류가 발생했습니다.");
       }
     };
 
     return (
-      <nav className="px-4 py-2 mb-4 flex justify-center">
+      <nav className="px-4 py-2 mb-4 flex justify-center font-nanumhuman">
         <div className="w-full flex justify-between items-center gap-40">
-          {/* Project name */}
-          <div
-            className="font-semibold max-w-[280px] truncate"
-            title={editorState.projectName || "Untitled Project"}
-          >
-            {editorState.projectName || "Untitled Project"}
+          {/* Logo + Project name */}
+          <div className="flex items-center gap-3">
+            <Link to="/" title="메인 페이지" className="logo-press flex items-center">
+              <img src="/img/Logo.png" alt="Logo" className="h-10 w-auto" />
+            </Link>
+            <div
+              className="font-extrabold text-3xl max-w-[480px] truncate"
+              title={editorState.projectName || "Untitled Project"}
+            >
+              {editorState.projectName || "Untitled Project"}
+            </div>
           </div>
 
           <div className="flex flex-1 justify-between">
-            {/* Slider + Transform */}
-            <div className="flex items-center gap-10">
-              <div>
-                <input
-                  type="range"
-                  min={100}
-                  max={10000}
-                  step={10}
-                  value={Number(localDots) || 0}
-                  onChange={handleRangeChange}
-                  onMouseUp={commitDots}
-                  onTouchEnd={commitDots}
-                  onPointerUp={commitDots}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onPointerMove={(e) => e.stopPropagation()}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onTouchStart={(e) => e.stopPropagation()}
-                  className="w-56 cursor-pointer"
-                />
-                <span className="text-sm text-gray-600 min-w-[42px] text-right">
-                  {localDots}
-                </span>
-              </div>
+            <button
+              onClick={() => {
+                setTransformClicked(true);
+                setJsonBuilt(false);
+                setLastJsonUrl("");
+                api?.handleTransform && api.handleTransform();
+              }}
+              disabled={editorState.processing || !editorState.selectedId}
+              className={`px-3 py-1.5 rounded text-white ${
+                editorState.processing
+                  ? "!bg-blue-600"
+                  : "!bg-blue-600 hover:!bg-blue-700"
+              }`}
+              title={
+                editorState.processing
+                  ? "변환 중"
+                  : !editorState.selectedId
+                  ? "먼저 씬을 선택하세요"
+                  : undefined
+              }
+            >
+              변환
+            </button>
 
-              <button
-                onClick={() => api?.handleTransform && api.handleTransform()}
-                disabled={editorState.processing || !editorState.selectedId}
-                className={`px-3 py-1.5 rounded text-white ${
-                  editorState.processing
-                    ? "!bg-blue-600"
-                    : "!bg-blue-600 hover:!bg-blue-700"
-                }`}
-                title={
-                  editorState.processing
-                    ? "변환 중"
-                    : !editorState.selectedId
-                    ? "먼저 씬을 선택하세요"
-                    : undefined
-                }
-              >
-                변환
-              </button>
-            </div>
-
-            {/* JSON + Unity */}
+            {/* Dashboard + JSON + Unity */}
             <div className="flex items-center gap-2">
+              <Link
+                to="/dashboard"
+                className="px-3 py-1.5 rounded border border-gray-300 text-gray-800 hover:bg-gray-100"
+                title="대시보드로 이동"
+              >
+                Dashboard
+              </Link>
               <button
                 onClick={handleJsonGeneration}
                 className="px-3 py-1.5 rounded !bg-blue-600 hover:!bg-blue-700 text-white"
               >
                 JSON 파일로만들기
+              </button>
+
+              <button
+                onClick={() => {
+                  if (!transformClicked || !jsonBuilt) {
+                    alert(
+                      "먼저 '변환' 버튼과 'JSON 파일로만들기' 버튼을 순서대로 실행해 주세요."
+                    );
+                    return;
+                  }
+                  if (!lastJsonUrl) {
+                    alert(
+                      "다운로드할 JSON URL이 없습니다. 'JSON 파일로만들기'를 먼저 실행해 주세요."
+                    );
+                    return;
+                  }
+                  try {
+                    const a = document.createElement("a");
+                    a.href = lastJsonUrl;
+                    a.download = `${(
+                      editorState.projectName || "project"
+                    ).replace(/[^\\w.-]+/g, "_")}.json`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                  } catch (_) {
+                    window.open(lastJsonUrl, "_blank", "noopener");
+                  }
+                }}
+                className="px-3 py-1.5 rounded !bg-emerald-600 hover:!bg-emerald-700 text-white"
+                title="Export"
+              >
+                Export
               </button>
 
               {!isUnityVisible ? (
@@ -204,14 +254,17 @@ export default function Navbar({ transparent: propTransparent = false }) {
       <nav className={`${base} relative flex items-center h-16 px-8 font-bold`}>
         {/* 중앙 메뉴 */}
         <div className="absolute left-1/2 -translate-x-1/2 flex gap-40 text-xl pt-1">
-          <Link className="hover:underline underline-offset-4 decoration-2" to="/">
+          <Link
+            className="hover:underline underline-offset-4 decoration-2"
+            to="/"
+          >
             Main
           </Link>
           <Link
             className="hover:underline underline-offset-4 decoration-2"
-            to="/editor"
+            to=""
           >
-            Editor
+            Introduce
           </Link>
           {!isAuthenticated && (
             <Link

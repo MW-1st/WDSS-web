@@ -8,10 +8,23 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:8000', // FastAPI 백엔드 서버 주소
-        changeOrigin: true, // CORS 에러 방지를 위해 필요한 설정
+        target: 'http://localhost:8000',
+        changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
+      // 이미지 경로들도 프록시 추가
+      '/uploads': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+      '/processed': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+      '/originals': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      }
     },
   },
 })

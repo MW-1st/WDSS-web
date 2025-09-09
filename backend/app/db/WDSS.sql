@@ -42,9 +42,10 @@ CREATE TABLE "jwt_blocklist" (
 CREATE TABLE "project" (
   "id" uuid PRIMARY KEY,
   "user_id" uuid,
-  "project_name" char(64),
+  "project_name" varchar(64),
   "format" char(64) DEFAULT 'dsj',
   "max_scene" int,
+  "max_drone" int,
   "max_speed" float,
   "max_accel" float,
   "min_separation" float,
@@ -112,7 +113,6 @@ ALTER TABLE "project" ALTER COLUMN "updated_at" SET DEFAULT NOW();
 
 -- scene 테이블
 ALTER TABLE "scene" ALTER COLUMN "id" SET DEFAULT gen_random_uuid();
-
 
 -- 4. updated_at 자동 갱신 트리거 적용
 -- users 테이블에 트리거 적용

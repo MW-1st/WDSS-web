@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import "../styles/DashboardPage.css"; // 스타일 import
 import "../styles/DashboardPage.css";
 import { CiMenuBurger } from "react-icons/ci";
+import { TiDelete } from "react-icons/ti";
 import ProjectSettingsModal from "../components/ProjectSettingsModal";
 
 
@@ -49,6 +50,22 @@ export default function DashboardPage() {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingProject, setEditingProject] = useState(null);
+  const [creating, setCreating] = useState(false);
+  const [bannerUrl, setBannerUrl] = useState("/img/banner_01.png");
+
+  // Pick a random banner when the dashboard mounts
+  useEffect(() => {
+    const candidates = [
+      "/img/banner_01.png",
+      "/img/banner_02.png",
+      "/img/banner_03.png",
+      "/img/banner_04.png",
+      "/img/banner_05.png",
+    ];
+    const idx = Math.floor(Math.random() * candidates.length);
+    setBannerUrl(candidates[idx]);
+  }, []);
+
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -67,22 +84,8 @@ export default function DashboardPage() {
     })();
   }, [isAuthenticated]);
 
-  const handleCreateProject = async () => {
-    try {
-      const newProjectData = {
-        project_name: "새 프로젝트",
-        format: "dsj",
-        max_scene: 15,
-        max_speed: 6.0,
-        max_accel: 3.0,
-        min_separation: 2.0,
-      };
-      const res = await client.post("/projects", newProjectData);
-      const projectId = res.data.project.id;
-      navigate(`/projects/${projectId}`);
-    } catch (error) {
-      console.error("Project creation failed:", error);
-    }
+  const handleCreateProject = () => {
+    setCreating(true);
   };
 
   const handleProjectClick = (projectId) => {
@@ -98,6 +101,19 @@ export default function DashboardPage() {
 
   const handleSaved = (updated) => {
     setProjects((prev) => prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)));
+  };
+
+  const handleDeleteProject = async (e, projectId, projectName) => {
+    e.stopPropagation();
+    const ok = window.confirm(`프로젝트 "${projectName}"를 삭제할까요? 이 작업은 되돌릴 수 없습니다.`);
+    if (!ok) return;
+    try {
+      await client.delete(`/projects/${projectId}`);
+      setProjects((prev) => prev.filter((p) => p.id !== projectId));
+    } catch (err) {
+      console.error("Failed to delete project:", err);
+      alert("프로젝트 삭제에 실패했습니다.");
+    }
   };
 
   const formatDate = (dateString) => {
@@ -116,7 +132,9 @@ export default function DashboardPage() {
   return (
     <>
       <div className="dashboard-container">
-        <header className="dashboard-header">
+        <div className="hero" style={{ height: 240 }}>
+          <img src={bannerUrl} alt="banner" className="hero-bg" />
+          <header className="dashboard-header">
           <h2 className="welcome-message">{user.username}님 안녕하세요</h2>
           <p className="welcome-sub-message">새 작업을 시작하거나 기존 프로젝트를 확인하세요.</p>
 
@@ -126,7 +144,8 @@ export default function DashboardPage() {
               <span>새 프로젝트 생성</span>
             </button>
           </div>
-        </header>
+          </header>
+        </div>
 
         <main className="dashboard-main">
           <section className="section">
@@ -147,6 +166,15 @@ export default function DashboardPage() {
                       (e.key === "Enter" || e.key === " ") && handleProjectClick(project.id)
                     }
                   >
+                    {/* Hover delete button */}
+                    <button
+                      className="project-delete-btn"
+                      title="프로젝트 삭제"
+                      aria-label={`삭제: ${project.project_name}`}
+                      onClick={(e) => handleDeleteProject(e, project.id, project.project_name)}
+                    >
+                      <TiDelete size={22} />
+                    </button>
                     <div className="card-thumbnail">
                       <ProjectIcon />
                     </div>
@@ -184,7 +212,18 @@ export default function DashboardPage() {
           onSaved={handleSaved}
         />
       )}
+      {creating && (
+        <ProjectSettingsModal
+          mode="create"
+          project={null}
+          onClose={() => setCreating(false)}
+          onSaved={(created) => {
+            setProjects((prev) => [created, ...prev]);
+            setCreating(false);
+            navigate(`/projects/${created.id}`);
+          }}
+        />
+      )}
     </>
   );
 }
-

@@ -1,12 +1,6 @@
 import asyncpg
+from app.config import PROCESSED_DIR, SVG_JSON_DIR
 from app.db.database import get_db
-from app.db.project import (
-    get_projects_by_user_id,
-    create_project,
-    get_project_by_id,
-    update_project_by_id,
-    delete_project_by_id,
-)
 from app.dependencies import get_current_user
 from app.schemas import (
     UserResponse,
@@ -17,8 +11,24 @@ from app.schemas import (
     SuccessResponse,
     ProjectUpdate,
 )
+from app.db.project import (
+    get_projects_by_user_id,
+    create_project,
+    get_project_by_id,
+    update_project_by_id,
+    delete_project_by_id,
+)
+from app.routers.websocket import manager
+from app.services.svg_service import (
+    svg_to_coords_with_colors,
+    get_svg_size,
+    coords_with_colors_to_json,
+)
 from fastapi import APIRouter, Depends, status, HTTPException
+import json
+import os
 import uuid
+
 
 router = APIRouter()
 
@@ -52,6 +62,7 @@ async def create_new_project(
     - **project_name**: 프로젝트의 이름
     - **format**: 포맷 (기본값: "dsj")
     - **max_scene**: 최대 씬 개수
+    - **max_drone**: 최대 드론 개수
     - **max_speed**: 드론의 최대 속도 (m/s)
     - **max_accel**: 드론의 최대 가속도 (m/s²)
     - **min_separation**: 드론 간 최소 안전 이격 거리 (m)
@@ -123,3 +134,138 @@ async def delete_existing_project(
             status_code=status.HTTP_404_NOT_FOUND, detail="Project not found"
         )
     return {"success": True}
+
+
+@router.post("/{project_id}/json")
+async def export_project_to_json(
+    project_id: uuid.UUID,
+    user: dict = Depends(get_current_user),
+    conn: asyncpg.Connection = Depends(get_db),
+    # 개별 씬 변환 파라미터들 (DB에 없는 값들)
+    z_value: float = 0.0,
+    scale_x: float = 1.0,
+    scale_y: float = 1.0,
+    scale_z: float = 1.0,
+    offset_x: float = 0.0,
+    offset_y: float = 0.0,
+    offset_z: float = 0.0,
+    led_intensity: float = 1.0,
+):
+    """프로젝트의 모든 씬을 JSON으로 변환"""
+
+    # 프로젝트 정보 가져오기 (JSON 메타데이터용)
+    project = await conn.fetchrow(
+        """
+              SELECT project_name, format, max_scene, max_drone, max_speed, max_accel, min_separation
+              FROM project
+              WHERE id = $1
+              """,
+        project_id,
+    )
+
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # 씬들 가져오기
+    scenes = await conn.fetch(
+        """
+              SELECT s.id, s.scene_num
+              FROM project_scenes ps
+                       JOIN scene s ON ps.scene_id = s.id
+              WHERE ps.project_id = $1
+              ORDER BY s.scene_num
+              """,
+        project_id,
+    )
+
+    if not scenes:
+        raise HTTPException(status_code=404, detail="No scenes found")
+
+    all_scenes_data = []
+
+    for i, scene in enumerate(scenes):
+        scene_id = scene["id"]
+        scene_num = scene["scene_num"]
+
+        # scene_holder 계산: 다음 씬까지의 간격
+        if i < len(scenes) - 1:  # 마지막 씬이 아닌 경우
+            next_scene_num = scenes[i + 1]["scene_num"]
+            scene_holder = next_scene_num - scene_num - 1
+        else:  # 마지막 씬인 경우
+            scene_holder = 0  # 기본값 또는 DB에서 설정된 기본 지속시간
+
+        # processed 파일 경로
+        processed_path = os.path.join(PROCESSED_DIR, f"{scene_id}.svg")
+
+        if os.path.exists(processed_path):
+            try:
+                # SVG 파일을 좌표+색상으로 변환
+                coords_with_colors = svg_to_coords_with_colors(processed_path)
+                scene_w, scene_h, scene_z = get_svg_size(processed_path)
+
+                # 개별 씬 액션 데이터 생성
+                actions = []
+                for x, y, (r, g, b) in coords_with_colors:
+                    tx = x * scale_x + offset_x
+                    ty = y * scale_y + offset_y
+                    tz = z_value * scale_z + offset_z
+                    actions.append(
+                        {
+                            "led_intensity": float(led_intensity),
+                            "led_rgb": [int(r), int(g), int(b)],
+                            "transform_pos": [float(tx), float(ty), float(tz)],
+                        }
+                    )
+
+                # 씬 데이터 구성
+                scene_data = {
+                    "scene_number": int(scene_num),
+                    "scene_holder": scene_holder,
+                    "scene_size": [float(scene_w), float(scene_h), float(scene_z)],
+                    "action_data": actions,
+                }
+
+                all_scenes_data.append(scene_data)
+
+            except Exception as e:
+                print(f"Error processing scene {scene_id}: {e}")
+                continue
+
+    if not all_scenes_data:
+        raise HTTPException(status_code=400, detail="No valid processed scenes found")
+
+    # 프로젝트 레벨 JSON 구성 (무조건 DB 값 사용)
+    project_json = {
+        "format": project["format"] or "dsj",
+        "show": {
+            "show_name": project["project_name"] or "Untitled Show",
+            "max_scene": int(project["max_scene"] or 1),
+            "max_drone": int(project["max_drone"] or 1),  # DB의 max_scene 값 사용
+        },
+        "constraints": {
+            "max_speed": float(project["max_speed"] or 6.0),
+            "max_accel": float(project["max_accel"] or 3.0),
+            "min_separation": float(project["min_separation"] or 2.0),
+        },
+        "scenes": all_scenes_data,
+    }
+
+    # JSON 파일 저장
+    from datetime import datetime
+
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    out_name = f"{project_id}_{ts}.json"
+    out_path = os.path.join(SVG_JSON_DIR, out_name)
+
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(project_json, f, ensure_ascii=False, indent=2)
+
+    # Unity로 전송
+    await manager.broadcast(json.dumps(project_json))
+
+    return {
+        "json_url": f"/svg-json/{out_name}",
+        "unity_sent": True,
+        "scenes_processed": len(all_scenes_data),
+        "total_scenes": len(scenes),
+    }

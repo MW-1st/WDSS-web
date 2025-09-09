@@ -50,6 +50,7 @@ class Project(BaseModel):
     project_name: str
     format: str
     max_scene: int
+    max_drone: int
     max_speed: float
     max_accel: float
     min_separation: float
@@ -70,6 +71,7 @@ class ProjectBase(BaseModel):
     )
     format: str = Field("dsj", description="프로젝트 포맷", example="dsj")
     max_scene: int = Field(..., description="최대 씬 개수", example=15)
+    max_drone: int = Field(..., description="최대 드론 개수", example=10)
     max_speed: float = Field(..., description="최대 속도", example=6.0)
     max_accel: float = Field(..., description="최대 가속도", example=3.0)
     min_separation: float = Field(..., description="드론간 최소 이격 거리", example=2.0)
@@ -89,6 +91,9 @@ class ProjectUpdate(BaseModel):
     )
     max_scene: Optional[int] = Field(
         None, description="수정할 최대 씬 개수", example=20
+    )
+    max_drone: Optional[int] = Field(
+        None, description="수정할 최대 드론 개수", example=15
     )
     max_speed: Optional[float] = Field(
         None, description="수정할 최대 속도", example=8.0
@@ -165,11 +170,11 @@ class SceneUpdate(BaseModel):
 
 class Scene(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
     id: str
     project_id: str
     scene_num: int
     s3_key: Optional[str] = None
+    display_url: Optional[str] = None
 
 
 class SceneResponse(BaseModel):
@@ -180,6 +185,10 @@ class SceneResponse(BaseModel):
 class ScenesResponse(BaseModel):
     success: bool
     scenes: List[Scene]
+
+
+class ScenePatch(BaseModel):
+    status: str
 
 
 class DeleteImageRequest(BaseModel):

@@ -27,13 +27,19 @@ export default function Canvas({
   drawingColor: externalDrawingColor = '#222222',
   activeLayerId: externalActiveLayerId,
   onModeChange,
-  onSelectionChange
+  onSelectionChange,
+  onPanChange
 }) {
   const canvasRef = useRef(null);
   const fabricCanvas = useRef(null);
   const [drawingMode, setDrawingMode] = useState(externalDrawingMode);
   const [eraserSize, setEraserSize] = useState(externalEraserSize);
   const [drawingColor, setDrawingColor] = useState(externalDrawingColor);
+  const currentColorRef = useRef(externalDrawingColor);
+  useEffect(() => { currentColorRef.current = externalDrawingColor; }, [externalDrawingColor]);
+  // Keep latest drawing mode accessible inside closures
+  const drawingModeRef = useRef(drawingMode);
+  useEffect(() => { drawingModeRef.current = drawingMode; }, [drawingMode]);
   const eraseHandlers = useRef({});
   const selectionHandlers = useRef({});
   const onSelectionChangeRef = useRef(onSelectionChange);
@@ -41,6 +47,7 @@ export default function Canvas({
   const [isDragOver, setIsDragOver] = useState(false);
   const [canvasRevision, setCanvasRevision] = useState(0);
   const [deleteIconPos, setDeleteIconPos] = useState(null);
+  const maxDroneWarningShownRef = useRef(false);
 
   // 레이어 관리 훅
   const {
@@ -87,7 +94,7 @@ export default function Canvas({
     }
   }, [layers, canvasRevision]); // 'layers' 또는 'canvasRevision' 상태가 변경될 때마다 실행
 
-  // Use useLayoutEffect to initialize the canvas
+  // Use useLayoutEffect to initialize the canvas (once)
   useLayoutEffect(() => {
     if (!canvasRef.current) return;
 
@@ -190,6 +197,24 @@ export default function Canvas({
       isPanMode = true;
       canvas.isDrawingMode = false;
       canvas.selection = false;
+      // 팬 모드에서 그리기/지우기 핸들러가 동작하지 않도록 임시 해제
+      try {
+        if (eraseHandlers.current) {
+          if (eraseHandlers.current.startDraw) {
+            canvas.off('mouse:down', eraseHandlers.current.startDraw);
+            canvas.off('mouse:move', eraseHandlers.current.continueDraw);
+            canvas.off('mouse:up', eraseHandlers.current.stopDraw);
+          }
+          if (eraseHandlers.current.startErase) {
+            canvas.off('mouse:down', eraseHandlers.current.startErase);
+            canvas.off('mouse:move', eraseHandlers.current.erase);
+            canvas.off('mouse:up', eraseHandlers.current.stopErase);
+          }
+          if (eraseHandlers.current.wheelHandler) {
+            canvas.off('mouse:wheel', eraseHandlers.current.wheelHandler);
+          }
+        }
+      } catch (_) {}
       canvas.defaultCursor = 'grab';
       canvas.hoverCursor = 'grab';
       canvas.moveCursor = 'grab';
@@ -200,6 +225,7 @@ export default function Canvas({
         obj.selectable = false;
         obj.evented = false;
       });
+      try { onPanChange && onPanChange(true); } catch {}
     };
 
     const exitPanMode = () => {
@@ -211,10 +237,14 @@ export default function Canvas({
       // 원래 상태 복원
       canvas.isDrawingMode = originalDrawingMode;
       canvas.selection = originalSelection;
-      canvas.defaultCursor = 'default';
-      canvas.hoverCursor = 'move';
-      canvas.moveCursor = 'move';
-      canvas.setCursor('default');
+      try {
+        applyDrawingMode(drawingModeRef.current, currentColorRef.current);
+      } catch (_) {
+        canvas.defaultCursor = 'default';
+        canvas.hoverCursor = 'move';
+        canvas.moveCursor = 'move';
+        canvas.setCursor('default');
+      }
       
       // 객체들을 다시 활성화 (드롭된 이미지만)
       canvas.getObjects().forEach(obj => {
@@ -223,27 +253,36 @@ export default function Canvas({
           obj.evented = true;
         }
       });
+      try { onPanChange && onPanChange(false); } catch {}
     };
 
     const handleKeyDown = (e) => {
-      if (e.code === 'Space') {
+      if (
+        e.code === 'Space' &&
+        !['INPUT','TEXTAREA','SELECT'].includes(((e.target && e.target.tagName) || '').toUpperCase()) &&
+        !((e.target && e.target.getAttribute) && e.target.getAttribute('contenteditable') === 'true')
+      ) {
         e.preventDefault(); // 브라우저 기본 스크롤 방지
         e.stopPropagation(); // 이벤트 전파 중단
         
-        if (!isPanMode) {
+        if (isPanMode) {
+          exitPanMode();
+        } else {
           enterPanMode();
         }
       }
     };
 
     const handleKeyUp = (e) => {
-      if (e.code === 'Space') {
+      if (
+        e.code === 'Space' &&
+        !['INPUT','TEXTAREA','SELECT'].includes(((e.target && e.target.tagName) || '').toUpperCase()) &&
+        !((e.target && e.target.getAttribute) && e.target.getAttribute('contenteditable') === 'true')
+      ) {
         e.preventDefault(); // 브라우저 기본 스크롤 방지
         e.stopPropagation(); // 이벤트 전파 중단
         
-        if (isPanMode) {
-          exitPanMode();
-        }
+        // 토글 방식에서는 keyup 시 별도 동작 없음
       }
     };
 
@@ -417,6 +456,11 @@ export default function Canvas({
     document.addEventListener('keydown', handleKeyDown, { capture: true });
     document.addEventListener('keyup', handleKeyUp, { capture: true });
     
+    // Expose minimal pan controls for external UI
+    canvas.enterPanMode = enterPanMode;
+    canvas.exitPanMode = exitPanMode;
+    canvas.getPanMode = () => isPanMode;
+    
     // 캔버스 경계 추가
     addCanvasBoundary();
 
@@ -439,7 +483,41 @@ export default function Canvas({
       document.removeEventListener('keyup', handleKeyUp, { capture: true });
       canvas.dispose();
     };
-  }, [width, height, externalStageRef]);
+  }, [externalStageRef]);
+
+  // Resize with zoom: keep object positions, zoom the viewport to match new size
+  const baseSizeRef = useRef({ w: width, h: height });
+  useEffect(() => {
+    const canvas = fabricCanvas.current;
+    if (!canvas) return;
+
+    const base = baseSizeRef.current || { w: width, h: height };
+    // Update physical canvas size
+    canvas.setWidth(width);
+    canvas.setHeight(height);
+
+    // Compute zoom so that base content fits new canvas
+    const zx = width / (base.w || 1);
+    const zy = height / (base.h || 1);
+    const z = Math.min(zx, zy);
+    canvas.setZoom(z);
+
+    // Center content by adjusting viewport transform translation
+    const vpt = canvas.viewportTransform || [z, 0, 0, z, 0, 0];
+    vpt[0] = z; vpt[3] = z;
+    vpt[4] = (width - base.w * z) / 2;
+    vpt[5] = (height - base.h * z) / 2;
+    canvas.setViewportTransform(vpt);
+
+    // Ensure clipPath matches new canvas bounds if present
+    if (canvas.clipPath) {
+      try {
+        canvas.clipPath.set({ width, height });
+      } catch (_) {}
+    }
+
+    canvas.requestRenderAll();
+  }, [width, height]);
 
   // Delete key to remove current selection in select mode
   useEffect(() => {
@@ -577,7 +655,7 @@ export default function Canvas({
         canvas.renderAll();
       });
     }
-  }, [imageUrl, width, height]);
+  }, [imageUrl]);
 
   // 외부에서 drawingMode가 변경될 때 반응
   useEffect(() => {
@@ -714,22 +792,70 @@ export default function Canvas({
       let isDrawing = false;
 
       const startDraw = (e) => {
+        // 팬 모드일 때는 브러쉬 점 그리기 방지
+        try {
+          const c = fabricCanvas.current;
+          if (c && typeof c.getPanMode === 'function' && c.getPanMode()) return;
+        } catch (_) {}
         isDrawing = true;
         drawDotAtPoint(e);
       };
 
       const continueDraw = (e) => {
+        // 팬 모드일 때는 브러쉬 이동 중 그리기 방지
+        try {
+          const c = fabricCanvas.current;
+          if (c && typeof c.getPanMode === 'function' && c.getPanMode()) return;
+        } catch (_) {}
         if (!isDrawing) return;
+
+        // 최대 개수 체크를 continueDraw에서도 해야 함
+        const currentDots = canvas.getObjects().filter(obj =>
+          obj.customType === 'svgDot' || obj.customType === 'drawnDot'
+        );
+        const maxDrone = window.editorAPI?.targetDots || 2000;
+
+        // 최대 개수에 도달했으면 더 이상 그리지 않음
+        if (currentDots.length >= maxDrone) {
+          return;
+        }
+
         drawDotAtPoint(e);
         canvas.requestRenderAll(); // 실시간 피드백을 위해 최적화된 렌더링 호출
       };
 
       const stopDraw = () => {
         isDrawing = false;
+
+        // 드로잉 세션이 끝났으므로 경고 플래그 리셋
+        maxDroneWarningShownRef.current = false;
+
         setCanvasRevision(c => c + 1); // 캔버스 변경을 알림
       };
 
       const drawDotAtPoint = (e) => {
+        // 현재 도트 개수 확인
+        const allObjects = canvas.getObjects();
+        const currentDots = allObjects.filter(obj =>
+          obj.customType === 'svgDot' || obj.customType === 'drawnDot'
+        );
+        console.log('전체 객체 수:', allObjects.length);
+        console.log('인식된 도트 수:', currentDots.length);
+        console.log('객체 타입들:', allObjects.map(obj => ({type: obj.type, customType: obj.customType})));
+
+        const maxDrone = window.editorAPI?.targetDots || 2000;
+        console.log('최대 드론 수:', maxDrone);
+
+        // 최대 개수에 도달한 경우 새 도트를 추가하지 않고 경고만 표시
+        if (currentDots.length >= maxDrone) {
+          // 한 번만 경고 표시하기 위한 플래그 체크
+          if (!maxDroneWarningShownRef.current) {
+            alert(`최대 드론 개수(${maxDrone}개)에 도달했습니다. 더 이상 추가할 수 없습니다.`);
+            maxDroneWarningShownRef.current = true;
+          }
+          return; // 새 도트 추가하지 않고 함수 종료
+        }
+
         const pointer = canvas.getPointer(e.e);
         // 클로저 문제를 피하기 위해 ref에서 최신 값을 가져옴
         const currentActiveLayerId = activeLayerIdRef.current;
@@ -742,11 +868,11 @@ export default function Canvas({
           left: pointer.x - dotRadius,
           top: pointer.y - dotRadius,
           radius: dotRadius,
-          fill: currentColor, // 현재 색상 사용
+          fill: currentColorRef.current || currentColor, // 현재 색상 사용
           selectable: false,
           evented: true,
           customType: 'drawnDot', // 그려진 도트로 구분
-          originalFill: currentColor, // 원본 색상 정보 보존
+          originalFill: currentColorRef.current || currentColor, // 원본 색상 정보 보존
           hoverCursor: 'crosshair',
           moveCursor: 'crosshair'
         });
@@ -836,11 +962,21 @@ export default function Canvas({
       let isErasing = false;
 
       const startErase = (e) => {
+        // 팬 모드일 때는 지우개 동작 방지
+        try {
+          const c = fabricCanvas.current;
+          if (c && typeof c.getPanMode === 'function' && c.getPanMode()) return;
+        } catch (_) {}
         isErasing = true;
         eraseAtPoint(e);
       };
 
       const erase = (e) => {
+        // 팬 모드일 때는 지우개 동작 방지
+        try {
+          const c = fabricCanvas.current;
+          if (c && typeof c.getPanMode === 'function' && c.getPanMode()) return;
+        } catch (_) {}
         if (!isErasing) return;
         eraseAtPoint(e);
       };
@@ -1194,7 +1330,7 @@ export default function Canvas({
     console.log('getCurrentCanvasAsSvg - 총 객체 수:', objects.length);
     
     objects.forEach((obj, index) => {
-      console.log(`객체 ${index}: type=${obj.type}, customType=${obj.customType}, fill=${obj.fill}, stroke=${obj.stroke}`);
+      // console.log(`객체 ${index}: type=${obj.type}, customType=${obj.customType}, fill=${obj.fill}, stroke=${obj.stroke}`);
       
       if (obj.customType === 'svgDot' || obj.customType === 'drawnDot') {
         // 도트의 중심점 계산

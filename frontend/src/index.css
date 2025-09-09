@@ -1,4 +1,4 @@
-@import "tailwindcss";
+﻿@import "tailwindcss";
 
 @font-face {
   font-family: "TwaySky";
@@ -140,7 +140,7 @@
   font-weight: 900;
   font-display: swap;
 }
-/* 부드럽게 색이 흐르도록 */
+/* 遺?쒕읇寃??됱씠 ?먮Ⅴ?꾨줉 */
 @keyframes gradientMove {
   0% {
     background-position: 0% 50%;
@@ -153,7 +153,7 @@
   }
 }
 
-/* 일렁이는 그라데이션 */
+/* ?쇰쟻?대뒗 洹몃씪?곗씠??*/
 .bg-wavy {
   background-image: linear-gradient(
     270deg,
@@ -167,7 +167,7 @@
   animation: gradientMove 20s ease-in-out infinite;
 }
 
-/* 가독성용 살짝 눌러주는 오버레이(선택) */
+/* 媛?낆꽦???댁쭩 ?뚮윭二쇰뒗 ?ㅻ쾭?덉씠(?좏깮) */
 .bg-veil {
   background: radial-gradient(
       80% 60% at 50% 40%,
@@ -179,14 +179,14 @@
 /* .button {
   background-color: #646cff;
 } */
-/* ── 갤러리 스크롤 가터 제거 ─────────────────────────── */
+/* ?? 媛ㅻ윭由??ㅽ겕濡?媛???쒓굅 ??????????????????????????? */
 .galleryPane {
-  scrollbar-gutter: auto !important; /* 전역 stable both-edges 무력화 */
-  /* 보기 좋은 기본 값들 */
+  scrollbar-gutter: auto !important; /* ?꾩뿭 stable both-edges 臾대젰??*/
+  /* 蹂닿린 醫뗭? 湲곕낯 媛믩뱾 */
   scrollbar-width: thin; /* Firefox */
 }
 
-/* WebKit (Chromium) 크기 통일 */
+/* WebKit (Chromium) ?ш린 ?듭씪 */
 .galleryPane::-webkit-scrollbar {
   width: 14px;
 }
@@ -198,12 +198,31 @@
   border-radius: 8px;
 }
 
-/* ── Fallback: 여전히 가터가 남는 환경 보정 ─────────────
-   스크롤이 실제로 생긴 경우에만(자바스크립트로 data-scroll-y 부여) 
-   오른쪽 "예약 공간"을 음수 마진으로 상쇄하고 동일 크기만큼 내부 패딩을 줘서
-   콘텐츠가 잘리지 않게 합니다.  */
+/* ?? Fallback: ?ъ쟾??媛?곌? ?⑤뒗 ?섍꼍 蹂댁젙 ?????????????
+   ?ㅽ겕濡ㅼ씠 ?ㅼ젣濡??앷릿 寃쎌슦?먮쭔(?먮컮?ㅽ겕由쏀듃濡?data-scroll-y 遺?? 
+   ?ㅻⅨ履?"?덉빟 怨듦컙"???뚯닔 留덉쭊?쇰줈 ?곸뇙?섍퀬 ?숈씪 ?ш린留뚰겮 ?대? ?⑤뵫??以섏꽌
+   肄섑뀗痢좉? ?섎━吏 ?딄쾶 ?⑸땲??  */
 .galleryPane[data-scroll-y="1"] {
-  --gutter-w: 14px; /* 위의 ::-webkit-scrollbar width와 맞춤 */
+  --gutter-w: 14px; /* ?꾩쓽 ::-webkit-scrollbar width? 留욎땄 */
   margin-right: calc(-1 * var(--gutter-w));
   padding-right: var(--gutter-w);
+}
+
+/* Utility: NanumHuman font for editor */
+.font-nanumhuman {
+  font-family: 'NanumHuman', ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Press effect for editor logo */
+.logo-press {
+  display: inline-flex;
+  transform: scale(1);
+  transform-origin: center left;
+  transition: transform 120ms ease;
+}
+.logo-press:hover {
+  transform: scale(0.98);
+}
+.logo-press:active {
+  transform: scale(0.96);
 }

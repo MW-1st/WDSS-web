@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import './LayerPanel.css';
+import '../styles/LayerPanel.css';
 
 const LayerPanel = ({
   layers,

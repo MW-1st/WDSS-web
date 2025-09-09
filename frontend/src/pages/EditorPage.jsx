@@ -10,6 +10,8 @@ import { getImageUrl } from '../utils/imageUtils';
 import { useUnity } from "../contexts/UnityContext.jsx";
 import { useParams } from "react-router-dom";
 import { CiSettings } from "react-icons/ci";
+import { LuMousePointer } from "react-icons/lu";
+import { IoHandRightOutline } from "react-icons/io5";
 import ProjectSettingsModal from "../components/ProjectSettingsModal";
 
 const VISIBLE = 4;
@@ -65,6 +67,7 @@ export default function EditorPage({ projectId = DUMMY }) {
   const [eraserSize, setEraserSize] = useState(20);
   const [drawingColor, setDrawingColor] = useState('#222222');
   const [selectedObject, setSelectedObject] = useState(null);
+  const [isPanMode, setIsPanMode] = useState(false);
   
   // 레이어 관련 상태
   const [canvasReady, setCanvasReady] = useState(false);
@@ -81,6 +84,7 @@ export default function EditorPage({ projectId = DUMMY }) {
   const handleSettingsSaved = (updated) => {
     setProjectMeta(updated);
     if (updated?.project_name) setProjectName(updated.project_name);
+    if (updated?.max_drone) setTargetDots(updated.max_drone);
   };
 
   const selectedScene = useMemo(
@@ -88,7 +92,8 @@ export default function EditorPage({ projectId = DUMMY }) {
       [scenes, selectedId]
   );
 
-  const imageUrl = selectedScene?.displayUrl || getImageUrl(selectedScene?.s3_key) || "";
+  // 방금 삭제한 상태(const [originalCanvasState, setOriginalCanvasState],const [imageUrl, setImageUrl])들 대신, 아래 두 줄로 정보를 파생시킵니다.
+  const imageUrl = getImageUrl(selectedScene?.display_url || selectedScene?.s3_key) || "";
   const originalCanvasState = selectedScene ? selectedScene.originalCanvasState : null;
   
   // 레이어 상태를 업데이트하는 함수
@@ -212,7 +217,10 @@ export default function EditorPage({ projectId = DUMMY }) {
         const {data} = await client.get(`/projects/${pid}`);
         const p = data?.project ?? data;
         if (p?.project_name) setProjectName(p.project_name);
-        if (p) setProjectMeta(p);
+        if (p) {
+          setProjectMeta(p);
+          if (p.max_drone) setTargetDots(p.max_drone);
+        }
       } catch (e) {
         console.warn(
             "Failed to load project info",
@@ -227,13 +235,13 @@ export default function EditorPage({ projectId = DUMMY }) {
     if (!pid) return;
     (async () => {
       try {
-        const {data} = await client.get(`/projects/${pid}/scenes/`);
+        const {data} = await client.get(`/projects/${pid}/scenes`);
         const list = data.scenes || [];
         setScenes(
             list.map((s, i) => ({
               ...s,
               name: s.name || `Scene ${s.scene_num ?? i + 1}`,
-              imageUrl: getImageUrl(s.s3_key),
+              imageUrl: getImageUrl(s.display_url || s.s3_key),
             }))
         );
         if (list[0]) setSelectedId(list[0].id);
@@ -275,7 +283,7 @@ export default function EditorPage({ projectId = DUMMY }) {
   const saveDebounced = useDebounced(async (scene_id, drones, preview, imageUrl, originalCanvasState) => {
     if (!pid) return;
     try {
-      const {data} = await client.post(`/projects/${pid}/scenes/${scene_id}`, {
+      const {data} = await client.put(`/projects/${pid}/scenes/${scene_id}`, {
         // s3_key: imageUrl
       });
       const saved = data.scene || {};
@@ -305,20 +313,39 @@ export default function EditorPage({ projectId = DUMMY }) {
   // + 생성
   const handleAddScene = async () => {
     try {
+      // 최대 씬 개수 제한 (프로젝트 설정)
+      const maxScenes = projectMeta?.max_scene ?? projectMeta?.maxScenes ?? null;
+      if (Number.isFinite(maxScenes) && maxScenes !== null && scenes.length >= maxScenes) {
+        alert(`씬은 최대 ${maxScenes}개까지만 생성할 수 있어요.`);
+        return;
+      }
       const projectIdReady = await ensureProjectId();
       console.log("확인된 Project ID:", projectIdReady);
-      const scene_num = scenes.length + 1;
+      const numericSceneNums = (scenes || [])
+        .map((s) => s?.scene_num)
+        .filter((n) => typeof n === "number" && !Number.isNaN(n));
+      const maxSceneNum = numericSceneNums.length ? Math.max(...numericSceneNums) : 0;
+      const scene_num = Math.max(maxSceneNum, scenes.length) + 1;
       console.log("확인된 scene_num:", scene_num);
       const {data} = await client.post(
-          `/projects/${projectIdReady}/scenes/`,
+          `/projects/${projectIdReady}/scenes`,
           {
             scene_num,
           }
       );
-      const created = data.scene || {};
-      const nextScenes = [...scenes, created];
+      const createdRaw = data.scene || data || {};
+      const createdId = createdRaw.id ?? createdRaw.scene_id ?? createdRaw.sceneId;
+      const createdNorm = {
+        ...createdRaw,
+        id: createdId,
+        project_id: createdRaw.project_id ?? projectIdReady,
+        scene_num: createdRaw.scene_num ?? scene_num,
+        name: createdRaw.name || `Scene ${createdRaw.scene_num ?? scene_num}`,
+        imageUrl: getImageUrl(createdRaw.s3_key),
+      };
+      const nextScenes = [...scenes, createdNorm];
       setScenes(nextScenes);
-      setSelectedId(created.id);
+      if (createdId) setSelectedId(createdId);
 
       const nextTotal = nextScenes.length + 1;
       if (nextTotal > VISIBLE) setStart(nextTotal - VISIBLE);
@@ -339,6 +366,23 @@ export default function EditorPage({ projectId = DUMMY }) {
     if (idx >= start + VISIBLE) setStart(idx - VISIBLE + 1);
   };
 
+  // scenes/selectedId 변경 시 선택 유효성 보정
+  useEffect(() => {
+    if (!Array.isArray(scenes)) return;
+
+    if (scenes.length === 0) {
+      if (selectedId != null) setSelectedId(null);
+      return;
+    }
+
+    const exists = selectedId != null && scenes.some((s) => s.id === selectedId);
+    if (!exists) {
+      // 새로 추가/기존 삭제 등으로 현재 선택이 유효하지 않으면 마지막 항목으로 보정
+      const lastId = scenes[scenes.length - 1]?.id ?? null;
+      if (lastId !== selectedId) setSelectedId(lastId);
+    }
+  }, [scenes, selectedId]);
+
   // + 카드까지 포함
   const items = useMemo(
       () => [...scenes, {id: "__ADD__", isAdd: true}],
@@ -348,6 +392,15 @@ export default function EditorPage({ projectId = DUMMY }) {
   const canSlide = total > VISIBLE;
   const end = Math.min(start + VISIBLE, total);
   const visibleItems = items.slice(start, end);
+
+  // UI-only scene numbering: override default "Scene N" style names for display without touching DB/state
+  const scenesForUI = useMemo(() => {
+    return scenes.map((s, idx) => {
+      const n = (s?.name || "").trim();
+      const isDefault = /^Scene\s+\d+$/i.test(n) || n === "";
+      return isDefault ? { ...s, name: `Scene ${idx + 1}` } : s;
+    });
+  }, [scenes]);
 
   // 이미지 변환 핸들러
   const handleTransform = async () => {
@@ -377,7 +430,7 @@ export default function EditorPage({ projectId = DUMMY }) {
         console.log("원본이 존재하여 재변환을 요청합니다.");
         const rgbColor = hexToRgb(drawingColor);
         const resp = await client.post(
-            `/projects/${pid}/scenes/${selectedId}/transformations`,
+            `/projects/${pid}/scenes/${selectedId}/processed`,
             {
               target_dots: targetDots,
               color_r: rgbColor.r,
@@ -431,7 +484,7 @@ export default function EditorPage({ projectId = DUMMY }) {
               if (scene.id === selectedId) {
                 const updatedScene = {
                   ...scene,
-                  displayUrl: finalUrl,
+                  display_url: finalUrl,
                 };
                 if (newS3Key) {
                   updatedScene.s3_key = newS3Key;
@@ -477,6 +530,15 @@ export default function EditorPage({ projectId = DUMMY }) {
   // 캔버스 핸들러 함수들
   const handleModeChange = React.useCallback(
       (mode) => {
+        // 이동도구가 선택된 경우 먼저 해제
+        try {
+          const canvas = stageRef.current;
+          const panActive = isPanMode || (canvas && typeof canvas.getPanMode === 'function' && canvas.getPanMode());
+          if (panActive && canvas && typeof canvas.exitPanMode === 'function') {
+            canvas.exitPanMode();
+          }
+        } catch (e) {}
+        setIsPanMode(false);
         setDrawingMode(mode);
         if (stageRef.current && stageRef.current.setDrawingMode) {
           stageRef.current.setDrawingMode(mode);
@@ -487,21 +549,39 @@ export default function EditorPage({ projectId = DUMMY }) {
           }, 20);
         }
       },
-      [drawingColor]
+      [drawingColor, isPanMode]
   );
 
-  const handleClearAll = React.useCallback(() => {
-    if (stageRef.current && stageRef.current.clear) {
-      if (
-          confirm(
-              "캔버스의 모든 내용을 지우시겠습니까? 이 작업은 되돌릴 수 없습니다."
-          )
-      ) {
-        stageRef.current.clear();
-        console.log("캔버스 전체가 초기화되었습니다");
-      }
-    }
-  }, []);
+const handleClearAll = React.useCallback(async () => {
+ if (stageRef.current && stageRef.current.clear) {
+   if (
+       confirm(
+           "캔버스의 모든 내용을 지우시겠습니까? 이 작업은 되돌릴 수 없습니다."
+       )
+   ) {
+     try {
+       // 1. 캔버스 초기화
+       stageRef.current.clear();
+       console.log("캔버스가 초기화되었습니다");
+
+       // 2. 서버에 씬 초기화 요청
+       const response = await client.patch(`/projects/${pid}/scenes/${selectedId}`, {
+         status: 'reset'
+       });
+
+       console.log("서버 씬 초기화 완료:", response.data);
+
+       // 3. 성공 메시지 (선택사항)
+       // alert("씬이 완전히 초기화되었습니다.");
+
+     } catch (error) {
+       console.error("씬 초기화 중 오류 발생:", error);
+       // 에러 처리 - 사용자에게 알림
+       alert("씬 초기화 중 오류가 발생했습니다. 다시 시도해주세요.");
+     }
+   }
+ }
+}, [client, pid, selectedId]); // client, projectId, sceneId를 dependency에 추가
 
   const handleColorChange = React.useCallback((color) => {
     setDrawingColor(color);
@@ -698,7 +778,7 @@ export default function EditorPage({ projectId = DUMMY }) {
 
   return (
       <div
-          className="editor-shell"
+          className="editor-shell font-nanumhuman"
           style={{
             width: "100%",
             minHeight: "100vh",
@@ -727,6 +807,58 @@ export default function EditorPage({ projectId = DUMMY }) {
             }}
         >
           <div style={{height: "100%", overflowY: "auto", padding: 16}}>
+            {/* Pointer (click) and Hand (pan) tools */}
+            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+              <button
+                onClick={() => {
+                  if (!isPanMode) {
+                    const c0 = stageRef?.current;
+                    if (c0 && typeof c0.enterPanMode === 'function') c0.enterPanMode();
+                    return;
+                  }
+                  setDrawingMode("select");
+                  const c = stageRef?.current;
+                  if (c && typeof c.exitPanMode === 'function') c.exitPanMode();
+                }}
+                title="클릭 도구 (V)"
+                aria-label="클릭 도구"
+                style={{
+                  border: "1px solid #ccc",
+                  padding: "8px 16px",
+                  borderRadius: 4,
+                  cursor: "pointer",
+                  fontSize: 16,
+                  background: drawingMode === 'select' && !isPanMode ? '#007bff' : '#f8f9fa',
+                  color: drawingMode === 'select' && !isPanMode ? 'white' : 'black',
+                }}
+              >
+                {isPanMode ? <IoHandRightOutline /> : <LuMousePointer />}
+              </button>
+              <button hidden
+                onClick={() => {
+                  const c = stageRef?.current;
+                  if (!c) return;
+                  if (typeof c.getPanMode === 'function' && c.getPanMode()) {
+                    if (typeof c.exitPanMode === 'function') c.exitPanMode();
+                  } else {
+                    if (typeof c.enterPanMode === 'function') c.enterPanMode();
+                  }
+                }}
+                title="이동 도구 (Space)"
+                aria-label="이동 도구"
+                style={{
+                  border: "1px solid #ccc",
+                  padding: "8px 16px",
+                  borderRadius: 4,
+                  cursor: "pointer",
+                  fontSize: 16,
+                  background: isPanMode ? '#007bff' : '#f8f9fa',
+                  color: isPanMode ? 'white' : 'black',
+                }}
+              >
+                <IoHandRightOutline />
+              </button>
+            </div>
             <EditorToolbar
                 pid={pid}
                 selectedId={selectedId}
@@ -804,12 +936,13 @@ export default function EditorPage({ projectId = DUMMY }) {
               activeLayerId={activeLayerIdState}
               onModeChange={handleModeChange}
               onSelectionChange={setSelectedObject}
+              onPanChange={setIsPanMode}
           />
 
           {/* 씬 캐러셀 */}
           <SceneCarousel
               projectId={pid}
-              scenes={scenes}
+              scenes={scenesForUI}
               setScenes={setScenes}
               selectedId={selectedId}
               start={start}
