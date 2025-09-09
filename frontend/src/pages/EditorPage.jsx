@@ -605,15 +605,15 @@ const handleClearAll = React.useCallback(async () => {
     if (!active) return;
 
     const applyFill = (obj) => {
-      if (
-          obj?.customType === "svgDot" ||
-          obj?.customType === "drawnDot" ||
-          obj?.type === "circle"
-      ) {
-        obj.set({fill: hex, originalFill: hex});
-        if ((obj.type === "path" || obj.type === "line" || !obj.fill) && ("stroke" in obj)) {
-          obj.set({stroke: hex});
-        }
+      if (!obj) return;
+      // If path/line or non-fillable but has stroke, apply to stroke
+      if (obj.type === "path" || obj.type === "line" || (!obj.fill && ("stroke" in obj))) {
+        obj.set({ stroke: hex });
+        return;
+      }
+      // Otherwise, apply to fill for fillable shapes (dots/circles etc.)
+      if ("fill" in obj) {
+        obj.set({ fill: hex, originalFill: hex });
       }
     };
 
@@ -624,7 +624,7 @@ const handleClearAll = React.useCallback(async () => {
     }
 
     canvas.renderAll && canvas.renderAll();
-    setSelectedObject((prev) => (prev ? {...prev, fill: hex} : prev));
+    setSelectedObject((prev) => (prev ? { ...prev, fill: hex, stroke: hex } : prev));
   }, []);
 
   // 레이어 관련 핸들러들

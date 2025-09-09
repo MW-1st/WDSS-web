@@ -375,6 +375,7 @@ export default function Canvas({
         type: active.type || null,
         customType: active.customType || null,
         fill: active.fill || null,
+        stroke: active.stroke || null,
         radius: typeof active.radius === 'number' ? active.radius : null,
         left: active.left ?? null,
         top: active.top ?? null,
