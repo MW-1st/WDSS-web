@@ -236,7 +236,7 @@ async def export_project_to_json(
 
     # 프로젝트 레벨 JSON 구성 (무조건 DB 값 사용)
     project_json = {
-        "format": project["format"] or "dsj",
+        "format": (project["format"] or "dsj").strip(),
         "show": {
             "show_name": project["project_name"] or "Untitled Show",
             "max_scene": int(project["max_scene"] or 1),
