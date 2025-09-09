@@ -1,0 +1,76 @@
+.properties-panel {
+  width: 100%;
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  display: flex;
+  flex-direction: column;
+}
+
+.properties-panel-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid #dee2e6;
+  background: #fff;
+  border-radius: 8px 8px 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.properties-panel-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #343a40;
+}
+
+.type-badge {
+  padding: 2px 8px;
+  font-size: 12px;
+  background: #eef4ff;
+  color: #2952cc;
+  border: 1px solid #cfe0ff;
+  border-radius: 999px;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+.properties-panel-body {
+  padding: 12px 16px 14px 16px;
+  overflow: visible; /* allow popovers (color picker) to escape */
+}
+
+.properties-empty {
+  color: #777;
+  font-size: 13px;
+}
+
+.properties-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.properties-row.smallmuted {
+  font-size: 12px;
+  color: #555;
+}
+
+.properties-field .label {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.properties-note {
+  color: #777;
+  font-size: 12px;
+}
+
+@media (max-width: 768px) {
+  .properties-panel-header h3 {
+    font-size: 14px;
+  }
+}
