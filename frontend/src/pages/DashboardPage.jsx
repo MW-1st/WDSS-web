@@ -7,6 +7,7 @@ import "../styles/DashboardPage.css";
 import { CiMenuBurger } from "react-icons/ci";
 import { TiDelete } from "react-icons/ti";
 import ProjectSettingsModal from "../components/ProjectSettingsModal";
+import { getImageUrl } from "../utils/imageUtils";
 
 
 const PlusIcon = () => (
@@ -52,6 +53,7 @@ export default function DashboardPage() {
   const [editingProject, setEditingProject] = useState(null);
   const [creating, setCreating] = useState(false);
   const [bannerUrl, setBannerUrl] = useState("/img/banner_01.png");
+  const [thumbs, setThumbs] = useState({});
 
   // Pick a random banner when the dashboard mounts
   useEffect(() => {
@@ -83,6 +85,50 @@ export default function DashboardPage() {
       }
     })();
   }, [isAuthenticated]);
+
+  // Fetch thumbnail (scene 1) for each project
+  useEffect(() => {
+    if (!Array.isArray(projects) || projects.length === 0) return;
+    let cancelled = false;
+
+    const run = async () => {
+      const entries = await Promise.all(
+        projects.map(async (p) => {
+          try {
+            const { data } = await client.get(`/projects/${p.id}/scenes`);
+            const list = Array.isArray(data) ? data : (data?.scenes ?? []);
+            if (!Array.isArray(list) || list.length === 0) return [p.id, null];
+
+            // Prefer scene_num === 1, else min scene_num, else first
+            const targetByOne = list.find((s) => s?.scene_num === 1) || null;
+            let target = targetByOne;
+            if (!target) {
+              const withNum = list.filter((s) => typeof s?.scene_num === "number");
+              if (withNum.length) {
+                const minNum = Math.min(...withNum.map((s) => s.scene_num));
+                target = withNum.find((s) => s.scene_num === minNum) || null;
+              }
+            }
+            if (!target) target = list[0];
+
+            const raw = target?.display_url || target?.s3_key;
+            const url = getImageUrl(raw);
+            return [p.id, url || null];
+          } catch (e) {
+            console.warn("Failed to load scenes for project", p.id, e?.response?.data || e?.message);
+            return [p.id, null];
+          }
+        })
+      );
+
+      if (!cancelled) setThumbs((prev) => ({ ...prev, ...Object.fromEntries(entries) }));
+    };
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [projects]);
 
   const handleCreateProject = () => {
     setCreating(true);
@@ -176,7 +222,16 @@ export default function DashboardPage() {
                       <TiDelete size={22} />
                     </button>
                     <div className="card-thumbnail">
-                      <ProjectIcon />
+                      {thumbs[project.id] ? (
+                        <img
+                          src={thumbs[project.id]}
+                          alt={`${project.project_name} 썸네일`}
+                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                          loading="lazy"
+                        />
+                      ) : (
+                        <ProjectIcon />
+                      )}
                     </div>
                     <div className="card-body">
                       <div className="flex items-start justify-between gap-2">
