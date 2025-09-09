@@ -92,7 +92,7 @@ export default function EditorPage({ projectId = DUMMY }) {
       [scenes, selectedId]
   );
 
-  // 방금 삭제한 상태(const [originalCanvasState, setOriginalCanvasState],const [imageUrl, setImageUrl])들 대신, 아래 두 줄로 정보를 파생시킵니다.
+  // 상태(const [originalCanvasState, setOriginalCanvasState],const [imageUrl, setImageUrl])들 대신, 아래 두 줄로 정보를 파생시킵니다.
   const imageUrl = getImageUrl(selectedScene?.display_url || selectedScene?.s3_key) || "";
   const originalCanvasState = selectedScene ? selectedScene.originalCanvasState : null;
   
@@ -570,6 +570,7 @@ const handleClearAll = React.useCallback(async () => {
        });
 
        console.log("서버 씬 초기화 완료:", response.data);
+       window.location.reload();
 
        // 3. 성공 메시지 (선택사항)
        // alert("씬이 완전히 초기화되었습니다.");
