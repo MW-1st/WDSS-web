@@ -26,6 +26,7 @@ export default function Canvas({
   eraserSize: externalEraserSize = 20,
   drawingColor: externalDrawingColor = '#222222',
   activeLayerId: externalActiveLayerId,
+  onPreviewChange,
   onModeChange,
   onSelectionChange,
   onPanChange
@@ -48,6 +49,18 @@ export default function Canvas({
   const [canvasRevision, setCanvasRevision] = useState(0);
   const [deleteIconPos, setDeleteIconPos] = useState(null);
   const maxDroneWarningShownRef = useRef(false);
+  const previewTimerRef = useRef(null);
+
+  const schedulePreview = useCallback(() => {
+    if (!onPreviewChange || !fabricCanvas.current) return;
+    if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+    previewTimerRef.current = setTimeout(() => {
+      try {
+        const dataURL = fabricCanvas.current.toDataURL({ format: 'png', quality: 0.92, multiplier: 1 });
+        onPreviewChange(dataURL);
+      } catch (_) {}
+    }, 200);
+  }, [onPreviewChange]);
 
   // 레이어 관리 훅
   const {
@@ -141,6 +154,10 @@ export default function Canvas({
     if (externalStageRef) {
       externalStageRef.current = canvas;
     }
+
+    // Preview update on core canvas events (debounced)
+    const previewEvents = ['object:added', 'object:modified', 'object:removed', 'path:created'];
+    previewEvents.forEach((evt) => canvas.on(evt, schedulePreview));
 
     // 초기 렌더링 활성화
     canvas.renderOnAddRemove = true;
