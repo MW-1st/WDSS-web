@@ -111,14 +111,19 @@ export default function Navbar({ transparent: propTransparent = false }) {
     };
 
     return (
-      <nav className="px-4 py-2 mb-4 flex justify-center">
+      <nav className="px-4 py-2 mb-4 flex justify-center font-nanumhuman">
         <div className="w-full flex justify-between items-center gap-40">
-          {/* Project name */}
-          <div
-            className="font-semibold text-2xl max-w-[480px] truncate pl-4"
-            title={editorState.projectName || "Untitled Project"}
-          >
-            {editorState.projectName || "Untitled Project"}
+          {/* Logo + Project name */}
+          <div className="flex items-center gap-3">
+            <Link to="/" title="메인 페이지" className="logo-press flex items-center">
+              <img src="/img/Logo.png" alt="Logo" className="h-10 w-auto" />
+            </Link>
+            <div
+              className="font-extrabold text-3xl max-w-[480px] truncate"
+              title={editorState.projectName || "Untitled Project"}
+            >
+              {editorState.projectName || "Untitled Project"}
+            </div>
           </div>
 
           <div className="flex flex-1 justify-between">
@@ -141,8 +146,15 @@ export default function Navbar({ transparent: propTransparent = false }) {
               변환
             </button>
 
-            {/* JSON + Unity */}
+            {/* Dashboard + JSON + Unity */}
             <div className="flex items-center gap-2">
+              <Link
+                to="/dashboard"
+                className="px-3 py-1.5 rounded border border-gray-300 text-gray-800 hover:bg-gray-100"
+                title="대시보드로 이동"
+              >
+                Dashboard
+              </Link>
               <button
                 onClick={handleJsonGeneration}
                 className="px-3 py-1.5 rounded !bg-blue-600 hover:!bg-blue-700 text-white"

@@ -778,7 +778,7 @@ const handleClearAll = React.useCallback(async () => {
 
   return (
       <div
-          className="editor-shell"
+          className="editor-shell font-nanumhuman"
           style={{
             width: "100%",
             minHeight: "100vh",
