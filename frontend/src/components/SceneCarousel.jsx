@@ -305,7 +305,7 @@ export default React.memo(function SceneCarousel({
         style={{
           width: dims.thumbW,
           height: dims.thumbH,
-          background: item.preview ? `url(${item.preview})` : "#ddd",
+          background: (item.preview || item.imageUrl) ? `url(${item.preview || item.imageUrl})` : "#ddd",
           backgroundSize: "cover",
           backgroundPosition: "center",
           borderRadius: 8,

@@ -54,6 +54,15 @@ export default function EditorPage({ projectId = DUMMY }) {
     localStorage.setItem("wdss:galleryOpen", JSON.stringify(galleryOpen));
   }, [galleryOpen]);
 
+  // Ensure gallery is closed on leaving the editor page
+  useEffect(() => {
+    return () => {
+      try {
+        localStorage.setItem("wdss:galleryOpen", JSON.stringify(false));
+      } catch (_) {}
+    };
+  }, []);
+
   // 이미지 변환 관련 상태
   const [processing, setProcessing] = useState(false);
   const [targetDots, setTargetDots] = useState(2000);
@@ -63,7 +72,7 @@ export default function EditorPage({ projectId = DUMMY }) {
   const galleryRef = useRef(null);
 
   // 캔버스 관련 상태
-  const [drawingMode, setDrawingMode] = useState("draw");
+  const [drawingMode, setDrawingMode] = useState("select");
   const [eraserSize, setEraserSize] = useState(20);
   const [drawingColor, setDrawingColor] = useState('#222222');
   const [selectedObject, setSelectedObject] = useState(null);
@@ -150,6 +159,12 @@ export default function EditorPage({ projectId = DUMMY }) {
       
       if (stageRef.current && stageRef.current.layers) {
         setCanvasReady(true);
+        // 초기 진입 시 도구를 클릭(선택) 모드로 강제 설정
+        try {
+          if (stageRef.current.setDrawingMode) {
+            stageRef.current.setDrawingMode('select');
+          }
+        } catch (_) {}
         updateLayerState();
         
         // 캔버스 선택 이벤트 리스너 추가
@@ -606,15 +621,15 @@ const handleClearAll = React.useCallback(async () => {
     if (!active) return;
 
     const applyFill = (obj) => {
-      if (
-          obj?.customType === "svgDot" ||
-          obj?.customType === "drawnDot" ||
-          obj?.type === "circle"
-      ) {
-        obj.set({fill: hex, originalFill: hex});
-        if ((obj.type === "path" || obj.type === "line" || !obj.fill) && ("stroke" in obj)) {
-          obj.set({stroke: hex});
-        }
+      if (!obj) return;
+      // If path/line or non-fillable but has stroke, apply to stroke
+      if (obj.type === "path" || obj.type === "line" || (!obj.fill && ("stroke" in obj))) {
+        obj.set({ stroke: hex });
+        return;
+      }
+      // Otherwise, apply to fill for fillable shapes (dots/circles etc.)
+      if ("fill" in obj) {
+        obj.set({ fill: hex, originalFill: hex });
       }
     };
 
@@ -625,7 +640,7 @@ const handleClearAll = React.useCallback(async () => {
     }
 
     canvas.renderAll && canvas.renderAll();
-    setSelectedObject((prev) => (prev ? {...prev, fill: hex} : prev));
+    setSelectedObject((prev) => (prev ? { ...prev, fill: hex, stroke: hex } : prev));
   }, []);
 
   // 레이어 관련 핸들러들
@@ -931,6 +946,10 @@ const handleClearAll = React.useCallback(async () => {
               imageUrl={imageUrl}
               stageRef={stageRef}
               onChange={handleSceneChange}
+              onPreviewChange={(dataUrl) => {
+                if (!dataUrl || !selectedId) return;
+                setScenes(prev => prev.map(s => s.id === selectedId ? { ...s, preview: dataUrl } : s));
+              }}
               drawingMode={drawingMode}
               eraserSize={eraserSize}
               drawingColor={drawingColor}

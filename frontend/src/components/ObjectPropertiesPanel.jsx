@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
 import ColorPicker from "./ColorPicker.jsx";
+import "../styles/ObjectPropertiesPanel.css";
 
 function normalizeColorToHex(color) {
   if (!color) return "#000000";
@@ -22,53 +23,53 @@ function normalizeColorToHex(color) {
 
 export default function ObjectPropertiesPanel({ selection, onChangeFill }) {
   const isMulti = selection?.type === "activeSelection";
-  const isDotOrCircle =
+  const isDotOrCircleOrPath =
     selection &&
     (selection.customType === "svgDot" ||
       selection.customType === "drawnDot" ||
-      selection.type === "circle");
-  // Allow ColorPicker for multi-selection or supported single objects
-  // (per request: use selection?.type check inline)
-  const currentFill = useMemo(
-    () => normalizeColorToHex(selection?.fill),
+      selection.type === "circle" ||
+      selection.type === "path" ||
+      selection.type === "line");
+
+  const currentColor = useMemo(
+    () => normalizeColorToHex(selection?.fill || selection?.stroke),
     [selection]
   );
 
   return (
-    <div style={{ padding: 16 }}>
-      <h4 style={{ margin: "0 0 12px 0" }}>개체 속성</h4>
+    <div className="properties-panel">
+      <div className="properties-panel-header">
+        <h3>개체 속성</h3>
+        {selection && (
+          <span className="type-badge">{selection.customType || selection.type || "-"}</span>
+        )}
+      </div>
 
-      {!selection && (
-        <div style={{ color: "#777", fontSize: 13 }}>개체를 선택하세요.</div>
-      )}
+      <div className="properties-panel-body">
+        {!selection && (
+          <div className="properties-empty">개체를 선택하세요</div>
+        )}
 
-      {selection && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div style={{ fontSize: 12, color: "#555" }}>
-            Type: {selection.customType || selection.type || "-"}
-          </div>
-
-          {(selection?.type &&
-            selection.type.toLowerCase() === "activeselection") ||
-          selection?.multiple ||
-          isDotOrCircle ? (
-            <div>
-              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>
-                Fill Color{isMulti ? " (multi)" : ""}
+        {selection && (
+          <div className="properties-section">
+            {(selection?.type &&
+              selection.type.toLowerCase() === "activeselection") ||
+            selection?.multiple ||
+            isDotOrCircleOrPath ? (
+              <div className="properties-field">
+                <div className="label">Fill Color{isMulti ? " (multi)" : ""}</div>
+                <ColorPicker
+                  color={currentColor}
+                  onChange={(hex) => onChangeFill && onChangeFill(hex)}
+                  onPreview={() => {}}
+                />
               </div>
-              <ColorPicker
-                color={currentFill}
-                onChange={(hex) => onChangeFill && onChangeFill(hex)}
-                onPreview={() => {}}
-              />
-            </div>
-          ) : (
-            <div style={{ color: "#777", fontSize: 12 }}>
-              이 오브젝트는 채우기 색상을 지원하지 않습니다.
-            </div>
-          )}
-        </div>
-      )}
+            ) : (
+              <div className="properties-note">이 객체는 채우기 색상을 지원하지 않습니다.</div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
