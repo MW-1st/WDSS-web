@@ -945,6 +945,10 @@ const handleClearAll = React.useCallback(async () => {
               imageUrl={imageUrl}
               stageRef={stageRef}
               onChange={handleSceneChange}
+              onPreviewChange={(dataUrl) => {
+                if (!dataUrl || !selectedId) return;
+                setScenes(prev => prev.map(s => s.id === selectedId ? { ...s, preview: dataUrl } : s));
+              }}
               drawingMode={drawingMode}
               eraserSize={eraserSize}
               drawingColor={drawingColor}
