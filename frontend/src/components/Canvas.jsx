@@ -128,6 +128,14 @@ export default function Canvas({
     brush.decimate = 2; // 브러시 포인트 간소화
     brush.limitedToCanvasSize = true; // 캔버스 경계 제한
     canvas.freeDrawingBrush = brush;
+    // 초기 외부 모드가 드로잉이 아니면 즉시 비활성화하여 첫 클릭에 선이 그려지지 않도록 함
+    try {
+      if (!(externalDrawingMode === 'draw' || externalDrawingMode === 'pixelErase')) {
+        canvas.isDrawingMode = false;
+        canvas.selection = (externalDrawingMode === 'select');
+        canvas.skipTargetFind = externalDrawingMode === 'draw' || externalDrawingMode === 'pixelErase' || externalDrawingMode === 'erase' || externalDrawingMode === 'brush';
+      }
+    } catch (_) {}
     fabricCanvas.current = canvas;
 
     if (externalStageRef) {

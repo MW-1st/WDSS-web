@@ -63,7 +63,7 @@ export default function EditorPage({ projectId = DUMMY }) {
   const galleryRef = useRef(null);
 
   // 캔버스 관련 상태
-  const [drawingMode, setDrawingMode] = useState("draw");
+  const [drawingMode, setDrawingMode] = useState("select");
   const [eraserSize, setEraserSize] = useState(20);
   const [drawingColor, setDrawingColor] = useState('#222222');
   const [selectedObject, setSelectedObject] = useState(null);
@@ -150,6 +150,12 @@ export default function EditorPage({ projectId = DUMMY }) {
       
       if (stageRef.current && stageRef.current.layers) {
         setCanvasReady(true);
+        // 초기 진입 시 도구를 클릭(선택) 모드로 강제 설정
+        try {
+          if (stageRef.current.setDrawingMode) {
+            stageRef.current.setDrawingMode('select');
+          }
+        } catch (_) {}
         updateLayerState();
         
         // 캔버스 선택 이벤트 리스너 추가
