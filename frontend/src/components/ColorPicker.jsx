@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { FaEyeDropper } from 'react-icons/fa';
 
 const ColorPicker = React.memo(function ColorPicker({ color, onChange, onPreview }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -113,7 +114,7 @@ const ColorPicker = React.memo(function ColorPicker({ color, onChange, onPreview
     }
   }, []);
 
-  // Draw hue canvas
+  // Draw hue canvas (horizontal)
   const drawHueCanvas = useCallback(() => {
     const canvas = hueCanvasRef.current;
     if (!canvas) return;
@@ -122,11 +123,11 @@ const ColorPicker = React.memo(function ColorPicker({ color, onChange, onPreview
     const width = canvas.width;
     const height = canvas.height;
 
-    for (let y = 0; y < height; y++) {
-      const hue = (y / height) * 360;
+    for (let x = 0; x < width; x++) {
+      const hue = (x / width) * 360;
       const [r, g, b] = hsvToRgb(hue, 1, 1);
       ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
-      ctx.fillRect(0, y, width, 1);
+      ctx.fillRect(x, 0, 1, height);
     }
   }, []);
 
@@ -180,12 +181,10 @@ const ColorPicker = React.memo(function ColorPicker({ color, onChange, onPreview
   // Handle hue canvas interaction
   const handleHueMouseMove = useCallback((e) => {
     if (!isDraggingHue && e.type !== 'mousedown') return;
-    
     const canvas = hueCanvasRef.current;
     const rect = canvas.getBoundingClientRect();
-    const y = Math.max(0, Math.min(e.clientY - rect.top, rect.height));
-    
-    const hue = (y / rect.height) * 360;
+    const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+    const hue = (x / rect.width) * 360;
     const newHsv = [hue, currentHsv[1], currentHsv[2]];
     setCurrentHsv(newHsv);
     
@@ -286,38 +285,73 @@ const ColorPicker = React.memo(function ColorPicker({ color, onChange, onPreview
             boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
           }}
         >
-          <div style={{ display: 'flex', gap: '8px' }}>
-            {/* Saturation/Brightness canvas */}
-            <canvas
-              ref={canvasRef}
-              width={200}
-              height={150}
-              style={{
-                cursor: 'crosshair',
-                border: '1px solid #ddd'
-              }}
-              onMouseDown={(e) => {
-                e.stopPropagation();
-                setIsDraggingSaturation(true);
-                handleSaturationMouseMove(e);
-              }}
-            />
-            
-            {/* Hue canvas */}
-            <canvas
-              ref={hueCanvasRef}
-              width={20}
-              height={150}
-              style={{
-                cursor: 'crosshair',
-                border: '1px solid #ddd'
-              }}
-              onMouseDown={(e) => {
-                e.stopPropagation();
-                setIsDraggingHue(true);
-                handleHueMouseMove(e);
-              }}
-            />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {/* Saturation/Brightness canvas with handle */}
+            <div style={{ position: 'relative', width: 200, height: 150 }}>
+              <canvas
+                ref={canvasRef}
+                width={200}
+                height={150}
+                style={{
+                  cursor: 'crosshair',
+                  border: '1px solid #ddd',
+                  borderRadius: '6px',
+                  display: 'block'
+                }}
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  setIsDraggingSaturation(true);
+                  handleSaturationMouseMove(e);
+                }}
+              />
+              {/* SV handle */}
+              <div
+                style={{
+                  position: 'absolute',
+                  left: `${Math.max(0, Math.min(200 * currentHsv[1], 200)) - 8}px`,
+                  top: `${Math.max(0, Math.min(150 * (1 - currentHsv[2]), 150)) - 8}px`,
+                  width: 16,
+                  height: 16,
+                  borderRadius: '50%',
+                  boxShadow: '0 0 0 2px #000, inset 0 0 0 2px #fff',
+                  pointerEvents: 'none'
+                }}
+              />
+            </div>
+
+            {/* Hue bar with handle (horizontal) */}
+            <div style={{ position: 'relative', width: 200, height: 16 }}>
+              <canvas
+                ref={hueCanvasRef}
+                width={200}
+                height={16}
+                style={{
+                  cursor: 'crosshair',
+                  border: '1px solid #ddd',
+                  borderRadius: '8px',
+                  display: 'block'
+                }}
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  setIsDraggingHue(true);
+                  handleHueMouseMove(e);
+                }}
+              />
+              {/* Hue handle */}
+              <div
+                style={{
+                  position: 'absolute',
+                  left: `${Math.max(0, Math.min(200 * (currentHsv[0] / 360), 200)) - 8}px`,
+                  top: '-6px',
+                  width: 16,
+                  height: 28,
+                  borderRadius: 14,
+                  background: 'transparent',
+                  boxShadow: '0 0 0 2px #fff, 0 0 0 3px #0003',
+                  pointerEvents: 'none'
+                }}
+              />
+            </div>
           </div>
           
           {/* Color preview and controls */}
@@ -356,6 +390,43 @@ const ColorPicker = React.memo(function ColorPicker({ color, onChange, onPreview
                   width: '70px'
                 }}
               />
+              {/* Eyedropper */}
+              <button
+                onClick={async () => {
+                  try {
+                    if ('EyeDropper' in window) {
+                      const eyeDropper = new window.EyeDropper();
+                      const result = await eyeDropper.open();
+                      const picked = result.sRGBHex;
+                      setPreviewColor(picked);
+                      const [r, g, b] = hexToRgb(picked);
+                      const hsv = rgbToHsv(r, g, b);
+                      setCurrentHsv(hsv);
+                      drawSaturationCanvas(hsv[0]);
+                      if (onPreview) onPreview(picked);
+                    } else {
+                      alert('이 브라우저는 스포이드(EyeDropper)를 지원하지 않습니다.');
+                    }
+                  } catch (err) {
+                    // 사용자가 취소한 경우 등 무시
+                  }
+                }}
+                title="스포이드로 색상 선택"
+                style={{
+                  width: 28,
+                  height: 28,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: '#f5f5f5',
+                  border: '1px solid #ccc',
+                  borderRadius: 4,
+                  cursor: 'pointer'
+                }}
+              >
+                <FaEyeDropper />
+              </button>
+
               <button
                 onClick={() => {
                   if (onChange) onChange(previewColor);

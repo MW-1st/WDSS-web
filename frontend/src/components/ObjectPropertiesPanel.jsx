@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+﻿import React, { useMemo } from "react";
 import ColorPicker from "./ColorPicker.jsx";
 
 function normalizeColorToHex(color) {
@@ -36,10 +36,10 @@ export default function ObjectPropertiesPanel({ selection, onChangeFill }) {
 
   return (
     <div style={{ padding: 16 }}>
-      <h4 style={{ margin: "0 0 12px 0" }}>개체 속성</h4>
+      <h4 style={{ margin: "0 0 12px 0" }}>媛쒖껜 ?띿꽦</h4>
 
       {!selection && (
-        <div style={{ color: "#777", fontSize: 13 }}>개체를 선택하세요.</div>
+        <div style={{ color: "#777", fontSize: 13 }}>媛쒖껜瑜??좏깮?섏꽭??</div>
       )}
 
       {selection && (
@@ -51,10 +51,12 @@ export default function ObjectPropertiesPanel({ selection, onChangeFill }) {
           {(selection?.type &&
             selection.type.toLowerCase() === "activeselection") ||
           selection?.multiple ||
-          isDotOrCircle ? (
+          isDotOrCircle ||
+          selection?.type === "path" ||
+          typeof selection?.fill !== 'undefined' ? (
             <div>
               <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>
-                Fill Color{isMulti ? " (multi)" : ""}
+                채우기 색상{isMulti ? " (multi)" : ""}
               </div>
               <ColorPicker
                 color={currentFill}
@@ -64,7 +66,7 @@ export default function ObjectPropertiesPanel({ selection, onChangeFill }) {
             </div>
           ) : (
             <div style={{ color: "#777", fontSize: 12 }}>
-              이 오브젝트는 채우기 색상을 지원하지 않습니다.
+              ???ㅻ툕?앺듃??梨꾩슦湲??됱긽??吏?먰븯吏 ?딆뒿?덈떎.
             </div>
           )}
         </div>
