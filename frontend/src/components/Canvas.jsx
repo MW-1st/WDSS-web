@@ -1464,8 +1464,11 @@ export default function Canvas({
     if (!fabricCanvas.current) return;
 
     const canvas = fabricCanvas.current;
-    // 모든 객체 제거
-    canvas.getObjects().forEach((obj) => canvas.remove(obj));
+    // 모든 객체 제거 (경계선은 유지)
+    canvas.getObjects().forEach((obj) => {
+      if (obj && obj.name === 'canvasBoundary') return; // 점선 테두리 유지
+      canvas.remove(obj);
+    });
     canvas.backgroundColor = "#fafafa";
     canvas.renderAll();
     setCanvasRevision(c => c + 1); // 캔버스 변경을 알림
