@@ -15,6 +15,18 @@ export const UnityProvider = ({ children }) => {
   const [isUnityVisible, setIsUnityVisible] = useState(false);
 
   const showUnity = () => {
+    try {
+      const canvas = window?.editorAPI?.stageRef?.current;
+      if (canvas && typeof canvas.discardActiveObject === 'function') {
+        const actives = typeof canvas.getActiveObjects === 'function' ? canvas.getActiveObjects() : [];
+        if (actives && actives.length > 0) {
+          // Deselect any currently-selected objects to avoid floating UI over the Unity modal
+          try { canvas.discardActiveObject(); } catch (_) {}
+          try { canvas.requestRenderAll && canvas.requestRenderAll(); } catch (_) {}
+        }
+      }
+    } catch (_) {}
+
     setIsUnityVisible(true);
     // Try to reactivate Unity when showing
     setTimeout(() => {
