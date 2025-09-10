@@ -10,6 +10,7 @@
 @theme {
   --font-tway: "TwaySky", ui-sans-serif, system-ui, sans-serif;
 }
+
 @font-face {
   font-family: "YUniverse";
   src: url("https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_yuniverse@1.0/YUniverse-L.woff2")
@@ -34,41 +35,37 @@
   font-weight: 400;
   font-style: normal;
 }
-
 @font-face {
   font-family: "NanumHuman";
   src: url("/fonts/NanumHumanLight.woff") format("woff");
   font-weight: 300;
   font-style: normal;
 }
-
 @font-face {
   font-family: "NanumHuman";
   src: url("/fonts/NanumHumanBold.woff") format("woff");
   font-weight: 700;
   font-style: normal;
 }
-
 @font-face {
   font-family: "NanumHuman";
   src: url("/fonts/NanumHumanEB.woff") format("woff");
   font-weight: 800;
   font-style: normal;
 }
-
 @font-face {
   font-family: "NanumHuman";
   src: url("/fonts/NanumHumanHeavy.woff") format("woff");
   font-weight: 900;
   font-style: normal;
 }
-
 @font-face {
   font-family: "NanumHuman";
   src: url("/fonts/NanumHumanEL.woff") format("woff");
   font-weight: 200;
   font-style: normal;
 }
+
 @font-face {
   font-family: "Pretendard";
   src: url("https://cdn.jsdelivr.net/gh/Project-Noonnu/noonfonts_2107@1.1/Pretendard-Thin.woff")
@@ -76,7 +73,6 @@
   font-weight: 100;
   font-display: swap;
 }
-
 @font-face {
   font-family: "Pretendard";
   src: url("https://cdn.jsdelivr.net/gh/Project-Noonnu/noonfonts_2107@1.1/Pretendard-ExtraLight.woff")
@@ -84,7 +80,6 @@
   font-weight: 200;
   font-display: swap;
 }
-
 @font-face {
   font-family: "Pretendard";
   src: url("https://cdn.jsdelivr.net/gh/Project-Noonnu/noonfonts_2107@1.1/Pretendard-Light.woff")
@@ -92,7 +87,6 @@
   font-weight: 300;
   font-display: swap;
 }
-
 @font-face {
   font-family: "Pretendard";
   src: url("https://cdn.jsdelivr.net/gh/Project-Noonnu/noonfonts_2107@1.1/Pretendard-Regular.woff")
@@ -100,7 +94,6 @@
   font-weight: 400;
   font-display: swap;
 }
-
 @font-face {
   font-family: "Pretendard";
   src: url("https://cdn.jsdelivr.net/gh/Project-Noonnu/noonfonts_2107@1.1/Pretendard-Medium.woff")
@@ -108,7 +101,6 @@
   font-weight: 500;
   font-display: swap;
 }
-
 @font-face {
   font-family: "Pretendard";
   src: url("https://cdn.jsdelivr.net/gh/Project-Noonnu/noonfonts_2107@1.1/Pretendard-SemiBold.woff")
@@ -116,7 +108,6 @@
   font-weight: 600;
   font-display: swap;
 }
-
 @font-face {
   font-family: "Pretendard";
   src: url("https://cdn.jsdelivr.net/gh/Project-Noonnu/noonfonts_2107@1.1/Pretendard-Bold.woff")
@@ -124,7 +115,6 @@
   font-weight: 700;
   font-display: swap;
 }
-
 @font-face {
   font-family: "Pretendard";
   src: url("https://cdn.jsdelivr.net/gh/Project-Noonnu/noonfonts_2107@1.1/Pretendard-ExtraBold.woff")
@@ -132,7 +122,6 @@
   font-weight: 800;
   font-display: swap;
 }
-
 @font-face {
   font-family: "Pretendard";
   src: url("https://cdn.jsdelivr.net/gh/Project-Noonnu/noonfonts_2107@1.1/Pretendard-Black.woff")
@@ -140,7 +129,8 @@
   font-weight: 900;
   font-display: swap;
 }
-/* 遺?쒕읇寃??됱씠 ?먮Ⅴ?꾨줉 */
+
+/* 그라디언트가 부드럽게 이동하는 애니메이션 */
 @keyframes gradientMove {
   0% {
     background-position: 0% 50%;
@@ -153,7 +143,7 @@
   }
 }
 
-/* ?쇰쟻?대뒗 洹몃씪?곗씠??*/
+/* 계속 움직이는 그라디언트 배경 */
 .bg-wavy {
   background-image: linear-gradient(
     270deg,
@@ -167,7 +157,7 @@
   animation: gradientMove 20s ease-in-out infinite;
 }
 
-/* 媛?낆꽦???댁쭩 ?뚮윭二쇰뒗 ?ㅻ쾭?덉씠(?좏깮) */
+/* 가독성을 높이는 어두운 베일 오버레이(선택) */
 .bg-veil {
   background: radial-gradient(
       80% 60% at 50% 40%,
@@ -176,17 +166,14 @@
     ),
     rgba(0, 0, 0, 0.06);
 }
-/* .button {
-  background-color: #646cff;
-} */
-/* ?? 媛ㅻ윭由??ㅽ겕濡?媛???쒓굅 ??????????????????????????? */
+
+/* 갤러리 스크롤 영역: 스크롤바 공간을 고정해 레이아웃 흔들림 방지 */
 .galleryPane {
-  scrollbar-gutter: auto !important; /* ?꾩뿭 stable both-edges 臾대젰??*/
-  /* 蹂닿린 醫뗭? 湲곕낯 媛믩뱾 */
+  scrollbar-gutter: auto !important; /* 레이아웃 안정화(both-edges 유사 효과) */
   scrollbar-width: thin; /* Firefox */
 }
 
-/* WebKit (Chromium) ?ш린 ?듭씪 */
+/* WebKit(Chromium) 전용 커스텀 스크롤바 */
 .galleryPane::-webkit-scrollbar {
   width: 14px;
 }
@@ -198,22 +185,20 @@
   border-radius: 8px;
 }
 
-/* ?? Fallback: ?ъ쟾??媛?곌? ?⑤뒗 ?섍꼍 蹂댁젙 ?????????????
-   ?ㅽ겕濡ㅼ씠 ?ㅼ젣濡??앷릿 寃쎌슦?먮쭔(?먮컮?ㅽ겕由쏀듃濡?data-scroll-y 遺?? 
-   ?ㅻⅨ履?"?덉빟 怨듦컙"???뚯닔 留덉쭊?쇰줈 ?곸뇙?섍퀬 ?숈씪 ?ш린留뚰겮 ?대? ?⑤뵫??以섏꽌
-   肄섑뀗痢좉? ?섎━吏 ?딄쾶 ?⑸땲??  */
+/* Fallback: 스크롤바가 오버레이되는 환경에서 수동으로 오른쪽 여백 보정
+   (data-scroll-y="1"을 부여하면 패딩을 추가해 내용 흔들림을 방지) */
 .galleryPane[data-scroll-y="1"] {
-  --gutter-w: 14px; /* ?꾩쓽 ::-webkit-scrollbar width? 留욎땄 */
+  --gutter-w: 14px; /* ::-webkit-scrollbar 폭과 동일하게 유지 */
   margin-right: calc(-1 * var(--gutter-w));
   padding-right: var(--gutter-w);
 }
 
-/* Utility: NanumHuman font for editor */
+/* Utility: NanumHuman 폰트를 편집기에 적용 */
 .font-nanumhuman {
-  font-family: 'NanumHuman', ui-sans-serif, system-ui, sans-serif;
+  font-family: "NanumHuman", ui-sans-serif, system-ui, sans-serif;
 }
 
-/* Press effect for editor logo */
+/* 로고 프레스(눌림) 효과 */
 .logo-press {
   display: inline-flex;
   transform: scale(1);
