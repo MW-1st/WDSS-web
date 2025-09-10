@@ -5,6 +5,7 @@ import SceneCarousel from "../components/SceneCarousel.jsx";
 import ImageGallery from "../components/ImageGallery.jsx";
 import LayerPanel from "../components/LayerPanel.jsx";
 import ObjectPropertiesPanel from "../components/ObjectPropertiesPanel.jsx";
+import { useAutoSave } from '../hooks/useAutoSave';
 import client from "../api/client";
 import { getImageUrl } from '../utils/imageUtils';
 import { useUnity } from "../contexts/UnityContext.jsx";
@@ -141,6 +142,24 @@ export default function EditorPage({ projectId = DUMMY }) {
 
   // unity 관련 상태
   const {isUnityVisible, showUnity, hideUnity, sendTestData} = useUnity();
+
+  // useAutoSave 훅 초기화 - selectedId가 변경될 때마다 새로운 인스턴스
+  const {
+    saveImmediately,
+    triggerAutoSave,
+    isSaving: isAutoSaving,
+    lastSaveTime,
+    saveError
+  } = useAutoSave(selectedId, stageRef, {
+    enabled: true,
+    delay: 1500,
+    onSave: (data) => {
+      console.log(`Auto-saved scene ${data.sceneId} with ${data.objectCount} objects`);
+    },
+    onError: (error) => {
+      console.error('Auto-save failed:', error);
+    }
+  });
 
   // 색상이 변경될 때 즉시 캔버스에 반영
   useEffect(() => {
@@ -516,7 +535,32 @@ export default function EditorPage({ projectId = DUMMY }) {
                 .then(response => console.log("수동 fetch 결과:", response.status))
                 .catch(err => console.error("수동 fetch 실패:", err));
 
-            stageRef.current.loadFabricJsonNative(finalUrl); // 함수명 변경
+            // 캔버스에 이미지 로드
+            stageRef.current.loadFabricJsonNative(finalUrl);
+            // 이미지 로드 완료 후 useAutoSave를 통해 즉시 저장
+            setTimeout(async () => {
+              try {
+                const transformMetadata = {
+                  imageUrl: finalUrl,
+                  projectId: pid,
+                  transformedAt: new Date().toISOString(),
+                  targetDots: targetDots,
+                  drawingColor: drawingColor,
+                  type: 'transformed',
+                  source: 'transform_complete'
+                };
+
+                const saveSuccess = await saveImmediately(transformMetadata);
+
+                if (saveSuccess) {
+                  console.log(`변환된 이미지 상태가 자동 저장되었습니다: ${selectedId}`);
+                } else {
+                  console.warn('변환된 이미지 자동 저장에 실패했습니다.');
+                }
+              } catch (error) {
+                console.error('변환된 캔버스 상태 저장 중 오류:', error);
+              }
+            }, 500); // 이미지 로드 완료를 위한 지연
           }
         }, 200);
 
