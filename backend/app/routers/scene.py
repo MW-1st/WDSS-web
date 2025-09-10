@@ -284,7 +284,7 @@ async def patch_scene(
 
                 # 연관된 파일들 삭제
                 original_file = os.path.join(ORIGINALS_DIR, f"{scene_id}.png")
-                processed_file = os.path.join(PROCESSED_DIR, f"{scene_id}.svg")
+                processed_file = os.path.join(PROCESSED_DIR, f"{scene_id}.json")
 
                 # originals 폴더의 파일 삭제
                 if os.path.exists(original_file):
@@ -426,7 +426,7 @@ async def create_original_and_transform(
 
         # 3. 변환 성공 시, 임시 파일들을 영구 저장소로 이동
         permanent_original_path = os.path.join(ORIGINALS_DIR, f"{scene_id}.png")
-        permanent_processed_path = os.path.join(PROCESSED_DIR, f"{scene_id}.svg")
+        permanent_processed_path = os.path.join(PROCESSED_DIR, f"{scene_id}.json")
 
         shutil.move(temp_original_path, permanent_original_path)
         shutil.move(temp_processed_path, permanent_processed_path)
@@ -452,7 +452,7 @@ async def create_original_and_transform(
             )
 
         # 5. 프론트엔드에 '변환된' 이미지의 URL을 반환
-        output_url = os.path.join("processed", f"{scene_id}.svg").replace("\\", "/")
+        output_url = os.path.join("processed", f"{scene_id}.json").replace("\\", "/")
         return {"output_url": f"{output_url}"}
 
     except Exception as e:
@@ -515,7 +515,7 @@ async def re_transform_from_original(
         shutil.move(temp_processed_path, final_processed_path)
 
         # 5. 업데이트된 변환 이미지의 URL을 반환
-        output_url = os.path.join("processed", f"{scene_id}.svg").replace("\\", "/")
+        output_url = os.path.join("processed", f"{scene_id}.json").replace("\\", "/")
         return {"output_url": f"{output_url}"}
 
     except Exception as e:
@@ -558,7 +558,7 @@ async def save_canvas_as_processed(
             await out_file.write(content)
 
         # 응답 데이터 준비
-        processed_url = os.path.join("processed", f"{scene_id}.svg").replace("\\", "/")
+        processed_url = os.path.join("processed", f"{scene_id}.json").replace("\\", "/")
 
         return {
             "success": True,
@@ -579,7 +579,7 @@ def get_display_url(original_s3_key: str) -> str:
 
     if original_s3_key.startswith("originals/"):
         return original_s3_key.replace("originals/", "processed/").replace(
-            ".png", ".svg"
+            ".png", ".json"
         )
 
     return original_s3_key

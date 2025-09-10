@@ -511,15 +511,15 @@ export default function EditorPage({ projectId = DUMMY }) {
         );
 
         setTimeout(() => {
-          if (stageRef.current && stageRef.current.loadImageFromUrl) {
+          if (stageRef.current && stageRef.current.loadFabricJsonNative) {
             fetch(finalUrl)
                 .then(response => console.log("수동 fetch 결과:", response.status))
                 .catch(err => console.error("수동 fetch 실패:", err));
 
-            stageRef.current.loadImageFromUrl(finalUrl);
+            stageRef.current.loadFabricJsonNative(finalUrl); // 함수명 변경
           }
         }, 200);
-        
+
         if (selectedScene) {
           saveDebounced(selectedId, selectedScene?.drones, selectedScene?.preview, finalUrl, originalCanvasState);
         }

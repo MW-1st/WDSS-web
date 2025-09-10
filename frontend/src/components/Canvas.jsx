@@ -624,6 +624,55 @@ export default function Canvas({
     if (!imageUrl || !fabricCanvas.current) return;
     const canvas = fabricCanvas.current;
 
+    if (imageUrl.endsWith(".json")) {
+      console.log("JSON 파일 로드 시작:", imageUrl);
+      fetch(imageUrl)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          return response.json();
+        })
+        .then(fabricJsonData => {
+          console.log("JSON 데이터 로드됨:", fabricJsonData);
+
+          // 기존 객체들 제거
+          const existingObjects = canvas.getObjects()
+            .filter(obj => obj.customType === "svgDot" || obj.customType === "jsonDot" || obj.type === "image");
+          existingObjects.forEach(obj => canvas.remove(obj));
+
+          // Fabric.js 내장 메서드로 JSON 로드
+          canvas.loadFromJSON(fabricJsonData, () => {
+            // 로드 완료 후 customType 추가 및 이벤트 설정
+            canvas.getObjects().forEach(obj => {
+              if (obj.type === "circle") {
+                obj.set({
+                  customType: "jsonDot",
+                  selectable: false,
+                  evented: true,
+                  hoverCursor: 'crosshair',
+                  moveCursor: 'crosshair'
+                });
+
+                // JSON 도트는 배경 레이어에 할당
+                const backgroundLayer = getLayer('background');
+                if (backgroundLayer) {
+                  fabricLayerUtils.assignObjectToLayer(obj, backgroundLayer.id, backgroundLayer.name);
+                }
+              }
+            });
+
+            setCanvasRevision(c => c + 1);
+            canvas.renderAll();
+            console.log(`${canvas.getObjects().length}개의 객체를 로드했습니다.`);
+          });
+        })
+        .catch(err => {
+          console.error("JSON 로드 실패:", err);
+          // JSON 로드 실패 시 기본 이미지 방식으로 폴백
+          loadAsImage();
+        });
+    }
     // SVG 파일인지 확인
     if (imageUrl.endsWith(".svg")) {
       console.log("SVG 파일 로드 시작:", imageUrl);
@@ -1626,53 +1675,51 @@ export default function Canvas({
       externalStageRef.current.clear = clearCanvas;
       
       // 누락된 loadImageFromUrl 메서드 추가
-      externalStageRef.current.loadImageFromUrl = (url) => {
-        console.log("loadImageFromUrl 호출됨:", url);
+      externalStageRef.current.loadFabricJsonNative = (url) => {
+        console.log("loadFabricJsonNative 호출됨:", url);
         if (!fabricCanvas.current) return;
 
         const canvas = fabricCanvas.current;
 
-        if (url.endsWith(".svg")) {
+        if (url.endsWith(".json")) {
           fetch(url)
-            .then(response => response.text())
-            .then(svgText => {
-              // 기존 SVG 요소들 제거
-              const existingSvgObjects = canvas.getObjects()
-                .filter(obj => obj.customType === "svgDot" || obj.type === "image");
-              existingSvgObjects.forEach(obj => canvas.remove(obj));
+            .then(response => {
+              if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+              }
+              return response.json();
+            })
+            .then(fabricJsonData => {
+              console.log("JSON 데이터 로드됨:", fabricJsonData);
 
-              // SVG 파싱
-              const parser = new DOMParser();
-              const svgDoc = parser.parseFromString(svgText, "image/svg+xml");
-              const circles = svgDoc.querySelectorAll("circle");
+              // 기존 객체들 제거
+              canvas.clear();
 
-              circles.forEach((circleEl) => {
-                const cx = parseFloat(circleEl.getAttribute('cx') || '0');
-                const cy = parseFloat(circleEl.getAttribute('cy') || '0');
-                const r = parseFloat(circleEl.getAttribute('r') || '2');
-                const originalFill = circleEl.getAttribute('fill') || '#000000';
-
-                const fabricCircle = new Circle({
-                  left: cx - r,
-                  top: cy - r,
-                  radius: r,
-                  fill: originalFill,
-                  selectable: false,
-                  evented: true,
-                  customType: "svgDot",
-                  originalCx: cx,
-                  originalCy: cy,
-                  originalFill: originalFill,
-                  hoverCursor: 'crosshair',
-                  moveCursor: 'crosshair'
+              // Fabric.js 내장 메서드로 JSON 로드
+              canvas.loadFromJSON(fabricJsonData, () => {
+                // 로드 완료 후 customType 추가 및 이벤트 설정
+                canvas.getObjects().forEach(obj => {
+                  if (obj.type === "circle") {
+                    obj.set({
+                      customType: "jsonDot",
+                      selectable: false,
+                      evented: true,
+                      hoverCursor: 'crosshair',
+                      moveCursor: 'crosshair'
+                    });
+                  }
                 });
 
-                canvas.add(fabricCircle);
+                canvas.renderAll();
+                console.log(`${canvas.getObjects().length}개의 객체를 로드했습니다.`);
               });
-
-              canvas.renderAll();
             })
-            .catch(err => console.error("SVG 로드 실패:", err));
+            .catch(err => {
+              console.error("JSON 로드 실패:", err);
+              alert("변환된 데이터를 불러오는데 실패했습니다.");
+            });
+        } else {
+          console.warn("JSON 파일이 아닙니다:", url);
         }
       };
 
