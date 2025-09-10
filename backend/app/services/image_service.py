@@ -2,6 +2,7 @@ import os
 import uuid
 import cv2
 import numpy as np
+import json
 
 
 def process_image(
@@ -15,14 +16,14 @@ def process_image(
     color_rgb: tuple[int, int, int] | None = None,
 ) -> str:
     """
-    입력 이미지 경로를 받아 엣지 픽셀을 일정 간격으로 점 샘플링한 결과 이미지를 생성합니다.
+    입력 이미지 경로를 받아 엣지 픽셀을 일정 간격으로 점 샘플링한 결과를 Fabric.js JSON으로 생성합니다.
 
     - 파이프라인: Gray → GaussianBlur → Canny → Grid Sampling
     - target_dots가 주어지면 엣지 픽셀 수로부터 step을 자동 계산합니다.
       대략적으로 기대 도트 수 ≈ edge_pixels / (step^2)로 가정하여 step ≈ sqrt(edge_pixels / target_dots)
-    - 결과는 backend/uploads/processed_<uuid>_<dot_count>.png 로 저장됩니다.
+    - 결과는 backend/uploads/processed_<uuid>_<dot_count>.json 로 저장됩니다.
 
-    Returns: 백엔드 루트 기준 상대 경로 (e.g., "uploads/processed_xxx.png")
+    Returns: 백엔드 루트 기준 상대 경로 (e.g., "uploads/processed_xxx.json")
     """
     if not os.path.exists(input_path):
         raise FileNotFoundError(f"Input image not found: {input_path}")
@@ -80,7 +81,7 @@ def process_image(
     out_dir = os.path.join(backend_dir, "uploads")
     os.makedirs(out_dir, exist_ok=True)
 
-    out_name = f"processed_{uuid.uuid4().hex}_{dot_count}.svg"
+    out_name = f"{uuid.uuid4().hex}.json"
     output_path = os.path.join(out_dir, out_name)
 
     # 색상 분석 및 펜 스트로크 통합
@@ -152,7 +153,8 @@ def process_image(
     # 펜 스트로크 색상 분석 (간소화)
     dominant_pen_colors = get_dominant_pen_color(img, points)
 
-    circles = []
+    # Fabric.js Circle 객체들 생성
+    fabric_objects = []
     for x, y in points:
         if y < img.shape[0] and x < img.shape[1]:
             b, g, r = img[int(y), int(x)]
@@ -186,22 +188,104 @@ def process_image(
                 r, g, b = color_rgb
                 actual_color = f"rgb({r}, {g}, {b})"
             else:
-                actual_color = "#000"
+                actual_color = "#000000"
 
-        circles.append(f'<circle cx="{x}" cy="{y}" r="2" fill="{actual_color}" />')
+        # Fabric.js Circle 객체 형식으로 생성
+        circle_obj = {
+            "type": "circle",
+            "version": "5.3.0",
+            "originX": "center",
+            "originY": "center",
+            "left": float(x),
+            "top": float(y),
+            "width": 4,
+            "height": 4,
+            "radius": 2,
+            "fill": actual_color,
+            "stroke": None,
+            "strokeWidth": 0,
+            "strokeDashArray": None,
+            "strokeLineCap": "butt",
+            "strokeDashOffset": 0,
+            "strokeLineJoin": "miter",
+            "strokeUniform": False,
+            "strokeMiterLimit": 4,
+            "scaleX": 1,
+            "scaleY": 1,
+            "angle": 0,
+            "flipX": False,
+            "flipY": False,
+            "opacity": 1,
+            "shadow": None,
+            "visible": True,
+            "backgroundColor": "",
+            "fillRule": "nonzero",
+            "paintFirst": "fill",
+            "globalCompositeOperation": "source-over",
+            "skewX": 0,
+            "skewY": 0,
+        }
+        fabric_objects.append(circle_obj)
 
-    # SVG 저장 (비ASCII 경로 호환)
-    svg_header = (
-        f'<?xml version="1.0" encoding="UTF-8"?>\n'
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}">\n'
-    )
-    svg_footer = "\n</svg>\n"
-    svg_content = svg_header + ("\n".join(circles)) + svg_footer
+    # Fabric.js Canvas JSON 형식으로 생성
+    fabric_canvas_json = {
+        "version": "5.3.0",
+        "objects": fabric_objects,
+        "background": "white",
+        "backgroundVpt": True,
+        "nextUnusedId": dot_count + 1,
+        "width": w,
+        "height": h,
+        "viewportTransform": [1, 0, 0, 1, 0, 0],
+        "zoom": 1,
+        "overlayColor": "",
+        "overlayImage": "",
+        "overlayOpacity": 1,
+        "overlayVpt": True,
+        "clipPath": None,
+        "enableRetinaScaling": True,
+        "renderOnAddRemove": True,
+        "controlsAboveOverlay": False,
+        "allowTouchScrolling": False,
+        "imageSmoothingEnabled": True,
+        "preserveObjectStacking": True,
+        "snapAngle": 45,
+        "snapThreshold": None,
+        "targetFindTolerance": 10,
+        "skipTargetFind": False,
+        "isDrawingMode": False,
+        "freeDrawingBrush": {
+            "type": "PencilBrush",
+            "width": 1,
+            "color": "rgb(0,0,0)",
+            "strokeLineCap": "round",
+            "strokeLineJoin": "round",
+            "shadow": None,
+            "strokeMiterLimit": 10,
+            "strokeDashArray": None,
+            "strokeDashOffset": 0,
+        },
+        "selection": True,
+        "selectionColor": "rgba(100, 100, 255, 0.3)",
+        "selectionDashArray": [],
+        "selectionBorderColor": "rgba(255, 255, 255, 0.3)",
+        "selectionLineWidth": 1,
+        "hoverCursor": "move",
+        "moveCursor": "move",
+        "defaultCursor": "default",
+        "freeDrawingCursor": "crosshair",
+        "rotationCursor": "crosshair",
+        "notAllowedCursor": "not-allowed",
+    }
+
+    # JSON 저장 (비ASCII 경로 호환)
+    # 출력 디렉토리가 존재하지 않으면 생성
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
     with open(output_path, "w", encoding="utf-8") as f:
-        f.write(svg_content)
-    print(f"Saved processed SVG to: {output_path}")
+        json.dump(fabric_canvas_json, f, ensure_ascii=False, indent=2)
 
-    # 백엔드 루트 기준 상대 경로 반환
-    rel_path = os.path.relpath(output_path, start=backend_dir)
-    return rel_path
+    print(f"Saved processed Fabric.js JSON to: {output_path}")
+
+    # 전체 경로 반환
+    return output_path
