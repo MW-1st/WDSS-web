@@ -19,11 +19,6 @@ from app.db.project import (
     delete_project_by_id,
 )
 from app.routers.websocket import manager
-from app.services.svg_service import (
-    svg_to_coords_with_colors,
-    get_svg_size,
-    coords_with_colors_to_json,
-)
 from app.services.fabric_json_service import (
     fabric_json_to_coords_with_colors,
     get_fabric_json_size,
