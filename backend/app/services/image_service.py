@@ -21,9 +21,9 @@ def process_image(
     - 파이프라인: Gray → GaussianBlur → Canny → Grid Sampling
     - target_dots가 주어지면 엣지 픽셀 수로부터 step을 자동 계산합니다.
       대략적으로 기대 도트 수 ≈ edge_pixels / (step^2)로 가정하여 step ≈ sqrt(edge_pixels / target_dots)
-    - 결과는 backend/uploads/processed_<uuid>_<dot_count>.png 로 저장됩니다.
+    - 결과는 backend/uploads/processed_<uuid>_<dot_count>.json 로 저장됩니다.
 
-    Returns: 백엔드 루트 기준 상대 경로 (e.g., "uploads/processed_xxx.png")
+    Returns: 백엔드 루트 기준 상대 경로 (e.g., "uploads/processed_xxx.json")
     """
     if not os.path.exists(input_path):
         raise FileNotFoundError(f"Input image not found: {input_path}")
@@ -46,7 +46,7 @@ def process_image(
     # 최소한의 모폴로지 연산
     kernel = np.ones((2, 2), np.uint8)
     edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)  # 끊어진 선만 연결
-    circle_radius = 2  # SVG 원 반지름(px)
+    circle_radius = 2  # 원 반지름(px)
 
     # step 자동 계산 (target_dots 지정 시 우선)
     h, w = edges.shape[:2]
@@ -76,6 +76,7 @@ def process_image(
             for x in range(0, w, step):
                 if edges[y, x] != 0:
                     points.append((x, y))
+
     # 최소 간격 유지(원 반지름 기준) + 중복 제거
     def _enforce_min_distance(points_list, min_dist):
         if not points_list or min_dist <= 1:
@@ -86,7 +87,7 @@ def process_image(
         accepted = []
         min_sq = float(min_dist) * float(min_dist)
 
-        for (px, py) in points_list:
+        for px, py in points_list:
             cx = int(px * inv)
             cy = int(py * inv)
             ok = True
@@ -95,7 +96,7 @@ def process_image(
                     bucket = grid.get((nx, ny))
                     if not bucket:
                         continue
-                    for (ax, ay) in bucket:
+                    for ax, ay in bucket:
                         dx = ax - px
                         dy = ay - py
                         if (dx * dx + dy * dy) < min_sq:
@@ -191,11 +192,16 @@ def process_image(
 
         return dominant_colors
 
+    def rgb_to_hex(r, g, b):
+        """RGB 값을 HEX 색상 코드로 변환"""
+        return f"#{r:02x}{g:02x}{b:02x}"
+
     # 펜 스트로크 색상 분석 (간소화)
     dominant_pen_colors = get_dominant_pen_color(img, points)
 
-    # Fabric.js Circle 객체들 생성
+    # Fabric.js 객체들을 저장할 리스트
     fabric_objects = []
+
     for x, y in points:
         if y < img.shape[0] and x < img.shape[1]:
             b, g, r = img[int(y), int(x)]
@@ -222,76 +228,72 @@ def process_image(
                 r = max(0, min(255, int(r * saturation_boost)))
                 g = max(0, min(255, int(g * saturation_boost)))
 
-            actual_color = f"rgb({int(r)}, {int(g)}, {int(b)})"
+            fill_color = rgb_to_hex(int(r), int(g), int(b))
         else:
             # 범위를 벗어난 경우
             if color_rgb:
                 r, g, b = color_rgb
-                actual_color = f"rgb({r}, {g}, {b})"
+                fill_color = rgb_to_hex(r, g, b)
             else:
-                actual_color = "#000000"
+                fill_color = "#000000"
 
-        circles.append(f'<circle cx="{x}" cy="{y}" r="2" fill="{actual_color}" />')
+        # Fabric.js Circle 객체 생성
+        circle_obj = {
+            "type": "circle",
+            "version": "5.3.0",
+            "originX": "center",
+            "originY": "center",
+            "left": x,
+            "top": y,
+            "width": circle_radius * 2,
+            "height": circle_radius * 2,
+            "fill": fill_color,
+            "stroke": None,
+            "strokeWidth": 0,
+            "strokeDashArray": None,
+            "strokeLineCap": "butt",
+            "strokeDashOffset": 0,
+            "strokeLineJoin": "miter",
+            "strokeUniform": False,
+            "strokeMiterLimit": 4,
+            "scaleX": 1,
+            "scaleY": 1,
+            "angle": 0,
+            "flipX": False,
+            "flipY": False,
+            "opacity": 1,
+            "shadow": None,
+            "visible": True,
+            "backgroundColor": "",
+            "fillRule": "nonzero",
+            "paintFirst": "fill",
+            "globalCompositeOperation": "source-over",
+            "skewX": 0,
+            "skewY": 0,
+            "radius": circle_radius,
+        }
 
-    # Fabric.js Canvas JSON 형식으로 생성
-    fabric_canvas_json = {
+        fabric_objects.append(circle_obj)
+
+    # Fabric.js Canvas JSON 구조 생성
+    fabric_canvas = {
         "version": "5.3.0",
         "objects": fabric_objects,
-        "background": "white",
-        "backgroundVpt": True,
-        "nextUnusedId": dot_count + 1,
+        "background": "",
+        "backgroundImage": "",
+        "overlay": "",
+        "clipPath": "",
         "width": w,
         "height": h,
         "viewportTransform": [1, 0, 0, 1, 0, 0],
-        "zoom": 1,
-        "overlayColor": "",
-        "overlayImage": "",
-        "overlayOpacity": 1,
-        "overlayVpt": True,
-        "clipPath": None,
-        "enableRetinaScaling": True,
-        "renderOnAddRemove": True,
-        "controlsAboveOverlay": False,
-        "allowTouchScrolling": False,
-        "imageSmoothingEnabled": True,
-        "preserveObjectStacking": True,
-        "snapAngle": 45,
-        "snapThreshold": None,
-        "targetFindTolerance": 10,
-        "skipTargetFind": False,
-        "isDrawingMode": False,
-        "freeDrawingBrush": {
-            "type": "PencilBrush",
-            "width": 1,
-            "color": "rgb(0,0,0)",
-            "strokeLineCap": "round",
-            "strokeLineJoin": "round",
-            "shadow": None,
-            "strokeMiterLimit": 10,
-            "strokeDashArray": None,
-            "strokeDashOffset": 0,
-        },
-        "selection": True,
-        "selectionColor": "rgba(100, 100, 255, 0.3)",
-        "selectionDashArray": [],
-        "selectionBorderColor": "rgba(255, 255, 255, 0.3)",
-        "selectionLineWidth": 1,
-        "hoverCursor": "move",
-        "moveCursor": "move",
-        "defaultCursor": "default",
-        "freeDrawingCursor": "crosshair",
-        "rotationCursor": "crosshair",
-        "notAllowedCursor": "not-allowed",
     }
 
-    # JSON 저장 (비ASCII 경로 호환)
-    # 출력 디렉토리가 존재하지 않으면 생성
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-
+    # JSON 파일로 저장 (비ASCII 경로 호환)
     with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(fabric_canvas_json, f, ensure_ascii=False, indent=2)
+        json.dump(fabric_canvas, f, ensure_ascii=False, indent=2)
 
     print(f"Saved processed Fabric.js JSON to: {output_path}")
 
-    # 전체 경로 반환
-    return output_path
+    # 백엔드 루트 기준 상대 경로 반환
+    rel_path = os.path.relpath(output_path, start=backend_dir)
+    return rel_path
