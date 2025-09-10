@@ -9,6 +9,7 @@ const ColorPicker = React.memo(function ColorPicker({ color, onChange, onPreview
   const containerRef = useRef(null);
   const [isDraggingSaturation, setIsDraggingSaturation] = useState(false);
   const [isDraggingHue, setIsDraggingHue] = useState(false);
+  const instanceIdRef = useRef(Math.random().toString(36).slice(2));
 
   // Layout constants to keep picker compact and avoid horizontal scroll
   const SV_WIDTH = 180;
@@ -21,31 +22,31 @@ const ColorPicker = React.memo(function ColorPicker({ color, onChange, onPreview
 
   // HSV to RGB conversion
   const hsvToRgb = (h, s, v) => {
-    const c = v * s;
-    const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
-    const m = v - c;
-    let r, g, b;
+  const c = v * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = v - c;
+  let r, g, b;
 
-    if (h >= 0 && h < 60) {
-      r = c; g = x; b = 0;
-    } else if (h >= 60 && h < 120) {
-      r = x; g = c; b = 0;
-    } else if (h >= 120 && h < 180) {
-      r = 0; g = c; b = x;
-    } else if (h >= 180 && h < 240) {
-      r = 0; g = x; b = c;
-    } else if (h >= 240 && h < 300) {
-      r = x; g = 0; b = c;
-    } else {
-      r = c; g = 0; b = x;
-    }
+  if (h >= 0 && h < 60) {
+    r = c; g = x; b = 0;
+  } else if (h >= 60 && h < 120) {
+    r = x; g = c; b = 0;
+  } else if (h >= 120 && h < 180) {
+    r = 0; g = c; b = x;
+  } else if (h >= 180 && h < 240) {
+    r = 0; g = x; b = c;
+  } else if (h >= 240 && h < 300) {
+    r = x; g = 0; b = c;
+  } else {
+    r = c; g = 0; b = x;
+  }
 
-    return [
-      Math.round((r + m) * 255),
-      Math.round((g + m) * 255),
-      Math.round((b + m) * 255)
-    ];
-  };
+  return [
+    Math.round((r + m) * 255),
+    Math.round((g + m) * 255),
+    Math.round((b + m) * 255)
+  ];
+};
 
   // RGB to HSV conversion
   const rgbToHsv = (r, g, b) => {
@@ -142,14 +143,23 @@ const ColorPicker = React.memo(function ColorPicker({ color, onChange, onPreview
 
   // Initialize canvases
   useEffect(() => {
-    // 컴포넌트가 마운트된 후 즉시 캔버스를 그리도록 setTimeout 사용
     const timer = setTimeout(() => {
       drawHueCanvas();
       drawSaturationCanvas(currentHsv[0]);
     }, 100);
-    
     return () => clearTimeout(timer);
   }, [drawHueCanvas, drawSaturationCanvas, currentHsv]);
+
+  // Close this popover when another ColorPicker opens
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.detail && e.detail !== instanceIdRef.current) {
+        setIsOpen(false);
+      }
+    };
+    window.addEventListener('app-colorpicker-open', handler);
+    return () => window.removeEventListener('app-colorpicker-open', handler);
+  }, []);
 
   // 팔레트가 열릴 때마다 캔버스를 다시 그리기
   useEffect(() => {
@@ -258,7 +268,7 @@ const ColorPicker = React.memo(function ColorPicker({ color, onChange, onPreview
       {/* Color preview button */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         <button
-          onClick={() => setIsOpen(!isOpen)}
+          onClick={() => setIsOpen(prev => { const next = !prev; if (next) window.dispatchEvent(new CustomEvent("app-colorpicker-open", { detail: instanceIdRef.current })); return next; })}
           style={{
             width: '40px',
             height: '30px',
@@ -268,7 +278,7 @@ const ColorPicker = React.memo(function ColorPicker({ color, onChange, onPreview
             cursor: 'pointer',
             padding: '0'
           }}
-          title="색상 선택"
+          title="Select color"
         />
         <div style={{
           fontSize: '12px',
@@ -405,7 +415,7 @@ const ColorPicker = React.memo(function ColorPicker({ color, onChange, onPreview
               <button
                 onClick={async () => {
                   try {
-                    if ('EyeDropper' in window) {
+                    if (typeof window !== 'undefined' && 'EyeDropper' in window && window.isSecureContext) {
                       const eyeDropper = new window.EyeDropper();
                       const result = await eyeDropper.open();
                       const picked = result.sRGBHex;
@@ -416,13 +426,43 @@ const ColorPicker = React.memo(function ColorPicker({ color, onChange, onPreview
                       drawSaturationCanvas(hsv[0]);
                       if (onPreview) onPreview(picked);
                     } else {
-                      alert('이 브라우저는 스포이드(EyeDropper)를 지원하지 않습니다.');
-                    }
+  // Fallback: system color picker (works across browsers)
+  const fallbackInput = document.createElement('input');
+  fallbackInput.type = 'color';
+  const startColor = /^#[0-9A-Fa-f]{6}$/.test(previewColor) ? previewColor : (color || '#000000');
+  fallbackInput.value = startColor;
+  fallbackInput.style.position = 'fixed';
+  fallbackInput.style.left = '-9999px';
+  fallbackInput.style.top = '0';
+  fallbackInput.style.opacity = '0';
+
+  const handleChange = (e) => {
+    const picked = e.target.value;
+    setPreviewColor(picked);
+    const [r, g, b] = hexToRgb(picked);
+    const hsv = rgbToHsv(r, g, b);
+    setCurrentHsv(hsv);
+    drawSaturationCanvas(hsv[0]);
+    if (onPreview) onPreview(picked);
+    if (fallbackInput && fallbackInput.parentNode) {
+      fallbackInput.parentNode.removeChild(fallbackInput);
+    }
+  };
+
+  fallbackInput.addEventListener('input', handleChange, { once: true });
+  fallbackInput.addEventListener('change', handleChange, { once: true });
+  document.body.appendChild(fallbackInput);
+  if (typeof fallbackInput.showPicker === 'function') {
+    fallbackInput.showPicker();
+  } else {
+    fallbackInput.click();
+  }
+}
                   } catch (err) {
-                    // 사용자가 취소한 경우 등 무시
+                    // User canceled or environment blocked; safely ignore
                   }
                 }}
-                title="스포이드로 색상 선택"
+                title="Eyedropper"
                 style={{
                   width: 28,
                   height: 28,
@@ -478,3 +518,11 @@ const ColorPicker = React.memo(function ColorPicker({ color, onChange, onPreview
 });
 
 export default ColorPicker;
+
+
+
+
+
+
+
+
