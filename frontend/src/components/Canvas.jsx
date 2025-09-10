@@ -50,6 +50,8 @@ export default function Canvas({
   const [deleteIconPos, setDeleteIconPos] = useState(null);
   const maxDroneWarningShownRef = useRef(false);
   const previewTimerRef = useRef(null);
+  // pan 모드 전/후 객체 상호작용 상태 저장용
+  const prevInteractMapRef = useRef(new WeakMap());
 
   const schedulePreview = useCallback(() => {
     if (!onPreviewChange || !fabricCanvas.current) return;
@@ -243,23 +245,43 @@ export default function Canvas({
       canvas.defaultCursor = 'grab';
       canvas.hoverCursor = 'grab';
       canvas.moveCursor = 'grab';
-      canvas.setCursor('grab');
-      
-      // 모든 객체를 선택 불가능하게 설정
-      canvas.getObjects().forEach(obj => {
-        obj.selectable = false;
-        obj.evented = false;
-      });
-      try { onPanChange && onPanChange(true); } catch {}
-    };
+     canvas.setCursor('grab');
+
+    // ✅ 팬 진입: 원래 상태 저장 후 비활성화
+    const prevMap = prevInteractMapRef.current;
+    canvas.getObjects().forEach(obj => {
+      prevMap.set(obj, { selectable: obj.selectable, evented: obj.evented });
+      obj.selectable = false;
+      obj.evented = false;
+    });
+    try { onPanChange && onPanChange(true); } catch {}
+    }; // ✅ 여기서 enterPanMode를 닫아야 합니다!!!
 
     const exitPanMode = () => {
       if (!isPanMode) return;
-      
+
       isPanMode = false;
       isPanning = false;
-      
-      // 원래 상태 복원
+
+      // (선택) 팬 해제 후 일반 클릭=선택으로 강제 복귀
+      setDrawingMode('select');
+      applyDrawingMode('select', currentColorRef.current);
+
+      // ✅ 팬 해제: 저장한 값으로 전부 복구
+      const prevMap = prevInteractMapRef.current;
+      canvas.getObjects().forEach(obj => {
+        const prev = prevMap.get(obj);
+        if (prev) {
+          obj.selectable = prev.selectable;
+          obj.evented = prev.evented;
+          prevMap.delete(obj);
+        } else {
+          obj.selectable = true;
+          obj.evented = true;
+        }
+      });
+
+      // 원래 모드/selection 복구 시도(안전망)
       canvas.isDrawingMode = originalDrawingMode;
       canvas.selection = originalSelection;
       try {
@@ -270,14 +292,10 @@ export default function Canvas({
         canvas.moveCursor = 'move';
         canvas.setCursor('default');
       }
-      
-      // 객체들을 다시 활성화 (드롭된 이미지만)
-      canvas.getObjects().forEach(obj => {
-        if (obj.customType === 'droppedImage') {
-          obj.selectable = true;
-          obj.evented = true;
-        }
-      });
+
+      // ❌ (이 부분은 이제 필요 없음) droppedImage만 복구하는 forEach는 지워주세요.
+      // canvas.getObjects().forEach(obj => { ... });
+
       try { onPanChange && onPanChange(false); } catch {}
     };
 
