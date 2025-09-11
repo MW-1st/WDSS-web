@@ -31,7 +31,8 @@ export default function Canvas({
   onModeChange,
   onSelectionChange,
   onPanChange,
-  scene
+  scene,
+  projectId
 }) {
   const canvasRef = useRef(null);
   const fabricCanvas = useRef(null);
@@ -91,15 +92,27 @@ export default function Canvas({
     isAutoSaveEnabled,
     isSaving,
     lastSaveTime,
-    saveError
-  } = useAutoSave(sceneId, fabricCanvas, {
+    saveError,
+    isServerSyncing,
+    lastServerSyncTime,
+    serverSyncError,
+    setServerSyncEnabled
+  } = useAutoSave(projectId ,sceneId, fabricCanvas, {
     enabled: true,
     delay: 1500,
+    serverSync: true,
+    serverSyncInterval: 30000,
     onSave: ({ sceneId, objectCount, manual }) => {
       console.log(`✅ Canvas saved${manual ? ' (manual)' : ''}: ${sceneId} (${objectCount} objects)`);
     },
     onError: (error) => {
       console.error('💾 Save failed:', error.message);
+    },
+    onServerSync: (data) => {
+      console.log('🌐 Server sync completed:', data);
+    },
+    onServerSyncError: (error) => {
+      console.error('🌐 Server sync failed:', error);
     }
   });
 

@@ -1,13 +1,18 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { saveCanvasToIndexedDB, loadCanvasFromIndexedDB } from '../utils/indexedDBUtils';
+import { useServerSync } from './useServerSync';
 
-export const useAutoSave = (sceneId, fabricCanvas, options = {}) => {
+export const useAutoSave = (projectId, sceneId, fabricCanvas, options = {}) => {
   const {
     enabled = true,
     delay = 1500,
     onSave = null,
     onError = null,
-    includeMetadata = true
+    includeMetadata = true,
+    serverSync = true,
+    serverSyncInterval = 150000,
+    onServerSync = null,
+    onServerSyncError = null
   } = options;
 
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(enabled);
@@ -16,6 +21,28 @@ export const useAutoSave = (sceneId, fabricCanvas, options = {}) => {
   const [saveError, setSaveError] = useState(null);
 
   const timeoutRef = useRef(null);
+
+  const {
+    syncToServer,
+    isServerSyncEnabled,
+    isSyncing: isServerSyncing,
+    lastSyncTime: lastServerSyncTime,
+    syncError: serverSyncError,
+    setEnabled: setServerSyncEnabled
+  } = useServerSync(projectId, sceneId, fabricCanvas, {
+    enabled: serverSync,
+    onSync: (data) => {
+      console.log('Server sync completed:', data);
+      if (onServerSync) onServerSync(data);
+    },
+    onError: (error) => {
+      console.error('Server sync failed:', error);
+      if (onServerSyncError) onServerSyncError(error);
+    }
+  });
+
+  // 서버 동기화를 위한 타이머 ref 추가
+  const serverSyncTimerRef = useRef(null);
 
   // 자동저장 트리거
   const triggerAutoSave = useCallback(async (metadata = {}) => {
@@ -68,6 +95,11 @@ export const useAutoSave = (sceneId, fabricCanvas, options = {}) => {
           onSave({ sceneId, objectCount: actualObjectCount });
         }
 
+        // 서버 동기화 스케줄링 추가
+        if (isServerSyncEnabled && !isServerSyncing) {
+          scheduleServerSync(canvasData);
+        }
+
         return true;
       } catch (error) {
         console.error('Auto-save failed:', error);
@@ -85,6 +117,22 @@ export const useAutoSave = (sceneId, fabricCanvas, options = {}) => {
 
     return true;
   }, [autoSaveEnabled, sceneId, fabricCanvas, delay, onSave, onError, includeMetadata]);
+
+  // 서버 동기화 스케줄링 함수 추가
+  const scheduleServerSync = useCallback((canvasData) => {
+    if (serverSyncTimerRef.current) {
+      clearTimeout(serverSyncTimerRef.current);
+    }
+
+    serverSyncTimerRef.current = setTimeout(async () => {
+      try {
+        await syncToServer(canvasData, 'original');
+        console.log('Scheduled server sync completed');
+      } catch (error) {
+        console.error('Scheduled server sync failed:', error);
+      }
+    }, serverSyncInterval);
+  }, [syncToServer, serverSyncInterval]);
 
   // 즉시 저장 (딜레이 없음)
   const saveImmediately = useCallback(async (metadata = {}) => {
@@ -190,6 +238,9 @@ export const useAutoSave = (sceneId, fabricCanvas, options = {}) => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
+      if (serverSyncTimerRef.current) {
+        clearTimeout(serverSyncTimerRef.current);
+      }
     };
   }, []);
 
@@ -213,7 +264,24 @@ export const useAutoSave = (sceneId, fabricCanvas, options = {}) => {
       saving: isSaving,
       lastSave: lastSaveTime,
       error: saveError
-    })
+    }),
+
+    // 서버 동기화 관련
+    isServerSyncing,
+    lastServerSyncTime,
+    serverSyncError,
+    setServerSyncEnabled,
+    syncToServerNow: () => {
+      const canvas = fabricCanvas?.current;
+      if (canvas) {
+        const canvasData = canvas.toJSON([
+          'layerId', 'layerName', 'customType', 'originalFill',
+          'originalCx', 'originalCy'
+        ]);
+        return syncToServer(canvasData, 'original');
+      }
+      return Promise.resolve(false);
+    }
   };
 };
 

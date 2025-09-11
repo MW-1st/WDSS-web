@@ -111,7 +111,7 @@ export default function DashboardPage() {
             }
             if (!target) target = list[0];
 
-            const raw = target?.display_url || target?.s3_key;
+            const raw = target?.s3_key;
             const url = getImageUrl(raw);
             return [p.id, url || null];
           } catch (e) {
