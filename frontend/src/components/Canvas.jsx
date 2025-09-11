@@ -56,6 +56,8 @@ export default function Canvas({
   const [deleteIconPos, setDeleteIconPos] = useState(null);
   const maxDroneWarningShownRef = useRef(false);
   const previewTimerRef = useRef(null);
+  // pan 모드 전/후 객체 상호작용 상태 저장용
+  const prevInteractMapRef = useRef(new WeakMap());
 
   const schedulePreview = useCallback(() => {
     if (!onPreviewChange || !fabricCanvas.current) return;
@@ -251,23 +253,43 @@ export default function Canvas({
       canvas.defaultCursor = 'grab';
       canvas.hoverCursor = 'grab';
       canvas.moveCursor = 'grab';
-      canvas.setCursor('grab');
-      
-      // 모든 객체를 선택 불가능하게 설정
-      canvas.getObjects().forEach(obj => {
-        obj.selectable = false;
-        obj.evented = false;
-      });
-      try { onPanChange && onPanChange(true); } catch {}
-    };
+     canvas.setCursor('grab');
+
+    // ✅ 팬 진입: 원래 상태 저장 후 비활성화
+    const prevMap = prevInteractMapRef.current;
+    canvas.getObjects().forEach(obj => {
+      prevMap.set(obj, { selectable: obj.selectable, evented: obj.evented });
+      obj.selectable = false;
+      obj.evented = false;
+    });
+    try { onPanChange && onPanChange(true); } catch {}
+    }; // ✅ 여기서 enterPanMode를 닫아야 합니다!!!
 
     const exitPanMode = () => {
       if (!isPanMode) return;
-      
+
       isPanMode = false;
       isPanning = false;
-      
-      // 원래 상태 복원
+
+      // (선택) 팬 해제 후 일반 클릭=선택으로 강제 복귀
+      setDrawingMode('select');
+      applyDrawingMode('select', currentColorRef.current);
+
+      // ✅ 팬 해제: 저장한 값으로 전부 복구
+      const prevMap = prevInteractMapRef.current;
+      canvas.getObjects().forEach(obj => {
+        const prev = prevMap.get(obj);
+        if (prev) {
+          obj.selectable = prev.selectable;
+          obj.evented = prev.evented;
+          prevMap.delete(obj);
+        } else {
+          obj.selectable = true;
+          obj.evented = true;
+        }
+      });
+
+      // 원래 모드/selection 복구 시도(안전망)
       canvas.isDrawingMode = originalDrawingMode;
       canvas.selection = originalSelection;
       try {
@@ -278,46 +300,13 @@ export default function Canvas({
         canvas.moveCursor = 'move';
         canvas.setCursor('default');
       }
-      
-      // 객체들을 다시 활성화 (드롭된 이미지만)
-      canvas.getObjects().forEach(obj => {
-        if (obj.customType === 'droppedImage') {
-          obj.selectable = true;
-          obj.evented = true;
-        }
-      });
+
+      // ❌ (이 부분은 이제 필요 없음) droppedImage만 복구하는 forEach는 지워주세요.
+      // canvas.getObjects().forEach(obj => { ... });
+
       try { onPanChange && onPanChange(false); } catch {}
     };
 
-    const handleKeyDown = (e) => {
-      if (
-        e.code === 'Space' &&
-        !['INPUT','TEXTAREA','SELECT'].includes(((e.target && e.target.tagName) || '').toUpperCase()) &&
-        !((e.target && e.target.getAttribute) && e.target.getAttribute('contenteditable') === 'true')
-      ) {
-        e.preventDefault(); // 브라우저 기본 스크롤 방지
-        e.stopPropagation(); // 이벤트 전파 중단
-        
-        if (isPanMode) {
-          exitPanMode();
-        } else {
-          enterPanMode();
-        }
-      }
-    };
-
-    const handleKeyUp = (e) => {
-      if (
-        e.code === 'Space' &&
-        !['INPUT','TEXTAREA','SELECT'].includes(((e.target && e.target.tagName) || '').toUpperCase()) &&
-        !((e.target && e.target.getAttribute) && e.target.getAttribute('contenteditable') === 'true')
-      ) {
-        e.preventDefault(); // 브라우저 기본 스크롤 방지
-        e.stopPropagation(); // 이벤트 전파 중단
-        
-        // 토글 방식에서는 keyup 시 별도 동작 없음
-      }
-    };
 
     const handleMouseDown = (opt) => {
       if (isPanMode && !isPanning) {
@@ -488,9 +477,7 @@ export default function Canvas({
     canvas.on('mouse:up', handleMouseUp);
     canvas.on('path:created', handlePathCreated);
     canvas.on('object:added', handleObjectAdded);
-    
-    document.addEventListener('keydown', handleKeyDown, { capture: true });
-    document.addEventListener('keyup', handleKeyUp, { capture: true });
+
     
     // Expose minimal pan controls for external UI
     canvas.enterPanMode = enterPanMode;
@@ -540,8 +527,6 @@ export default function Canvas({
       canvas.off('object:scaled', handleObjectScaled);
       canvas.off('object:rotated', handleObjectRotated);
       canvas.off('object:modified', handleObjectModified);
-      document.removeEventListener('keydown', handleKeyDown, { capture: true });
-      document.removeEventListener('keyup', handleKeyUp, { capture: true });
       canvas.dispose();
     };
   }, [externalStageRef]);
@@ -600,10 +585,17 @@ export default function Canvas({
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [drawingMode, triggerAutoSave]);
+
+  // Effect for loading the background image
   useEffect(() => {
     console.log("imageUrl 변경됨:", imageUrl);
     if (!imageUrl || !fabricCanvas.current) return;
     const canvas = fabricCanvas.current;
+
+    const postLoadActions = () => {
+      applyDrawingMode(drawingModeRef.current, currentColorRef.current);
+      canvas.renderAll();
+    };
 
     if (imageUrl.endsWith(".json")) {
       console.log("JSON 파일 로드 시작:", imageUrl);
@@ -680,7 +672,7 @@ export default function Canvas({
 
         setCanvasRevision(c => c + 1);
         canvas.renderAll();
-        console.log(`${canvas.getObjects().length}개의 객체를 로드했습니다.`);
+        postLoadActions();
       });
     };
   }, [imageUrl,scene?.id]); // selectedId도 dependency에 추가
@@ -1255,6 +1247,14 @@ export default function Canvas({
       canvas.on("mouse:wheel", wheelHandler);
       canvas.on("path:created", pathCreatedHandler);
     }
+    else if (mode === "pan") {
+    // 팬 모드 처리 - 실제로는 enterPanMode가 대부분 처리하지만 일관성을 위해 추가
+    canvas.isDrawingMode = false;
+    canvas.selection = false;
+    canvas.defaultCursor = "grab";
+    canvas.hoverCursor = "grab";
+    canvas.moveCursor = "grab";
+  }
   };
 
   const toggleDrawingMode = (mode) => {

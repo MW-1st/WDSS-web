@@ -34,8 +34,8 @@ const CanvasTools = React.memo(function CanvasTools({
     switch (mode) {
       case "draw":
         return "그리기(P): 자유곡선을 그립니다.";
-      case "select":
-        return "선택(V): 객체 이동/크기 조절.";
+      // case "select":
+      //   return "선택(V): 객체 이동/크기 조절.";
       case "brush":
         return "브러시(B): 점을 찍습니다.";
       case "erase":
@@ -159,13 +159,13 @@ const CanvasTools = React.memo(function CanvasTools({
           onMouseEnter={() => setHovered("select")}
           onMouseLeave={() => setHovered(null)}
         >
-          <button
+          {/* <button
             onClick={() => onModeChange("select")}
             style={getButtonStyle("select")}
             aria-label="선택"
           >
             <PiSelectionPlusBold />
-          </button>
+          </button> */}
         </div>
 
         <div
