@@ -3,7 +3,7 @@ import { saveCanvasToIndexedDB, loadCanvasFromIndexedDB } from '../utils/indexed
 import { useServerSync } from './useServerSync';
 import client from "../api/client.js";
 
-export const useAutoSave = (projectId, sceneId, fabricCanvas, options = {}) => {
+export const useAutoSave = (projectId, sceneId, fabricCanvas, options = {}, sceneData) => {
   const {
     enabled = true,
     delay = 1500,
@@ -260,15 +260,22 @@ export const useAutoSave = (projectId, sceneId, fabricCanvas, options = {}) => {
 
   useEffect(() => {
     const determineInitialSaveMode = async () => {
-      console.log('🔍 Determining save mode for sceneId:', sceneId, 'projectId:', projectId);
+      console.log('🔍 Determining save mode for sceneId:', sceneId);
 
       if (!sceneId || !projectId) return;
 
       try {
-        const response = await client.get(`/projects/${projectId}/scenes/${sceneId}`);
-        const s3Key = response.data?.scene?.s3_key;
-
-        console.log('📝 Scene s3_key:', s3Key);
+        // sceneData가 있으면 추가 요청 없이 사용
+        let s3Key;
+        if (sceneData && sceneData.s3_key !== undefined) {
+          s3Key = sceneData.s3_key;
+          console.log('📝 Using provided scene s3_key:', s3Key);
+        } else {
+          // sceneData가 없을 때만 서버 요청
+          const response = await client.get(`/projects/${projectId}/scenes/${sceneId}`);
+          s3Key = response.data?.scene?.s3_key;
+          console.log('📝 Fetched scene s3_key:', s3Key);
+        }
 
         if (!s3Key || s3Key.startsWith('originals')) {
           setSaveMode('originals');
@@ -280,19 +287,20 @@ export const useAutoSave = (projectId, sceneId, fabricCanvas, options = {}) => {
       } catch (error) {
         console.warn('❌ Failed to determine save mode:', error);
         setSaveMode('originals');
-        console.log('✅ Save mode defaulted to: originals');
       }
     };
 
     determineInitialSaveMode();
-  }, [sceneId, projectId]);
+  }, [sceneId, projectId, sceneData?.s3_key]);
 
+  
   return {
     // 상태
     isAutoSaveEnabled: autoSaveEnabled,
     isSaving,
     lastSaveTime,
     saveError,
+    saveMode,
 
     // 함수
     triggerAutoSave,
@@ -315,6 +323,7 @@ export const useAutoSave = (projectId, sceneId, fabricCanvas, options = {}) => {
     lastServerSyncTime,
     serverSyncError,
     setServerSyncEnabled,
+
     syncToServerNow: () => {
       const canvas = fabricCanvas?.current;
       if (canvas) {
@@ -322,7 +331,7 @@ export const useAutoSave = (projectId, sceneId, fabricCanvas, options = {}) => {
           'layerId', 'layerName', 'customType', 'originalFill',
           'originalCx', 'originalCy'
         ]);
-        return syncToServer(canvasData, 'original');
+        return syncToServer(canvasData, saveMode);
       }
       return Promise.resolve(false);
     }

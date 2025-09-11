@@ -15,6 +15,8 @@ function MainCanvasSection({
   onModeChange,
   onSelectionChange,
   onPanChange,
+  changeSaveMode,
+  triggerAutoSave
 }) {
   return (
     <section
@@ -56,6 +58,8 @@ function MainCanvasSection({
               onModeChange={onModeChange}
               onSelectionChange={onSelectionChange}
               onPanChange={onPanChange}
+              changeSaveMode={changeSaveMode}
+              triggerAutoSave={triggerAutoSave}
             />
 
           ) : (

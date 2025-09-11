@@ -78,7 +78,9 @@ export default function EditorPage({ projectId = DUMMY }) {
   const [drawingColor, setDrawingColor] = useState('#222222');
   const [selectedObject, setSelectedObject] = useState(null);
   const [isPanMode, setIsPanMode] = useState(false);
-  
+
+  const previousSceneId = useRef(selectedId);
+
   // 레이어 관련 상태
   const [canvasReady, setCanvasReady] = useState(false);
   const [layersState, setLayersState] = useState([]);
@@ -148,12 +150,10 @@ export default function EditorPage({ projectId = DUMMY }) {
     saveImmediately,
     triggerAutoSave,
     isSaving: isAutoSaving,
-    lastSaveTime,
-    saveError,
+    saveMode,
+    changeSaveMode,
+    syncToServerNow,
     isServerSyncing,
-    lastServerSyncTime,
-    serverSyncError,
-    changeSaveMode
   } = useAutoSave(pid, selectedId, stageRef, {
     enabled: true,
     delay: 1500,
@@ -170,8 +170,85 @@ export default function EditorPage({ projectId = DUMMY }) {
     },
     onServerSyncError: (error) => {
       console.error('Server sync failed:', error);
-    }
+    },
+    selectedScene
   });
+
+  // 수동 저장 함수
+  const handleManualSave = async () => {
+    if (!selectedId || !stageRef.current || !pid) {
+      console.warn('Cannot save: missing selectedId, stageRef, or projectId');
+      return;
+    }
+
+    try {
+      console.log('Manual save started with mode:', saveMode);
+
+      const canvas = stageRef.current;
+      const canvasData = canvas.toJSON([
+        'layerId', 'layerName', 'customType', 'originalFill',
+        'originalCx', 'originalCy'
+      ]);
+
+      // 현재 saveMode에 맞게 서버에 저장
+      const success = await syncToServer(canvasData, saveMode);
+
+      if (success) {
+        console.log(`Scene ${selectedId} manually saved with mode: ${saveMode}`);
+        // 성공 알림 (선택사항)
+        // alert('저장되었습니다.');
+      } else {
+        console.error('Manual save failed');
+        alert('저장에 실패했습니다. 다시 시도해주세요.');
+      }
+    } catch (error) {
+      console.error('Manual save error:', error);
+      alert('저장 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 씬 변경 시 서버 동기화
+  useEffect(() => {
+    if (previousSceneId.current && previousSceneId.current !== selectedId) {
+      console.log('Scene changed, syncing to server...');
+    }
+
+    previousSceneId.current = selectedId;
+  }, [selectedId]);
+
+  // 브라우저 이벤트 리스너
+  useEffect(() => {
+    const handleBeforeUnload = (event) => {
+      if (selectedId && stageRef.current) {
+        console.log('Page unloading, syncing to server...');
+        syncToServerNow();
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        console.log('Page hidden, syncing to server...');
+        syncToServerNow();
+      }
+    };
+
+    const handlePopState = () => {
+      console.log('Navigation detected, syncing to server...');
+      syncToServerNow();
+    };
+
+    // 이벤트 리스너 등록
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      // 정리
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [selectedId, syncToServerNow]);
 
   // 색상이 변경될 때 즉시 캔버스에 반영
   useEffect(() => {
@@ -325,19 +402,19 @@ export default function EditorPage({ projectId = DUMMY }) {
     }
   }, [selectedId, pid]);
 
-  // 저장(디바운스)
-  const saveDebounced = useDebounced(async (scene_id, drones, preview, imageUrl, originalCanvasState) => {
-    if (!pid) return;
-    try {
-      const {data} = await client.put(`/projects/${pid}/scenes/${scene_id}`, {
-        // s3_key: imageUrl
-      });
-      const saved = data.scene || {};
-      setScenes((prev) => prev.map((s) => (s.id === scene_id ? {...s, ...saved} : s)));
-    } catch (e) {
-      console.error(e);
-    }
-  }, 500);
+  // // 저장(디바운스)
+  // const saveDebounced = useDebounced(async (scene_id, drones, preview, imageUrl, originalCanvasState) => {
+  //   if (!pid) return;
+  //   try {
+  //     const {data} = await client.put(`/projects/${pid}/scenes/${scene_id}`, {
+  //       // s3_key: imageUrl
+  //     });
+  //     const saved = data.scene || {};
+  //     setScenes((prev) => prev.map((s) => (s.id === scene_id ? {...s, ...saved} : s)));
+  //   } catch (e) {
+  //     console.error(e);
+  //   }
+  // }, 500);
 
   // Canvas → 변경 반영
   const handleSceneChange = React.useCallback(
@@ -345,15 +422,16 @@ export default function EditorPage({ projectId = DUMMY }) {
         setScenes((prev) =>
             prev.map((s) => (s.id === id ? {...s, ...patch} : s))
         );
-        saveDebounced(
-            id,
-            patch.data,
-            patch.preview,
-            imageUrl,
-            originalCanvasState
-        );
+        // saveDebounced(
+        //     id,
+        //     patch.data,
+        //     patch.preview,
+        //     imageUrl,
+        //     originalCanvasState
+        // );
       },
-      [saveDebounced, imageUrl, originalCanvasState, setScenes]
+      // [saveDebounced, imageUrl, originalCanvasState, setScenes]
+      [imageUrl, originalCanvasState, setScenes]
   );
 
   // + 생성
@@ -402,9 +480,37 @@ export default function EditorPage({ projectId = DUMMY }) {
     }
   };
 
+  // 이전 씬의 saveMode를 기억하기 위한 ref 추가
+  const previousSaveModeRef = useRef('originals');
+
+  // useAutoSave의 saveMode 변경을 감지
+  useEffect(() => {
+    if (saveMode) {
+      previousSaveModeRef.current = saveMode;
+    }
+  }, [saveMode]);
+
   // 선택
-  const handleSelect = (id) => {
+  const handleSelect = async (id) => {
     if (id === "__ADD__") return;
+
+    // 현재 씬이 있고, 다른 씬을 선택하는 경우
+    if (selectedId && selectedId !== id && stageRef.current && pid) {
+      try {
+        const canvas = stageRef.current;
+        const canvasData = canvas.toJSON([
+          'layerId', 'layerName', 'customType', 'originalFill',
+          'originalCx', 'originalCy'
+        ]);
+
+        // 현재 씬(곧 이전 씬이 될)을 서버에 저장
+        syncToServerNow(canvasData, previousSaveModeRef);
+        console.log(`Scene ${selectedId} saved before switching`);
+      } catch (error) {
+        console.error('Failed to save current scene before switching:', error);
+      }
+    }
+
     setSelectedId(id);
     const items = [...scenes, {id: "__ADD__", isAdd: true}];
     const idx = items.findIndex(it => it.id === id);
@@ -586,9 +692,9 @@ export default function EditorPage({ projectId = DUMMY }) {
           }
         }, 200);
 
-        if (selectedScene) {
-          saveDebounced(selectedId, selectedScene?.drones, selectedScene?.preview, finalUrl, originalCanvasState);
-        }
+        // if (selectedScene) {
+        //   saveDebounced(selectedId, selectedScene?.drones, selectedScene?.preview, finalUrl, originalCanvasState);
+        // }
       }
     } catch (e) {
       console.error("Transform error", e);
@@ -848,6 +954,7 @@ const handleClearAll = React.useCallback(async () => {
       stageRef,
       setTargetDots,
       handleTransform,
+      handleManualSave
     };
     // notify listeners (e.g., Navbar) that editor state changed
     window.dispatchEvent(
@@ -858,6 +965,7 @@ const handleClearAll = React.useCallback(async () => {
             imageUrl,
             selectedId,
             projectName,
+            isServerSyncing,
           },
         })
     );
@@ -970,6 +1078,8 @@ const handleClearAll = React.useCallback(async () => {
                 stageRef={stageRef}
                 layout="sidebar"
                 onGalleryStateChange={setGalleryOpen}
+                isServerSyncing = {isServerSyncing}
+                handleManualSave = {handleManualSave}
             />
             <div style={{marginTop: "auto"}}>
               <button
@@ -1029,6 +1139,8 @@ const handleClearAll = React.useCallback(async () => {
               onModeChange={handleModeChange}
               onSelectionChange={setSelectedObject}
               onPanChange={setIsPanMode}
+              changeSaveMode={changeSaveMode}
+              triggerAutoSave={triggerAutoSave}
           />
 
           {/* 씬 캐러셀 */}
