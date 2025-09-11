@@ -163,12 +163,32 @@ export default function EditorPage({ projectId = DUMMY }) {
     serverSyncInterval: 30000,
     onSave: (data) => {
       console.log(`Auto-saved scene ${data.sceneId} with ${data.objectCount} objects`);
+      if (data.s3_key) {
+        setScenes(prevScenes =>
+          prevScenes.map(scene =>
+            scene.id === data.sceneId
+              ? { ...scene, s3_key: data.s3_key }
+              : scene
+          )
+        );
+        console.log(`Scene ${data.sceneId} s3_key updated to: ${data.s3_key}`);
+      }
     },
     onError: (error) => {
       console.error('Auto-save failed:', error);
     },
     onServerSync: (data) => {
       console.log('Server sync completed:', data);
+      if (data.s3_key) {
+        setScenes(prevScenes =>
+          prevScenes.map(scene =>
+            scene.id === data.sceneId
+              ? { ...scene, s3_key: data.s3_key }
+              : scene
+          )
+        );
+        console.log(`Scene ${data.sceneId} s3_key updated after server sync: ${data.s3_key}`);
+      }
     },
     onServerSyncError: (error) => {
       console.error('Server sync failed:', error);
