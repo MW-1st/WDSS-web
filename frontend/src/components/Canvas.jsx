@@ -299,35 +299,6 @@ export default function Canvas({
       try { onPanChange && onPanChange(false); } catch {}
     };
 
-    const handleKeyDown = (e) => {
-      if (
-        e.code === 'Space' &&
-        !['INPUT','TEXTAREA','SELECT'].includes(((e.target && e.target.tagName) || '').toUpperCase()) &&
-        !((e.target && e.target.getAttribute) && e.target.getAttribute('contenteditable') === 'true')
-      ) {
-        e.preventDefault(); // 브라우저 기본 스크롤 방지
-        e.stopPropagation(); // 이벤트 전파 중단
-        
-        if (isPanMode) {
-          exitPanMode();
-        } else {
-          enterPanMode();
-        }
-      }
-    };
-
-    const handleKeyUp = (e) => {
-      if (
-        e.code === 'Space' &&
-        !['INPUT','TEXTAREA','SELECT'].includes(((e.target && e.target.tagName) || '').toUpperCase()) &&
-        !((e.target && e.target.getAttribute) && e.target.getAttribute('contenteditable') === 'true')
-      ) {
-        e.preventDefault(); // 브라우저 기본 스크롤 방지
-        e.stopPropagation(); // 이벤트 전파 중단
-        
-        // 토글 방식에서는 keyup 시 별도 동작 없음
-      }
-    };
 
     const handleMouseDown = (opt) => {
       if (isPanMode && !isPanning) {
@@ -497,8 +468,6 @@ export default function Canvas({
     canvas.on('path:created', handlePathCreated);
     canvas.on('object:added', handleObjectAdded);
     
-    document.addEventListener('keydown', handleKeyDown, { capture: true });
-    document.addEventListener('keyup', handleKeyUp, { capture: true });
     
     // Expose minimal pan controls for external UI
     canvas.enterPanMode = enterPanMode;
@@ -523,8 +492,7 @@ export default function Canvas({
       canvas.off('object:rotating', handleTransforming);
       canvas.off('object:modified', handleModified);
       canvas.off('after:render', handleAfterRender);
-      document.removeEventListener('keydown', handleKeyDown, { capture: true });
-      document.removeEventListener('keyup', handleKeyUp, { capture: true });
+
       canvas.dispose();
     };
   }, [externalStageRef]);

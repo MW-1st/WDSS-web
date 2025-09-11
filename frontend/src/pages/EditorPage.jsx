@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+﻿import React, { useEffect, useMemo, useRef, useState } from "react";
 import EditorToolbar from "../components/EditorToolbar.jsx";
 import MainCanvasSection from "../components/MainCanvasSection.jsx";
 import SceneCarousel from "../components/SceneCarousel.jsx";
@@ -597,7 +597,7 @@ export default function EditorPage({ projectId = DUMMY }) {
       if (key === "v") {
         e.preventDefault();
         handleModeChange('select');
-      } else if (key === "h" || e.code === 'Space') { // Also handle space for pan
+      } else if (key === "h") { // Also handle space for pan
         e.preventDefault();
         handleModeChange('pan');
       }
@@ -923,7 +923,7 @@ const handleClearAll = React.useCallback(async () => {
                     handleModeChange("pan");
                     setToolSelectionOpen(false);
                   }}
-                  title="이동 도구 (Space)"
+                  title="이동 도구 (H)"
                   aria-label="이동 도구"
                   style={{
                     display: "flex",
