@@ -261,7 +261,7 @@ async def export_project_to_json(
         json.dump(project_json, f, ensure_ascii=False, indent=2)
 
     # Unity로 전송
-    await manager.broadcast(json.dumps(project_json))
+    await manager.broadcast_to_room(str(project_id), json.dumps(project_json))
 
     return {
         "json_url": f"/svg-json/{out_name}",

@@ -239,6 +239,7 @@ async def svg_to_json_endpoint(
     scene_holder: int = 0,
     max_scene: int = 1,
     max_drone: int | None = None,
+    project_id: str | None = None,
     # mapping
     z_value: float = 0.0,
     scale_x: float = 1.0,
@@ -301,7 +302,8 @@ async def svg_to_json_endpoint(
             json.dump(data, f, ensure_ascii=False, indent=2)
 
         # Unity로 JSON 데이터 전송
-        await manager.broadcast(json.dumps(data))
+        if project_id:
+            await manager.broadcast_to_room(project_id, json.dumps(data))
 
         return {"json_url": f"/svg-json/{out_name}", "unity_sent": True}
     finally:

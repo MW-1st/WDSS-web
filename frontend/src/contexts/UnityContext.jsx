@@ -49,9 +49,9 @@ export const UnityProvider = ({ children }) => {
   
   const hideUnity = () => setIsUnityVisible(false);
 
-  const sendTestData = async () => {
+  const sendTestData = async (projectId = 'test-project') => {
     try {
-        const response = await client.post('/ws/test/broadcast', {});
+        const response = await client.post(`/ws/test/broadcast/${projectId}`, {});
         console.log('요청 성공:', response.data);
       } catch (error) {
         console.error('요청 실패:', error);
