@@ -3,6 +3,7 @@ import Canvas from "../components/Canvas.jsx";
 
 function MainCanvasSection({
   selectedScene,
+  projectId,
   imageUrl,
   stageRef,
   onChange,
@@ -40,6 +41,7 @@ function MainCanvasSection({
           {selectedScene ? (
             <Canvas
               key={selectedScene.id}
+              projectId={projectId}
               scene={selectedScene}
               width={1200}
               height={675}
