@@ -2,6 +2,7 @@ import os
 import uuid
 import cv2
 import numpy as np
+import json
 
 
 def process_image(
@@ -15,14 +16,14 @@ def process_image(
     color_rgb: tuple[int, int, int] | None = None,
 ) -> str:
     """
-    입력 이미지 경로를 받아 엣지 픽셀을 일정 간격으로 점 샘플링한 결과 이미지를 생성합니다.
+    입력 이미지 경로를 받아 엣지 픽셀을 일정 간격으로 점 샘플링한 결과를 Fabric.js JSON으로 생성합니다.
 
     - 파이프라인: Gray → GaussianBlur → Canny → Grid Sampling
     - target_dots가 주어지면 엣지 픽셀 수로부터 step을 자동 계산합니다.
       대략적으로 기대 도트 수 ≈ edge_pixels / (step^2)로 가정하여 step ≈ sqrt(edge_pixels / target_dots)
-    - 결과는 backend/uploads/processed_<uuid>_<dot_count>.png 로 저장됩니다.
+    - 결과는 backend/uploads/processed_<uuid>_<dot_count>.json 로 저장됩니다.
 
-    Returns: 백엔드 루트 기준 상대 경로 (e.g., "uploads/processed_xxx.png")
+    Returns: 백엔드 루트 기준 상대 경로 (e.g., "uploads/processed_xxx.json")
     """
     if not os.path.exists(input_path):
         raise FileNotFoundError(f"Input image not found: {input_path}")
@@ -45,7 +46,7 @@ def process_image(
     # 최소한의 모폴로지 연산
     kernel = np.ones((2, 2), np.uint8)
     edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)  # 끊어진 선만 연결
-    circle_radius = 2  # SVG 원 반지름(px)
+    circle_radius = 2  # 원 반지름(px)
 
     # step 자동 계산 (target_dots 지정 시 우선)
     h, w = edges.shape[:2]
@@ -75,6 +76,7 @@ def process_image(
             for x in range(0, w, step):
                 if edges[y, x] != 0:
                     points.append((x, y))
+
     # 최소 간격 유지(원 반지름 기준) + 중복 제거
     def _enforce_min_distance(points_list, min_dist):
         if not points_list or min_dist <= 1:
@@ -85,7 +87,7 @@ def process_image(
         accepted = []
         min_sq = float(min_dist) * float(min_dist)
 
-        for (px, py) in points_list:
+        for px, py in points_list:
             cx = int(px * inv)
             cy = int(py * inv)
             ok = True
@@ -94,7 +96,7 @@ def process_image(
                     bucket = grid.get((nx, ny))
                     if not bucket:
                         continue
-                    for (ax, ay) in bucket:
+                    for ax, ay in bucket:
                         dx = ax - px
                         dy = ay - py
                         if (dx * dx + dy * dy) < min_sq:
@@ -121,7 +123,7 @@ def process_image(
     out_dir = os.path.join(backend_dir, "uploads")
     os.makedirs(out_dir, exist_ok=True)
 
-    out_name = f"processed_{uuid.uuid4().hex}_{dot_count}.svg"
+    out_name = f"processed_{uuid.uuid4().hex}_{dot_count}.json"
     output_path = os.path.join(out_dir, out_name)
 
     # 색상 분석 및 펜 스트로크 통합
@@ -190,10 +192,16 @@ def process_image(
 
         return dominant_colors
 
+    def rgb_to_hex(r, g, b):
+        """RGB 값을 HEX 색상 코드로 변환"""
+        return f"#{r:02x}{g:02x}{b:02x}"
+
     # 펜 스트로크 색상 분석 (간소화)
     dominant_pen_colors = get_dominant_pen_color(img, points)
 
-    circles = []
+    # Fabric.js 객체들을 저장할 리스트
+    fabric_objects = []
+
     for x, y in points:
         if y < img.shape[0] and x < img.shape[1]:
             b, g, r = img[int(y), int(x)]
@@ -220,28 +228,71 @@ def process_image(
                 r = max(0, min(255, int(r * saturation_boost)))
                 g = max(0, min(255, int(g * saturation_boost)))
 
-            actual_color = f"rgb({int(r)}, {int(g)}, {int(b)})"
+            fill_color = rgb_to_hex(int(r), int(g), int(b))
         else:
             # 범위를 벗어난 경우
             if color_rgb:
                 r, g, b = color_rgb
-                actual_color = f"rgb({r}, {g}, {b})"
+                fill_color = rgb_to_hex(r, g, b)
             else:
-                actual_color = "#000"
+                fill_color = "#000000"
 
-        circles.append(f'<circle cx="{x}" cy="{y}" r="{circle_radius}" fill="{actual_color}" />')
+        # Fabric.js Circle 객체 생성
+        circle_obj = {
+            "type": "circle",
+            "version": "5.3.0",
+            "originX": "center",
+            "originY": "center",
+            "left": x,
+            "top": y,
+            "width": circle_radius * 2,
+            "height": circle_radius * 2,
+            "fill": fill_color,
+            "stroke": None,
+            "strokeWidth": 0,
+            "strokeDashArray": None,
+            "strokeLineCap": "butt",
+            "strokeDashOffset": 0,
+            "strokeLineJoin": "miter",
+            "strokeUniform": False,
+            "strokeMiterLimit": 4,
+            "scaleX": 1,
+            "scaleY": 1,
+            "angle": 0,
+            "flipX": False,
+            "flipY": False,
+            "opacity": 1,
+            "shadow": None,
+            "visible": True,
+            "backgroundColor": "",
+            "fillRule": "nonzero",
+            "paintFirst": "fill",
+            "globalCompositeOperation": "source-over",
+            "skewX": 0,
+            "skewY": 0,
+            "radius": circle_radius,
+        }
 
-    # SVG 저장 (비ASCII 경로 호환)
-    svg_header = (
-        f'<?xml version="1.0" encoding="UTF-8"?>\n'
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}">\n'
-    )
-    svg_footer = "\n</svg>\n"
-    svg_content = svg_header + ("\n".join(circles)) + svg_footer
+        fabric_objects.append(circle_obj)
 
+    # Fabric.js Canvas JSON 구조 생성
+    fabric_canvas = {
+        "version": "5.3.0",
+        "objects": fabric_objects,
+        "background": "",
+        "backgroundImage": "",
+        "overlay": "",
+        "clipPath": "",
+        "width": w,
+        "height": h,
+        "viewportTransform": [1, 0, 0, 1, 0, 0],
+    }
+
+    # JSON 파일로 저장 (비ASCII 경로 호환)
     with open(output_path, "w", encoding="utf-8") as f:
-        f.write(svg_content)
-    print(f"Saved processed SVG to: {output_path}")
+        json.dump(fabric_canvas, f, ensure_ascii=False, indent=2)
+
+    print(f"Saved processed Fabric.js JSON to: {output_path}")
 
     # 백엔드 루트 기준 상대 경로 반환
     rel_path = os.path.relpath(output_path, start=backend_dir)

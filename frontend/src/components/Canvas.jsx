@@ -15,7 +15,9 @@ import {
   Rect,
 } from "fabric";
 import useLayers from "../hooks/useLayers";
+import { useAutoSave } from '../hooks/useAutoSave';
 import * as fabricLayerUtils from "../utils/fabricLayerUtils";
+import {loadCanvasFromIndexedDB, saveCanvasToIndexedDB} from "../utils/indexedDBUtils.js";
 
 export default function Canvas({
   width = 800,
@@ -29,7 +31,11 @@ export default function Canvas({
   onPreviewChange,
   onModeChange,
   onSelectionChange,
-  onPanChange
+  onPanChange,
+  scene,
+  projectId,
+  changeSaveMode,
+  triggerAutoSave,
 }) {
   const canvasRef = useRef(null);
   const fabricCanvas = useRef(null);
@@ -63,6 +69,8 @@ export default function Canvas({
       } catch (_) {}
     }, 200);
   }, [onPreviewChange]);
+
+  const sceneId = scene?.id;
 
   // 레이어 관리 훅
   const {
@@ -348,6 +356,8 @@ export default function Canvas({
           fabricLayerUtils.assignObjectToLayer(path, activeLayer.id, activeLayer.name);
           console.log('✅ Path assigned to layer:', activeLayer.name);
           setCanvasRevision(c => c + 1); // 캔버스 변경을 알림
+
+          triggerAutoSave({ drawingMode: 'draw' });
         } else {
           console.error('❌ Path assignment failed - no active layer found!');
           console.log('Debug info:', {
@@ -467,7 +477,7 @@ export default function Canvas({
     canvas.on('mouse:up', handleMouseUp);
     canvas.on('path:created', handlePathCreated);
     canvas.on('object:added', handleObjectAdded);
-    
+
     
     // Expose minimal pan controls for external UI
     canvas.enterPanMode = enterPanMode;
@@ -476,6 +486,27 @@ export default function Canvas({
     
     // 캔버스 경계 추가
     addCanvasBoundary();
+
+    const handleObjectMoved = () => {
+      triggerAutoSave({ action: 'objectMoved' });
+    };
+
+    const handleObjectScaled = () => {
+      triggerAutoSave({ action: 'objectScaled' });
+    };
+
+    const handleObjectRotated = () => {
+      triggerAutoSave({ action: 'objectRotated' });
+    };
+
+    const handleObjectModified = () => {
+      triggerAutoSave({ action: 'objectModified' });
+    };
+
+    canvas.on('object:moved', handleObjectMoved);
+    canvas.on('object:scaled', handleObjectScaled);
+    canvas.on('object:rotated', handleObjectRotated);
+    canvas.on('object:modified', handleObjectModified);
 
     return () => {
       canvas.off('mouse:wheel', handleCanvasZoom);
@@ -492,7 +523,10 @@ export default function Canvas({
       canvas.off('object:rotating', handleTransforming);
       canvas.off('object:modified', handleModified);
       canvas.off('after:render', handleAfterRender);
-
+      canvas.off('object:moved', handleObjectMoved);
+      canvas.off('object:scaled', handleObjectScaled);
+      canvas.off('object:rotated', handleObjectRotated);
+      canvas.off('object:modified', handleObjectModified);
       canvas.dispose();
     };
   }, [externalStageRef]);
@@ -546,10 +580,11 @@ export default function Canvas({
       canvas.requestRenderAll();
       setDeleteIconPos(null);
       const cb = onSelectionChangeRef.current; if (cb) cb(null);
+      triggerAutoSave({ action: 'delete', deletedCount: activeObjects.length });
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [drawingMode]);
+  }, [drawingMode, triggerAutoSave]);
 
   // Effect for loading the background image
   useEffect(() => {
@@ -562,123 +597,113 @@ export default function Canvas({
       canvas.renderAll();
     };
 
-    // SVG 파일인지 확인
-    if (imageUrl.endsWith(".svg")) {
-      console.log("SVG 파일 로드 시작:", imageUrl);
-      // SVG 파일을 직접 로드하여 개별 요소들에 접근 가능하도록 처리
-      fetch(imageUrl)
-        .then((response) => {
-          console.log("SVG fetch 응답:", response.status);
-          return response.text();
-        })
-        .then((svgText) => {
-          console.log("SVG 텍스트 길이:", svgText.length);
-          console.log("SVG 내용 시작:", svgText.substring(0, 200));
-          // 기존 SVG 요소들 제거
-          const existingSvgObjects = canvas
-            .getObjects()
-            .filter(
-              (obj) => obj.customType === "svgDot" || obj.type === "image"
-            );
-          existingSvgObjects.forEach((obj) => canvas.remove(obj));
+    if (imageUrl.endsWith(".json")) {
+      console.log("JSON 파일 로드 시작:", imageUrl);
 
-          // SVG를 파싱하여 개별 도트들을 Fabric 객체로 변환
-          const parser = new DOMParser();
-          const svgDoc = parser.parseFromString(svgText, "image/svg+xml");
-          const circles = svgDoc.querySelectorAll("circle");
-          console.log("찾은 circle 개수:", circles.length);
+      // IndexedDB에서 먼저 확인
+      (async () => {
+        try {
+          // selectedId를 사용해서 IndexedDB에서 캐시된 데이터 확인
+          const cachedData = await loadCanvasFromIndexedDB(scene.id);
 
-          let addedCount = 0;
-          circles.forEach((circleEl, index) => {
+          if (cachedData) {
+            console.log("IndexedDB에서 캐시된 JSON 데이터 사용:", scene.id);
+            loadFabricCanvasFromData(cachedData);
+            return;
+          }
 
-            const cx = parseFloat(circleEl.getAttribute('cx') || '0');
-            const cy = parseFloat(circleEl.getAttribute('cy') || '0');
-            const r = parseFloat(circleEl.getAttribute('r') || '2');
-            const originalFill = circleEl.getAttribute('fill') || '#000000';
+          console.log("캐시된 데이터 없음, 서버에서 가져오기:", imageUrl);
 
-            if (index < 10) {
-              console.log(`Circle ${index}: cx=${cx}, cy=${cy}, r=${r}, originalFill=${originalFill}`);
+          // 캐시가 없으면 기존처럼 fetch로 가져오기
+          const response = await fetch(imageUrl);
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          const fabricJsonData = await response.json();
+          console.log("서버에서 JSON 데이터 로드됨:", fabricJsonData);
+
+          // 서버에서 가져온 데이터를 IndexedDB에 저장
+          if (scene.id) {
+            try {
+              await saveCanvasToIndexedDB(scene.id, fabricJsonData);
+              console.log("JSON 데이터가 IndexedDB에 저장됨:", scene.id);
+            } catch (saveError) {
+              console.warn("IndexedDB 저장 실패:", saveError);
             }
+          }
 
-            // 실제 SVG의 색상을 그대로 사용 (색상 대체하지 않음)
-            const actualFill = originalFill;
+          loadFabricCanvasFromData(fabricJsonData);
 
-            if (index < 10) {
-              console.log(`Circle ${index} actualFill: ${actualFill}`);
-            }
+        } catch (err) {
+          console.error("JSON 로드 실패:", err);
+          // // JSON 로드 실패 시 기본 이미지 방식으로 폴백
+          // loadAsImage();
+        }
+      })();
+    }
+    // Fabric Canvas 로드 함수 (공통 로직 분리)
+    const loadFabricCanvasFromData = (fabricJsonData) => {
+      // 기존 객체들 제거
+      const existingObjects = canvas.getObjects()
+        .filter(obj => obj.customType === "svgDot" || obj.customType === "jsonDot" || obj.type === "image");
+      existingObjects.forEach(obj => canvas.remove(obj));
 
-            const fabricCircle = new Circle({
-              left: cx - r,
-              top: cy - r,
-              radius: r,
-              fill: actualFill,
+      // Fabric.js 내장 메서드로 JSON 로드
+      canvas.loadFromJSON(fabricJsonData, () => {
+        // 로드 완료 후 customType 추가 및 이벤트 설정
+        canvas.getObjects().forEach(obj => {
+          if (obj.type === "circle") {
+            obj.set({
+              customType: "jsonDot",
               selectable: false,
-              evented: true, // 그리기/지우기 상호작용 가능하도록 true로 설정
-              customType: "svgDot", // 커스텀 타입 추가로 식별 가능
-              originalCx: cx,
-              originalCy: cy,
-              originalFill: originalFill, // 원본 색상 정보 보존
+              evented: true,
               hoverCursor: 'crosshair',
               moveCursor: 'crosshair'
             });
 
-            // SVG 도트는 배경 레이어에 할당
+            // JSON 도트는 배경 레이어에 할당
             const backgroundLayer = getLayer('background');
             if (backgroundLayer) {
-              fabricLayerUtils.assignObjectToLayer(fabricCircle, backgroundLayer.id, backgroundLayer.name);
+              fabricLayerUtils.assignObjectToLayer(obj, backgroundLayer.id, backgroundLayer.name);
             }
-
-            canvas.add(fabricCircle);
-            addedCount++;
-          });
-
-          console.log(`총 ${addedCount}개의 circle을 캔버스에 추가했습니다`);
-          console.log("캔버스 객체 개수:", canvas.getObjects().length);
-
-          setCanvasRevision(c => c + 1); // 캔버스 변경을 알림
-          canvas.renderAll();
-          postLoadActions();
-        })
-        .catch((err) => {
-          console.error("SVG 로드 실패:", err);
-          // SVG 로드 실패 시 기본 이미지 방식으로 폴백
-          loadAsImage(postLoadActions);
-        });
-    } else {
-      loadAsImage(postLoadActions);
-    }
-
-    function loadAsImage(callback) {
-      FabricImage.fromURL(imageUrl, {
-        crossOrigin: "anonymous",
-      }).then((img) => {
-        // Clear previous image
-        const existingImage = canvas.getObjects("image")[0];
-        if (existingImage) {
-          canvas.remove(existingImage);
-        }
-
-        const scale = Math.min(width / img.width, height / img.height, 1);
-        img.set({
-          left: (width - img.width * scale) / 2,
-          top: (height - img.height * scale) / 2,
-          scaleX: scale,
-          scaleY: scale,
-          selectable: false,
-          evented: false,
+          }
         });
 
-        canvas.add(img);
-        canvas.sendToBack(img);
+        setCanvasRevision(c => c + 1);
         canvas.renderAll();
-        if (callback) callback();
-      })
-      .catch((err) => {
-        console.error("Image load error:", err);
-        if (callback) callback();
+        postLoadActions();
       });
-    }
-  }, [imageUrl]);
+    };
+  }, [imageUrl,scene?.id]); // selectedId도 dependency에 추가
+
+
+  //   function loadAsImage() {
+  //     FabricImage.fromURL(imageUrl, {
+  //       crossOrigin: "anonymous",
+  //     }).then((img) => {
+  //       // Clear previous image
+  //       const existingImage = canvas.getObjects("image")[0];
+  //       if (existingImage) {
+  //         canvas.remove(existingImage);
+  //       }
+  //
+  //       const scale = Math.min(width / img.width, height / img.height, 1);
+  //       img.set({
+  //         left: (width - img.width * scale) / 2,
+  //         top: (height - img.height * scale) / 2,
+  //         scaleX: scale,
+  //         scaleY: scale,
+  //         selectable: false,
+  //         evented: false,
+  //       });
+  //
+  //       canvas.add(img);
+  //       canvas.sendToBack(img);
+  //       canvas.renderAll();
+  //     });
+  //   }
+  // }, [imageUrl]);
 
   // 외부에서 drawingMode가 변경될 때 반응
   useEffect(() => {
@@ -854,6 +879,7 @@ export default function Canvas({
         maxDroneWarningShownRef.current = false;
 
         setCanvasRevision(c => c + 1); // 캔버스 변경을 알림
+        triggerAutoSave({ drawingMode: 'brush' });
       };
 
       const drawDotAtPoint = (e) => {
@@ -1006,6 +1032,7 @@ export default function Canvas({
 
       const stopErase = () => {
         isErasing = false;
+        triggerAutoSave({ drawingMode: 'erase' });
       };
 
       const eraseAtPoint = (e) => {
@@ -1055,6 +1082,7 @@ export default function Canvas({
 
         if (objectsToRemove.length > 0) {
           canvas.renderAll();
+          triggerAutoSave({ drawingMode: 'erase', erased: objectsToRemove.length });
         }
       };
 
@@ -1325,7 +1353,7 @@ export default function Canvas({
         canvas.add(img);
         canvas.setActiveObject(img);
         setCanvasRevision(c => c + 1); // 캔버스 변경을 알림
-        
+        triggerAutoSave({ action: 'imageDropped', imageUrl });
         canvas.renderAll();
       })
       .catch((err) => {
@@ -1343,8 +1371,11 @@ export default function Canvas({
         "캔버스의 모든 내용을 지우시겠습니까? 이 작업은 되돌릴 수 없습니다."
       )
     ) {
+      const canvas = fabricCanvas.current;
+      const objectCount = canvas.getObjects().length;
       clearCanvas();
       console.log("캔버스 전체가 초기화되었습니다");
+      triggerAutoSave({ action: 'clearAll', clearedCount: objectCount });
     }
   };
 
@@ -1572,53 +1603,51 @@ export default function Canvas({
       externalStageRef.current.clear = clearCanvas;
       
       // 누락된 loadImageFromUrl 메서드 추가
-      externalStageRef.current.loadImageFromUrl = (url) => {
-        console.log("loadImageFromUrl 호출됨:", url);
+      externalStageRef.current.loadFabricJsonNative = (url) => {
+        console.log("loadFabricJsonNative 호출됨:", url);
         if (!fabricCanvas.current) return;
 
         const canvas = fabricCanvas.current;
 
-        if (url.endsWith(".svg")) {
+        if (url.endsWith(".json")) {
           fetch(url)
-            .then(response => response.text())
-            .then(svgText => {
-              // 기존 SVG 요소들 제거
-              const existingSvgObjects = canvas.getObjects()
-                .filter(obj => obj.customType === "svgDot" || obj.type === "image");
-              existingSvgObjects.forEach(obj => canvas.remove(obj));
+            .then(response => {
+              if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+              }
+              return response.json();
+            })
+            .then(fabricJsonData => {
+              console.log("JSON 데이터 로드됨:", fabricJsonData);
 
-              // SVG 파싱
-              const parser = new DOMParser();
-              const svgDoc = parser.parseFromString(svgText, "image/svg+xml");
-              const circles = svgDoc.querySelectorAll("circle");
+              // 기존 객체들 제거
+              canvas.clear();
 
-              circles.forEach((circleEl) => {
-                const cx = parseFloat(circleEl.getAttribute('cx') || '0');
-                const cy = parseFloat(circleEl.getAttribute('cy') || '0');
-                const r = parseFloat(circleEl.getAttribute('r') || '2');
-                const originalFill = circleEl.getAttribute('fill') || '#000000';
-
-                const fabricCircle = new Circle({
-                  left: cx - r,
-                  top: cy - r,
-                  radius: r,
-                  fill: originalFill,
-                  selectable: false,
-                  evented: true,
-                  customType: "svgDot",
-                  originalCx: cx,
-                  originalCy: cy,
-                  originalFill: originalFill,
-                  hoverCursor: 'crosshair',
-                  moveCursor: 'crosshair'
+              // Fabric.js 내장 메서드로 JSON 로드
+              canvas.loadFromJSON(fabricJsonData, () => {
+                // 로드 완료 후 customType 추가 및 이벤트 설정
+                canvas.getObjects().forEach(obj => {
+                  if (obj.type === "circle") {
+                    obj.set({
+                      customType: "jsonDot",
+                      selectable: false,
+                      evented: true,
+                      hoverCursor: 'crosshair',
+                      moveCursor: 'crosshair'
+                    });
+                  }
                 });
 
-                canvas.add(fabricCircle);
+                canvas.renderAll();
+                console.log(`${canvas.getObjects().length}개의 객체를 로드했습니다.`);
               });
-
-              canvas.renderAll();
             })
-            .catch(err => console.error("SVG 로드 실패:", err));
+            .catch(err => {
+              console.error("JSON 로드 실패:", err);
+              alert("변환된 데이터를 불러오는데 실패했습니다.");
+            });
+        } else {
+          console.warn("JSON 파일이 아닙니다:", url);
         }
       };
 
@@ -1661,10 +1690,12 @@ export default function Canvas({
         toggleLock: handleLayerLockChange,
         reorderLayers: reorderLayers,
       };
+
+      externalStageRef.current.changeSaveMode = changeSaveMode;
     }
   }, [externalStageRef, getSortedLayers, activeLayerId, setActiveLayerId, createLayer, 
       handleDeleteLayer, renameLayer, handleLayerVisibilityChange, handleLayerLockChange, 
-      reorderLayers]);
+      reorderLayers, changeSaveMode]);
 
   return (
     <div
@@ -1693,6 +1724,7 @@ export default function Canvas({
             canvas.requestRenderAll();
             setDeleteIconPos(null);
             const cb = onSelectionChangeRef.current; if (cb) cb(null);
+            triggerAutoSave({ action: 'deleteButton', deletedCount: activeObjects.length });
           }}
           style={{
             position: 'absolute',

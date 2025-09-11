@@ -218,7 +218,7 @@ async def process_uploaded_image(
             color_rgb = (color_r, color_g, color_b)
 
         output_path = process_image(
-            input_path, target_dots=target_dots, color_rgb=color_rgb
+            input_path, scene_id, target_dots=target_dots, color_rgb=color_rgb
         )
     finally:
         # 임시 파일 정리 (scene 경로가 아닌 경우)

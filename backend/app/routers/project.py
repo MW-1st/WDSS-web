@@ -19,16 +19,14 @@ from app.db.project import (
     delete_project_by_id,
 )
 from app.routers.websocket import manager
-from app.services.svg_service import (
-    svg_to_coords_with_colors,
-    get_svg_size,
-    coords_with_colors_to_json,
+from app.services.fabric_json_service import (
+    fabric_json_to_coords_with_colors,
+    get_fabric_json_size,
 )
 from fastapi import APIRouter, Depends, status, HTTPException
 import json
 import os
 import uuid
-
 
 router = APIRouter()
 
@@ -195,13 +193,13 @@ async def export_project_to_json(
             scene_holder = 0  # 기본값 또는 DB에서 설정된 기본 지속시간
 
         # processed 파일 경로
-        processed_path = os.path.join(PROCESSED_DIR, f"{scene_id}.svg")
+        processed_path = os.path.join(PROCESSED_DIR, f"{scene_id}.json")
 
         if os.path.exists(processed_path):
             try:
                 # SVG 파일을 좌표+색상으로 변환
-                coords_with_colors = svg_to_coords_with_colors(processed_path)
-                scene_w, scene_h, scene_z = get_svg_size(processed_path)
+                coords_with_colors = fabric_json_to_coords_with_colors(processed_path)
+                scene_w, scene_h, scene_z = get_fabric_json_size(processed_path)
 
                 # 개별 씬 액션 데이터 생성
                 actions = []

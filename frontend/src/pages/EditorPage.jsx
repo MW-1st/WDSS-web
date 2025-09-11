@@ -5,6 +5,7 @@ import SceneCarousel from "../components/SceneCarousel.jsx";
 import ImageGallery from "../components/ImageGallery.jsx";
 import LayerPanel from "../components/LayerPanel.jsx";
 import ObjectPropertiesPanel from "../components/ObjectPropertiesPanel.jsx";
+import { useAutoSave } from '../hooks/useAutoSave';
 import client from "../api/client";
 import { getImageUrl } from '../utils/imageUtils';
 import { useUnity } from "../contexts/UnityContext.jsx";
@@ -80,6 +81,7 @@ export default function EditorPage({ projectId = DUMMY }) {
   const [selectedObject, setSelectedObject] = useState(null);
   const [isPanMode, setIsPanMode] = useState(false);
   const [isToolSelectionOpen, setToolSelectionOpen] = useState(false);
+  const previousSceneId = useRef(selectedId);
 
   // 레이어 관련 상태
   const [canvasReady, setCanvasReady] = useState(false);
@@ -104,8 +106,8 @@ export default function EditorPage({ projectId = DUMMY }) {
       [scenes, selectedId]
   );
 
-  // 방금 삭제한 상태(const [originalCanvasState, setOriginalCanvasState],const [imageUrl, setImageUrl])들 대신, 아래 두 줄로 정보를 파생시킵니다.
-  const imageUrl = getImageUrl(selectedScene?.display_url || selectedScene?.s3_key) || "";
+  // 상태(const [originalCanvasState, setOriginalCanvasState],const [imageUrl, setImageUrl])들 대신, 아래 두 줄로 정보를 파생시킵니다.
+  const imageUrl = getImageUrl(selectedScene?.s3_key) || "";
   const originalCanvasState = selectedScene ? selectedScene.originalCanvasState : null;
   
   // 레이어 상태를 업데이트하는 함수
@@ -144,6 +146,111 @@ export default function EditorPage({ projectId = DUMMY }) {
 
   // unity 관련 상태
   const {isUnityVisible, showUnity, hideUnity, sendTestData} = useUnity();
+
+  // useAutoSave 훅 초기화 - selectedId가 변경될 때마다 새로운 인스턴스
+  const {
+    saveImmediately,
+    triggerAutoSave,
+    isSaving: isAutoSaving,
+    saveMode,
+    changeSaveMode,
+    syncToServerNow,
+    isServerSyncing,
+  } = useAutoSave(pid, selectedId, stageRef, {
+    enabled: true,
+    delay: 1500,
+    serverSync: true,
+    serverSyncInterval: 30000,
+    onSave: (data) => {
+      console.log(`Auto-saved scene ${data.sceneId} with ${data.objectCount} objects`);
+    },
+    onError: (error) => {
+      console.error('Auto-save failed:', error);
+    },
+    onServerSync: (data) => {
+      console.log('Server sync completed:', data);
+    },
+    onServerSyncError: (error) => {
+      console.error('Server sync failed:', error);
+    },
+    selectedScene
+  });
+
+  // 수동 저장 함수
+  const handleManualSave = async () => {
+    if (!selectedId || !stageRef.current || !pid) {
+      console.warn('Cannot save: missing selectedId, stageRef, or projectId');
+      return;
+    }
+
+    try {
+      console.log('Manual save started with mode:', saveMode);
+
+      const canvas = stageRef.current;
+      const canvasData = canvas.toJSON([
+        'layerId', 'layerName', 'customType', 'originalFill',
+        'originalCx', 'originalCy'
+      ]);
+
+      // 현재 saveMode에 맞게 서버에 저장
+      const success = await syncToServer(canvasData, saveMode);
+
+      if (success) {
+        console.log(`Scene ${selectedId} manually saved with mode: ${saveMode}`);
+        // 성공 알림 (선택사항)
+        // alert('저장되었습니다.');
+      } else {
+        console.error('Manual save failed');
+        alert('저장에 실패했습니다. 다시 시도해주세요.');
+      }
+    } catch (error) {
+      console.error('Manual save error:', error);
+      alert('저장 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 씬 변경 시 서버 동기화
+  useEffect(() => {
+    if (previousSceneId.current && previousSceneId.current !== selectedId) {
+      console.log('Scene changed, syncing to server...');
+    }
+
+    previousSceneId.current = selectedId;
+  }, [selectedId]);
+
+  // 브라우저 이벤트 리스너
+  useEffect(() => {
+    const handleBeforeUnload = (event) => {
+      if (selectedId && stageRef.current) {
+        console.log('Page unloading, syncing to server...');
+        syncToServerNow();
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        console.log('Page hidden, syncing to server...');
+        syncToServerNow();
+      }
+    };
+
+    const handlePopState = () => {
+      console.log('Navigation detected, syncing to server...');
+      syncToServerNow();
+    };
+
+    // 이벤트 리스너 등록
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      // 정리
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [selectedId, syncToServerNow]);
 
   // 색상이 변경될 때 즉시 캔버스에 반영
   useEffect(() => {
@@ -259,7 +366,7 @@ export default function EditorPage({ projectId = DUMMY }) {
             list.map((s, i) => ({
               ...s,
               name: s.name || `Scene ${s.scene_num ?? i + 1}`,
-              imageUrl: getImageUrl(s.display_url || s.s3_key),
+              imageUrl: getImageUrl(s.s3_key),
             }))
         );
         if (list[0]) setSelectedId(list[0].id);
@@ -297,19 +404,19 @@ export default function EditorPage({ projectId = DUMMY }) {
     }
   }, [selectedId, pid]);
 
-  // 저장(디바운스)
-  const saveDebounced = useDebounced(async (scene_id, drones, preview, imageUrl, originalCanvasState) => {
-    if (!pid) return;
-    try {
-      const {data} = await client.put(`/projects/${pid}/scenes/${scene_id}`, {
-        // s3_key: imageUrl
-      });
-      const saved = data.scene || {};
-      setScenes((prev) => prev.map((s) => (s.id === scene_id ? {...s, ...saved} : s)));
-    } catch (e) {
-      console.error(e);
-    }
-  }, 500);
+  // // 저장(디바운스)
+  // const saveDebounced = useDebounced(async (scene_id, drones, preview, imageUrl, originalCanvasState) => {
+  //   if (!pid) return;
+  //   try {
+  //     const {data} = await client.put(`/projects/${pid}/scenes/${scene_id}`, {
+  //       // s3_key: imageUrl
+  //     });
+  //     const saved = data.scene || {};
+  //     setScenes((prev) => prev.map((s) => (s.id === scene_id ? {...s, ...saved} : s)));
+  //   } catch (e) {
+  //     console.error(e);
+  //   }
+  // }, 500);
 
   // Canvas → 변경 반영
   const handleSceneChange = React.useCallback(
@@ -317,15 +424,16 @@ export default function EditorPage({ projectId = DUMMY }) {
         setScenes((prev) =>
             prev.map((s) => (s.id === id ? {...s, ...patch} : s))
         );
-        saveDebounced(
-            id,
-            patch.data,
-            patch.preview,
-            imageUrl,
-            originalCanvasState
-        );
+        // saveDebounced(
+        //     id,
+        //     patch.data,
+        //     patch.preview,
+        //     imageUrl,
+        //     originalCanvasState
+        // );
       },
-      [saveDebounced, imageUrl, originalCanvasState, setScenes]
+      // [saveDebounced, imageUrl, originalCanvasState, setScenes]
+      [imageUrl, originalCanvasState, setScenes]
   );
 
   // + 생성
@@ -374,9 +482,37 @@ export default function EditorPage({ projectId = DUMMY }) {
     }
   };
 
+  // 이전 씬의 saveMode를 기억하기 위한 ref 추가
+  const previousSaveModeRef = useRef('originals');
+
+  // useAutoSave의 saveMode 변경을 감지
+  useEffect(() => {
+    if (saveMode) {
+      previousSaveModeRef.current = saveMode;
+    }
+  }, [saveMode]);
+
   // 선택
-  const handleSelect = (id) => {
+  const handleSelect = async (id) => {
     if (id === "__ADD__") return;
+
+    // 현재 씬이 있고, 다른 씬을 선택하는 경우
+    if (selectedId && selectedId !== id && stageRef.current && pid) {
+      try {
+        const canvas = stageRef.current;
+        const canvasData = canvas.toJSON([
+          'layerId', 'layerName', 'customType', 'originalFill',
+          'originalCx', 'originalCy'
+        ]);
+
+        // 현재 씬(곧 이전 씬이 될)을 서버에 저장
+        syncToServerNow(canvasData, previousSaveModeRef);
+        console.log(`Scene ${selectedId} saved before switching`);
+      } catch (error) {
+        console.error('Failed to save current scene before switching:', error);
+      }
+    }
+
     setSelectedId(id);
     handleModeChange('select'); // Reset mode to select
     const items = [...scenes, {id: "__ADD__", isAdd: true}];
@@ -442,25 +578,16 @@ export default function EditorPage({ projectId = DUMMY }) {
       let finalUrl = '';
       let newS3Key = null;
 
-      const checkResp = await client.get(`/projects/${pid}/scenes/${selectedId}/originals`);
-      const originalExists = checkResp.data.exists;
+      // 씬 정보를 가져와서 s3_key 확인
+      const sceneResp = await client.get(`/projects/${pid}/scenes/${selectedId}`);
+      const sceneData = sceneResp.data;
+      const s3Key = sceneData.s3_key;
 
-      if (originalExists) {
-        console.log("원본이 존재하여 재변환을 요청합니다.");
-        const rgbColor = hexToRgb(drawingColor);
-        const resp = await client.post(
-            `/projects/${pid}/scenes/${selectedId}/processed`,
-            {
-              target_dots: targetDots,
-              color_r: rgbColor.r,
-              color_g: rgbColor.g,
-              color_b: rgbColor.b,
-            }
-        );
-        finalUrl = getImageUrl(resp.data.output_url);
+      // s3_key가 null이거나 'originals'로 시작하면 원본 파일과 함께 변환 요청
+      const needsOriginalFile = !s3Key || s3Key.startsWith('originals');
 
-      } else {
-        console.log("원본이 없어 최초 생성을 요청합니다.");
+      if (needsOriginalFile) {
+        console.log("원본 파일이 필요하여 최초 생성을 요청합니다.");
         const hasContent = stageRef.current.hasDrawnContent && stageRef.current.hasDrawnContent();
         if (!hasContent) {
           alert("변환할 내용이 없습니다. 먼저 이미지를 추가하거나 그림을 그려주세요.");
@@ -484,11 +611,29 @@ export default function EditorPage({ projectId = DUMMY }) {
         fd.append("image", file);
 
         const resp = await client.post(
-            `/projects/${pid}/scenes/${selectedId}/originals?target_dots=${targetDots}`,
-            fd
+          `/projects/${pid}/scenes/${selectedId}/processed?target_dots=${targetDots}`,
+          fd
         );
         finalUrl = getImageUrl(resp.data.output_url);
         newS3Key = resp.data.s3_key;
+
+      } else {
+        console.log("기존 원본을 사용하여 재변환을 요청합니다.");
+        const rgbColor = hexToRgb(drawingColor);
+        const resp = await client.post(
+          `/projects/${pid}/scenes/${selectedId}/processed?target_dots=${targetDots}`,
+          {
+            color_r: rgbColor.r,
+            color_g: rgbColor.g,
+            color_b: rgbColor.b,
+          }
+        );
+        finalUrl = getImageUrl(resp.data.output_url);
+      }
+
+      if (stageRef.current?.changeSaveMode) {
+        stageRef.current.changeSaveMode('processed');
+        console.log(stageRef.current.changeSaveMode);
       }
 
       console.log("변환 완료! 최종 URL:", finalUrl);
@@ -499,34 +644,59 @@ export default function EditorPage({ projectId = DUMMY }) {
         }
 
         setScenes(prevScenes =>
-            prevScenes.map(scene => {
-              if (scene.id === selectedId) {
-                const updatedScene = {
-                  ...scene,
-                  display_url: finalUrl,
-                };
-                if (newS3Key) {
-                  updatedScene.s3_key = newS3Key;
-                }
-                return updatedScene;
+          prevScenes.map(scene => {
+            if (scene.id === selectedId) {
+              const updatedScene = {
+                ...scene,
+                // display_url: finalUrl,
+              };
+              if (newS3Key) {
+                updatedScene.s3_key = newS3Key;
               }
-              return scene;
-            })
+              return updatedScene;
+            }
+            return scene;
+          })
         );
 
         setTimeout(() => {
-          if (stageRef.current && stageRef.current.loadImageFromUrl) {
+          if (stageRef.current && stageRef.current.loadFabricJsonNative) {
             fetch(finalUrl)
-                .then(response => console.log("수동 fetch 결과:", response.status))
-                .catch(err => console.error("수동 fetch 실패:", err));
+              .then(response => console.log("수동 fetch 결과:", response.status))
+              .catch(err => console.error("수동 fetch 실패:", err));
 
-            stageRef.current.loadImageFromUrl(finalUrl);
+            // 캔버스에 이미지 로드
+            stageRef.current.loadFabricJsonNative(finalUrl);
+            // 이미지 로드 완료 후 useAutoSave를 통해 즉시 저장
+            setTimeout(async () => {
+              try {
+                const transformMetadata = {
+                  imageUrl: finalUrl,
+                  projectId: pid,
+                  transformedAt: new Date().toISOString(),
+                  targetDots: targetDots,
+                  drawingColor: drawingColor,
+                  type: 'transformed',
+                  source: 'transform_complete'
+                };
+
+                const saveSuccess = await saveImmediately(transformMetadata);
+
+                if (saveSuccess) {
+                  console.log(`변환된 이미지 상태가 자동 저장되었습니다: ${selectedId}`);
+                } else {
+                  console.warn('변환된 이미지 자동 저장에 실패했습니다.');
+                }
+              } catch (error) {
+                console.error('변환된 캔버스 상태 저장 중 오류:', error);
+              }
+            }, 500); // 이미지 로드 완료를 위한 지연
           }
         }, 200);
-        
-        if (selectedScene) {
-          saveDebounced(selectedId, selectedScene?.drones, selectedScene?.preview, finalUrl, originalCanvasState);
-        }
+
+        // if (selectedScene) {
+        //   saveDebounced(selectedId, selectedScene?.drones, selectedScene?.preview, finalUrl, originalCanvasState);
+        // }
       }
     } catch (e) {
       console.error("Transform error", e);
@@ -560,7 +730,7 @@ export default function EditorPage({ projectId = DUMMY }) {
         setDrawingMode('pan');
         return;
       }
-      
+
       // 다른 모드 처리 (기존 로직)
       try {
         const canvas = stageRef.current;
@@ -587,9 +757,9 @@ export default function EditorPage({ projectId = DUMMY }) {
   useEffect(() => {
     const handler = (e) => {
       const target = e.target;
-      const isTyping = target && 
-        (target.tagName === "INPUT" || 
-         target.tagName === "TEXTAREA" || 
+      const isTyping = target &&
+        (target.tagName === "INPUT" ||
+         target.tagName === "TEXTAREA" ||
          target.isContentEditable);
       if (isTyping) return;
 
@@ -602,7 +772,7 @@ export default function EditorPage({ projectId = DUMMY }) {
         handleModeChange('pan');
       }
     };
-    
+
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [handleModeChange]);
@@ -624,7 +794,13 @@ const handleClearAll = React.useCallback(async () => {
          status: 'reset'
        });
 
+       if (stageRef.current?.changeSaveMode) {
+          stageRef.current.changeSaveMode('originals');
+          console.log(stageRef.current.changeSaveMode);
+        }
+
        console.log("서버 씬 초기화 완료:", response.data);
+       window.location.reload();
 
        // 3. 성공 메시지 (선택사항)
        // alert("씬이 완전히 초기화되었습니다.");
@@ -816,6 +992,7 @@ const handleClearAll = React.useCallback(async () => {
       stageRef,
       setTargetDots,
       handleTransform,
+      handleManualSave
     };
     // notify listeners (e.g., Navbar) that editor state changed
     window.dispatchEvent(
@@ -826,6 +1003,7 @@ const handleClearAll = React.useCallback(async () => {
             imageUrl,
             selectedId,
             projectName,
+            isServerSyncing,
           },
         })
     );
@@ -864,7 +1042,7 @@ const handleClearAll = React.useCallback(async () => {
             }}
         >
           <div style={{height: "100%", overflowY: "auto", padding: 16}}>
-           
+
           <div style={{ position: "relative", display: "inline-block", marginBottom: 12 }}>
             <button
               ref={toolButtonRef}
@@ -967,6 +1145,8 @@ const handleClearAll = React.useCallback(async () => {
                 stageRef={stageRef}
                 layout="sidebar"
                 onGalleryStateChange={setGalleryOpen}
+                isServerSyncing = {isServerSyncing}
+                handleManualSave = {handleManualSave}
             />
             <div style={{marginTop: "auto"}}>
               <button
@@ -1011,6 +1191,7 @@ const handleClearAll = React.useCallback(async () => {
         >
           <MainCanvasSection
               selectedScene={selectedScene}
+              projectId={project_id}
               imageUrl={imageUrl}
               stageRef={stageRef}
               onChange={handleSceneChange}
@@ -1025,6 +1206,8 @@ const handleClearAll = React.useCallback(async () => {
               onModeChange={handleModeChange}
               onSelectionChange={setSelectedObject}
               onPanChange={setIsPanMode}
+              changeSaveMode={changeSaveMode}
+              triggerAutoSave={triggerAutoSave}
           />
 
           {/* 씬 캐러셀 */}

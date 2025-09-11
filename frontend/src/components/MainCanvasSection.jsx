@@ -3,6 +3,7 @@ import Canvas from "../components/Canvas.jsx";
 
 function MainCanvasSection({
   selectedScene,
+  projectId,
   imageUrl,
   stageRef,
   onChange,
@@ -14,6 +15,8 @@ function MainCanvasSection({
   onModeChange,
   onSelectionChange,
   onPanChange,
+  changeSaveMode,
+  triggerAutoSave
 }) {
   return (
     <section
@@ -40,6 +43,7 @@ function MainCanvasSection({
           {selectedScene ? (
             <Canvas
               key={selectedScene.id}
+              projectId={projectId}
               scene={selectedScene}
               width={1200}
               height={675}
@@ -54,6 +58,8 @@ function MainCanvasSection({
               onModeChange={onModeChange}
               onSelectionChange={onSelectionChange}
               onPanChange={onPanChange}
+              changeSaveMode={changeSaveMode}
+              triggerAutoSave={triggerAutoSave}
             />
 
           ) : (
