@@ -164,14 +164,16 @@ export const useServerSync = (projectId, sceneId, fabricCanvas, options = {}) =>
       setLastSyncTime(new Date());
       pendingSyncRef.current = false;
 
-      if (onSync) {
-        onSync({
-          type: syncType,
-          sceneId,
-          success: true,
-          result
-        });
-      }
+     if (onSync) {
+      onSync({
+        type: syncType,
+        sceneId,
+        success: true,
+        result,
+        // 서버 응답에서 s3_key 추출
+        s3_key: result?.s3_key || result?.scene?.s3_key || null
+      });
+    }
 
       console.log(`Server sync completed: ${syncType} for scene ${sceneId}`);
       return true;

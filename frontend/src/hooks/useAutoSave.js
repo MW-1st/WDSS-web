@@ -32,7 +32,16 @@ export const useAutoSave = (projectId, sceneId, fabricCanvas, options = {}, scen
     lastSyncTime: lastServerSyncTime,
     syncError: serverSyncError,
     setEnabled: setServerSyncEnabled
-  } = useServerSync(projectId, sceneId, fabricCanvas, {});
+  } = useServerSync(projectId, sceneId, fabricCanvas, {
+    // 🔥 onSync 콜백 추가 - useServerSync에서 받은 데이터를 EditorPage로 전달
+    onSync: (syncData) => {
+      console.log('useAutoSave received sync data:', syncData);
+      if (onServerSync) {
+        onServerSync(syncData);
+      }
+    },
+    onError: onServerSyncError
+  });
 
   // 서버 동기화를 위한 타이머 ref 추가
   const serverSyncTimerRef = useRef(null);
@@ -85,7 +94,15 @@ export const useAutoSave = (projectId, sceneId, fabricCanvas, options = {}, scen
         setLastSaveTime(new Date());
 
         if (onSave) {
-          onSave({ sceneId, objectCount: actualObjectCount });
+          // saveMode에 따라 가상의 s3_key 생성
+          const virtualS3Key = `${saveMode}/${sceneId}.json`;
+
+          onSave({
+            sceneId,
+            objectCount: actualObjectCount,
+            s3_key: virtualS3Key, // 가상의 s3_key 추가
+            source: 'indexedDB' // 출처 표시
+          });
         }
 
         // 서버 동기화 스케줄링 추가
@@ -141,7 +158,11 @@ export const useAutoSave = (projectId, sceneId, fabricCanvas, options = {}, scen
       try {
         console.log('🚀 Executing scheduled sync with mode:', saveMode);
         await syncToServer(canvasData, saveMode);
-        console.log('✅ Scheduled server sync completed with mode:', saveMode);
+        if (success) {
+          console.log('✅ Scheduled server sync completed with mode:', saveMode);
+        } else {
+          console.warn('⚠️ Scheduled server sync returned false');
+        }
       } catch (error) {
         console.error('❌ Scheduled server sync failed:', error);
       }
@@ -187,8 +208,17 @@ export const useAutoSave = (projectId, sceneId, fabricCanvas, options = {}, scen
       await saveCanvasToIndexedDB(sceneId, canvasData, saveMetadata);
       setLastSaveTime(new Date());
 
+      // 🔥 즉시 저장 시에도 가상의 s3_key 생성
       if (onSave) {
-        onSave({ sceneId, objectCount: actualObjectCount, manual: true });
+        const virtualS3Key = `${saveMode}/${sceneId}.json`;
+
+        onSave({
+          sceneId,
+          objectCount: actualObjectCount,
+          manual: true,
+          s3_key: virtualS3Key, // 가상의 s3_key 추가
+          source: 'indexedDB' // 출처 표시
+        });
       }
 
       return true;
@@ -293,7 +323,7 @@ export const useAutoSave = (projectId, sceneId, fabricCanvas, options = {}, scen
     determineInitialSaveMode();
   }, [sceneId, projectId, sceneData?.s3_key]);
 
-  
+
   return {
     // 상태
     isAutoSaveEnabled: autoSaveEnabled,
