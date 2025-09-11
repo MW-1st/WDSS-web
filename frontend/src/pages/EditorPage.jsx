@@ -5,6 +5,7 @@ import SceneCarousel from "../components/SceneCarousel.jsx";
 import ImageGallery from "../components/ImageGallery.jsx";
 import LayerPanel from "../components/LayerPanel.jsx";
 import ObjectPropertiesPanel from "../components/ObjectPropertiesPanel.jsx";
+import PreviewPanel from "../components/PreviewPanel.jsx";
 import { useAutoSave } from '../hooks/useAutoSave';
 import client from "../api/client";
 import { getImageUrl } from '../utils/imageUtils';
@@ -82,6 +83,16 @@ export default function EditorPage({ projectId = DUMMY }) {
   const [isPanMode, setIsPanMode] = useState(false);
   const [isToolSelectionOpen, setToolSelectionOpen] = useState(false);
   const previousSceneId = useRef(selectedId);
+
+  // 미리보기 패널 관련 상태
+  const previewPanelRef = useRef(null);
+
+  // 캔버스 변경 시 미리보기 업데이트
+  const handleCanvasChange = React.useCallback(() => {
+    if (previewPanelRef.current && previewPanelRef.current.triggerPreview) {
+      previewPanelRef.current.triggerPreview();
+    }
+  }, []);
 
   // 레이어 관련 상태
   const [canvasReady, setCanvasReady] = useState(false);
@@ -1219,6 +1230,7 @@ const handleClearAll = React.useCallback(async () => {
                 if (!dataUrl || !selectedId) return;
                 setScenes(prev => prev.map(s => s.id === selectedId ? { ...s, preview: dataUrl } : s));
               }}
+              onCanvasChange={handleCanvasChange}
               drawingMode={drawingMode}
               eraserSize={eraserSize}
               drawingColor={drawingColor}
@@ -1287,6 +1299,23 @@ const handleClearAll = React.useCallback(async () => {
             <ObjectPropertiesPanel
                 selection={selectedObject}
                 onChangeFill={handleSelectedFillChange}
+            />
+
+            {/* 구분선 */}
+            <div style={{ margin: '16px 0', borderTop: '1px solid #eee' }} />
+
+            {/* 미리보기 패널 */}
+            <PreviewPanel
+                ref={previewPanelRef}
+                projectId={pid}
+                sceneId={selectedId}
+                stageRef={stageRef}
+                targetDots={targetDots}
+                drawingColor={drawingColor}
+                onTransformComplete={handleTransform}
+                processing={processing}
+                enabled={true}
+                layersState={layersState}
             />
           </div>
         </aside>

@@ -8,6 +8,7 @@ function MainCanvasSection({
   stageRef,
   onChange,
   onPreviewChange,
+  onCanvasChange,
   drawingMode,
   eraserSize,
   drawingColor,
@@ -49,6 +50,7 @@ function MainCanvasSection({
               height={675}
               onChange={(patch) => onChange(selectedScene.id, patch)}
               onPreviewChange={onPreviewChange}
+              onCanvasChange={onCanvasChange}
               imageUrl={imageUrl}
               stageRef={stageRef}
               drawingMode={drawingMode}

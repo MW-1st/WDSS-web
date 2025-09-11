@@ -29,6 +29,7 @@ export default function Canvas({
   drawingColor: externalDrawingColor = '#222222',
   activeLayerId: externalActiveLayerId,
   onPreviewChange,
+  onCanvasChange,
   onModeChange,
   onSelectionChange,
   onPanChange,
@@ -51,6 +52,8 @@ export default function Canvas({
   const selectionHandlers = useRef({});
   const onSelectionChangeRef = useRef(onSelectionChange);
   useEffect(() => { onSelectionChangeRef.current = onSelectionChange; }, [onSelectionChange]);
+  const onCanvasChangeRef = useRef(onCanvasChange);
+  useEffect(() => { onCanvasChangeRef.current = onCanvasChange; }, [onCanvasChange]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [canvasRevision, setCanvasRevision] = useState(0);
   const [deleteIconPos, setDeleteIconPos] = useState(null);
@@ -358,6 +361,7 @@ export default function Canvas({
           setCanvasRevision(c => c + 1); // 캔버스 변경을 알림
 
           triggerAutoSave({ drawingMode: 'draw' });
+          if (onCanvasChangeRef.current) onCanvasChangeRef.current();
         } else {
           console.error('❌ Path assignment failed - no active layer found!');
           console.log('Debug info:', {
@@ -489,18 +493,22 @@ export default function Canvas({
 
     const handleObjectMoved = () => {
       triggerAutoSave({ action: 'objectMoved' });
+      if (onCanvasChangeRef.current) onCanvasChangeRef.current();
     };
 
     const handleObjectScaled = () => {
       triggerAutoSave({ action: 'objectScaled' });
+      if (onCanvasChangeRef.current) onCanvasChangeRef.current();
     };
 
     const handleObjectRotated = () => {
       triggerAutoSave({ action: 'objectRotated' });
+      if (onCanvasChangeRef.current) onCanvasChangeRef.current();
     };
 
     const handleObjectModified = () => {
       triggerAutoSave({ action: 'objectModified' });
+      if (onCanvasChangeRef.current) onCanvasChangeRef.current();
     };
 
     canvas.on('object:moved', handleObjectMoved);
@@ -581,6 +589,7 @@ export default function Canvas({
       setDeleteIconPos(null);
       const cb = onSelectionChangeRef.current; if (cb) cb(null);
       triggerAutoSave({ action: 'delete', deletedCount: activeObjects.length });
+      if (onCanvasChangeRef.current) onCanvasChangeRef.current();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -880,6 +889,7 @@ export default function Canvas({
 
         setCanvasRevision(c => c + 1); // 캔버스 변경을 알림
         triggerAutoSave({ drawingMode: 'brush' });
+        if (onCanvasChangeRef.current) onCanvasChangeRef.current();
       };
 
       const drawDotAtPoint = (e) => {
@@ -1033,6 +1043,7 @@ export default function Canvas({
       const stopErase = () => {
         isErasing = false;
         triggerAutoSave({ drawingMode: 'erase' });
+        if (onCanvasChangeRef.current) onCanvasChangeRef.current();
       };
 
       const eraseAtPoint = (e) => {
@@ -1083,6 +1094,7 @@ export default function Canvas({
         if (objectsToRemove.length > 0) {
           canvas.renderAll();
           triggerAutoSave({ drawingMode: 'erase', erased: objectsToRemove.length });
+          if (onCanvasChangeRef.current) onCanvasChangeRef.current();
         }
       };
 
@@ -1354,6 +1366,7 @@ export default function Canvas({
         canvas.setActiveObject(img);
         setCanvasRevision(c => c + 1); // 캔버스 변경을 알림
         triggerAutoSave({ action: 'imageDropped', imageUrl });
+        if (onCanvasChangeRef.current) onCanvasChangeRef.current();
         canvas.renderAll();
       })
       .catch((err) => {
@@ -1376,6 +1389,7 @@ export default function Canvas({
       clearCanvas();
       console.log("캔버스 전체가 초기화되었습니다");
       triggerAutoSave({ action: 'clearAll', clearedCount: objectCount });
+      if (onCanvasChangeRef.current) onCanvasChangeRef.current();
     }
   };
 
@@ -1725,6 +1739,7 @@ export default function Canvas({
             setDeleteIconPos(null);
             const cb = onSelectionChangeRef.current; if (cb) cb(null);
             triggerAutoSave({ action: 'deleteButton', deletedCount: activeObjects.length });
+            if (onCanvasChangeRef.current) onCanvasChangeRef.current();
           }}
           style={{
             position: 'absolute',
