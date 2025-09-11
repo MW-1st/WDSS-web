@@ -13,6 +13,7 @@ import { CiSettings } from "react-icons/ci";
 import { LuMousePointer } from "react-icons/lu";
 import { IoHandRightOutline } from "react-icons/io5";
 import ProjectSettingsModal from "../components/ProjectSettingsModal";
+import PortalPopover from "../components/PortalPopover.jsx";
 
 const VISIBLE = 4;
 const DUMMY = "11111111-1111-1111-1111-111111111111";
@@ -70,6 +71,7 @@ export default function EditorPage({ projectId = DUMMY }) {
   // 원본 캔버스 상태 관리
   const stageRef = useRef(null);
   const galleryRef = useRef(null);
+  const toolButtonRef = useRef(null);
 
   // 캔버스 관련 상태
   const [drawingMode, setDrawingMode] = useState("select");
@@ -77,7 +79,8 @@ export default function EditorPage({ projectId = DUMMY }) {
   const [drawingColor, setDrawingColor] = useState('#222222');
   const [selectedObject, setSelectedObject] = useState(null);
   const [isPanMode, setIsPanMode] = useState(false);
-  
+  const [isToolSelectionOpen, setToolSelectionOpen] = useState(false);
+
   // 레이어 관련 상태
   const [canvasReady, setCanvasReady] = useState(false);
   const [layersState, setLayersState] = useState([]);
@@ -375,6 +378,7 @@ export default function EditorPage({ projectId = DUMMY }) {
   const handleSelect = (id) => {
     if (id === "__ADD__") return;
     setSelectedId(id);
+    handleModeChange('select'); // Reset mode to select
     const items = [...scenes, {id: "__ADD__", isAdd: true}];
     const idx = items.findIndex(it => it.id === id);
     if (idx < start) setStart(idx);
@@ -543,29 +547,65 @@ export default function EditorPage({ projectId = DUMMY }) {
   };
 
   // 캔버스 핸들러 함수들
+// EditorPage.jsx - handleModeChange 함수 수정 (기존 함수를 찾아서 수정)
   const handleModeChange = React.useCallback(
-      (mode) => {
-        // 이동도구가 선택된 경우 먼저 해제
-        try {
-          const canvas = stageRef.current;
-          const panActive = isPanMode || (canvas && typeof canvas.getPanMode === 'function' && canvas.getPanMode());
-          if (panActive && canvas && typeof canvas.exitPanMode === 'function') {
-            canvas.exitPanMode();
-          }
-        } catch (e) {}
-        setIsPanMode(false);
-        setDrawingMode(mode);
-        if (stageRef.current && stageRef.current.setDrawingMode) {
-          stageRef.current.setDrawingMode(mode);
-          setTimeout(() => {
-            if (stageRef.current && stageRef.current.setDrawingColor) {
-              stageRef.current.setDrawingColor(drawingColor);
-            }
-          }, 20);
+    (mode) => {
+      // 팬 모드 처리
+      if (mode === 'pan') {
+        const canvas = stageRef.current;
+        if (canvas && typeof canvas.enterPanMode === 'function') {
+          canvas.enterPanMode();
         }
-      },
-      [drawingColor, isPanMode]
+        setIsPanMode(true);
+        setDrawingMode('pan');
+        return;
+      }
+      
+      // 다른 모드 처리 (기존 로직)
+      try {
+        const canvas = stageRef.current;
+        const panActive = isPanMode || (canvas && typeof canvas.getPanMode === 'function' && canvas.getPanMode());
+        if (panActive && canvas && typeof canvas.exitPanMode === 'function') {
+          canvas.exitPanMode();
+        }
+      } catch (e) {}
+      setIsPanMode(false);
+      setDrawingMode(mode);
+      if (stageRef.current && stageRef.current.setDrawingMode) {
+        stageRef.current.setDrawingMode(mode);
+        setTimeout(() => {
+          if (stageRef.current && stageRef.current.setDrawingColor) {
+            stageRef.current.setDrawingColor(drawingColor);
+          }
+        }, 20);
+      }
+    },
+    [drawingColor, isPanMode]
   );
+
+  // 키보드 단축키 추가
+  useEffect(() => {
+    const handler = (e) => {
+      const target = e.target;
+      const isTyping = target && 
+        (target.tagName === "INPUT" || 
+         target.tagName === "TEXTAREA" || 
+         target.isContentEditable);
+      if (isTyping) return;
+
+      const key = e.key?.toLowerCase();
+      if (key === "v") {
+        e.preventDefault();
+        handleModeChange('select');
+      } else if (key === "h" || e.code === 'Space') { // Also handle space for pan
+        e.preventDefault();
+        handleModeChange('pan');
+      }
+    };
+    
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [handleModeChange]);
 
 const handleClearAll = React.useCallback(async () => {
  if (stageRef.current && stageRef.current.clear) {
@@ -791,6 +831,8 @@ const handleClearAll = React.useCallback(async () => {
     );
   }, [targetDots, processing, imageUrl, selectedId, projectName]);
 
+  const isSelectOrPan = drawingMode === 'select' || isPanMode;
+
   return (
       <div
           className="editor-shell font-nanumhuman"
@@ -822,58 +864,85 @@ const handleClearAll = React.useCallback(async () => {
             }}
         >
           <div style={{height: "100%", overflowY: "auto", padding: 16}}>
-            {/* Pointer (click) and Hand (pan) tools */}
-            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-              <button
-                onClick={() => {
-                  if (!isPanMode) {
-                    const c0 = stageRef?.current;
-                    if (c0 && typeof c0.enterPanMode === 'function') c0.enterPanMode();
-                    return;
-                  }
-                  setDrawingMode("select");
-                  const c = stageRef?.current;
-                  if (c && typeof c.exitPanMode === 'function') c.exitPanMode();
-                }}
-                title="클릭 도구 (V)"
-                aria-label="클릭 도구"
-                style={{
-                  border: "1px solid #ccc",
-                  padding: "8px 16px",
-                  borderRadius: 4,
-                  cursor: "pointer",
-                  fontSize: 16,
-                  background: drawingMode === 'select' && !isPanMode ? '#007bff' : '#f8f9fa',
-                  color: drawingMode === 'select' && !isPanMode ? 'white' : 'black',
-                }}
-              >
-                {isPanMode ? <IoHandRightOutline /> : <LuMousePointer />}
-              </button>
-              <button hidden
-                onClick={() => {
-                  const c = stageRef?.current;
-                  if (!c) return;
-                  if (typeof c.getPanMode === 'function' && c.getPanMode()) {
-                    if (typeof c.exitPanMode === 'function') c.exitPanMode();
-                  } else {
-                    if (typeof c.enterPanMode === 'function') c.enterPanMode();
-                  }
-                }}
-                title="이동 도구 (Space)"
-                aria-label="이동 도구"
-                style={{
-                  border: "1px solid #ccc",
-                  padding: "8px 16px",
-                  borderRadius: 4,
-                  cursor: "pointer",
-                  fontSize: 16,
-                  background: isPanMode ? '#007bff' : '#f8f9fa',
-                  color: isPanMode ? 'white' : 'black',
-                }}
-              >
-                <IoHandRightOutline />
-              </button>
-            </div>
+           
+          <div style={{ position: "relative", display: "inline-block", marginBottom: 12 }}>
+            <button
+              ref={toolButtonRef}
+              onClick={() => setToolSelectionOpen(prev => !prev)}
+              title="도구 선택"
+              aria-label="도구 선택"
+              style={{
+                border: `2px solid ${isSelectOrPan ? '#007bff' : '#e0e0e0'}`,
+                padding: "8px 16px",
+                borderRadius: 8,
+                cursor: "pointer",
+                fontSize: 16,
+                transition: "all 0.2s ease",
+                backgroundColor: isSelectOrPan ? '#007bff' : '#ffffff',
+                color: isSelectOrPan ? 'white' : '#333333',
+                boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+              }}
+            >
+              {isPanMode ? <IoHandRightOutline /> : <LuMousePointer />}
+            </button>
+            <PortalPopover
+              anchorRef={toolButtonRef}
+              open={isToolSelectionOpen}
+              onClose={() => setToolSelectionOpen(false)}
+              placement="right"
+              align="start"
+              offset={8}
+              width={100}
+              padding={4}
+            >
+                <button
+                  onClick={() => {
+                    handleModeChange("select");
+                    setToolSelectionOpen(false);
+                  }}
+                  title="선택 도구 (V)"
+                  aria-label="선택 도구"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "8px 12px",
+                    border: "none",
+                    backgroundColor: drawingMode === 'select' && !isPanMode ? '#007bff' : 'transparent',
+                    color: drawingMode === 'select' && !isPanMode ? 'white' : '#333333',
+                    width: "100%",
+                    textAlign: "left",
+                    cursor: "pointer"
+                  }}
+                >
+                  <LuMousePointer />
+                  <span>선택</span>
+                </button>
+                <button
+                  onClick={() => {
+                    handleModeChange("pan");
+                    setToolSelectionOpen(false);
+                  }}
+                  title="이동 도구 (Space)"
+                  aria-label="이동 도구"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "8px 12px",
+                    border: "none",
+                    backgroundColor: isPanMode ? '#007bff' : 'transparent',
+                    color: isPanMode ? 'white' : '#333333',
+                    width: "100%",
+                    textAlign: "left",
+                    cursor: "pointer"
+                  }}
+                >
+                  <IoHandRightOutline />
+                  <span>이동</span>
+                </button>
+            </PortalPopover>
+          </div>
             <EditorToolbar
                 pid={pid}
                 selectedId={selectedId}

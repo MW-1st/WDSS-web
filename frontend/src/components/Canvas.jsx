@@ -589,6 +589,11 @@ export default function Canvas({
     if (!imageUrl || !fabricCanvas.current) return;
     const canvas = fabricCanvas.current;
 
+    const postLoadActions = () => {
+      applyDrawingMode(drawingModeRef.current, currentColorRef.current);
+      canvas.renderAll();
+    };
+
     // SVG 파일인지 확인
     if (imageUrl.endsWith(".svg")) {
       console.log("SVG 파일 로드 시작:", imageUrl);
@@ -664,17 +669,18 @@ export default function Canvas({
 
           setCanvasRevision(c => c + 1); // 캔버스 변경을 알림
           canvas.renderAll();
+          postLoadActions();
         })
         .catch((err) => {
           console.error("SVG 로드 실패:", err);
           // SVG 로드 실패 시 기본 이미지 방식으로 폴백
-          loadAsImage();
+          loadAsImage(postLoadActions);
         });
     } else {
-      loadAsImage();
+      loadAsImage(postLoadActions);
     }
 
-    function loadAsImage() {
+    function loadAsImage(callback) {
       FabricImage.fromURL(imageUrl, {
         crossOrigin: "anonymous",
       }).then((img) => {
@@ -697,6 +703,11 @@ export default function Canvas({
         canvas.add(img);
         canvas.sendToBack(img);
         canvas.renderAll();
+        if (callback) callback();
+      })
+      .catch((err) => {
+        console.error("Image load error:", err);
+        if (callback) callback();
       });
     }
   }, [imageUrl]);
@@ -1240,6 +1251,14 @@ export default function Canvas({
       canvas.on("mouse:wheel", wheelHandler);
       canvas.on("path:created", pathCreatedHandler);
     }
+    else if (mode === "pan") {
+    // 팬 모드 처리 - 실제로는 enterPanMode가 대부분 처리하지만 일관성을 위해 추가
+    canvas.isDrawingMode = false;
+    canvas.selection = false;
+    canvas.defaultCursor = "grab";
+    canvas.hoverCursor = "grab";
+    canvas.moveCursor = "grab";
+  }
   };
 
   const toggleDrawingMode = (mode) => {
