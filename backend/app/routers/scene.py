@@ -286,6 +286,7 @@ async def patch_scene(
 
                 # 연관된 파일들 삭제
                 original_file = os.path.join(ORIGINALS_DIR, f"{scene_id}.json")
+                original_png_file = os.path.join(ORIGINALS_DIR, f"{scene_id}.json")
                 processed_file = os.path.join(PROCESSED_DIR, f"{scene_id}.json")
 
                 # originals 폴더의 파일 삭제
@@ -295,6 +296,15 @@ async def patch_scene(
                     except OSError as e:
                         # 파일 삭제 실패시 로그는 남기되 작업은 계속 진행
                         print(f"Failed to remove original file {original_file}: {e}")
+
+                if os.path.exists(original_png_file):
+                    try:
+                        os.remove(original_png_file)
+                    except OSError as e:
+                        # 파일 삭제 실패시 로그는 남기되 작업은 계속 진행
+                        print(
+                            f"Failed to remove original file {original_png_file}: {e}"
+                        )
 
                 # processed 폴더의 파일 삭제
                 if os.path.exists(processed_file):
