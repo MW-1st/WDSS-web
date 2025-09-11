@@ -135,7 +135,10 @@ export const useServerSync = (projectId, sceneId, fabricCanvas, options = {}) =>
 
   // IndexedDB에서 서버로 동기화
   const syncToServer = useCallback(async (canvasData, syncType = 'original') => {
+    console.log('🌐 Server sync starting with type:', syncType);
+
     if (!serverSyncEnabled || !canvasData) {
+      console.log('❌ Server sync skipped - disabled or no data');
       return false;
     }
 
@@ -146,13 +149,17 @@ export const useServerSync = (projectId, sceneId, fabricCanvas, options = {}) =>
     try {
       let result;
 
-      if (syncType === 'original') {
+      if (syncType === 'original' || syncType === 'originals') {
+        console.log('📤 Syncing to originals endpoint');
         result = await saveOriginalToServer(canvasData);
-      } else if (syncType === 'dots') {
+      } else if (syncType === 'dots' || syncType === 'processed') {
+        console.log('📤 Syncing to processed endpoint');
         result = await saveDotCanvasToServer(canvasData);
       } else {
         throw new Error(`Unknown sync type: ${syncType}`);
       }
+
+      console.log('✅ Server sync completed for type:', syncType);
 
       setLastSyncTime(new Date());
       pendingSyncRef.current = false;

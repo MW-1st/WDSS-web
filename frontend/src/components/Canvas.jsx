@@ -96,7 +96,8 @@ export default function Canvas({
     isServerSyncing,
     lastServerSyncTime,
     serverSyncError,
-    setServerSyncEnabled
+    setServerSyncEnabled,
+    changeSaveMode
   } = useAutoSave(projectId ,sceneId, fabricCanvas, {
     enabled: true,
     delay: 1500,
@@ -1775,10 +1776,12 @@ export default function Canvas({
         toggleLock: handleLayerLockChange,
         reorderLayers: reorderLayers,
       };
+
+      externalStageRef.current.changeSaveMode = changeSaveMode;
     }
   }, [externalStageRef, getSortedLayers, activeLayerId, setActiveLayerId, createLayer, 
       handleDeleteLayer, renameLayer, handleLayerVisibilityChange, handleLayerLockChange, 
-      reorderLayers]);
+      reorderLayers, changeSaveMode]);
 
   return (
     <div

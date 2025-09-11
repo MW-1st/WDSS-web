@@ -152,7 +152,8 @@ export default function EditorPage({ projectId = DUMMY }) {
     saveError,
     isServerSyncing,
     lastServerSyncTime,
-    serverSyncError
+    serverSyncError,
+    changeSaveMode
   } = useAutoSave(pid, selectedId, stageRef, {
     enabled: true,
     delay: 1500,
@@ -522,6 +523,11 @@ export default function EditorPage({ projectId = DUMMY }) {
         finalUrl = getImageUrl(resp.data.output_url);
       }
 
+      if (stageRef.current?.changeSaveMode) {
+        stageRef.current.changeSaveMode('processed');
+        console.log(stageRef.current.changeSaveMode);
+      }
+
       console.log("변환 완료! 최종 URL:", finalUrl);
 
       if (finalUrl) {
@@ -643,6 +649,11 @@ const handleClearAll = React.useCallback(async () => {
        const response = await client.patch(`/projects/${pid}/scenes/${selectedId}`, {
          status: 'reset'
        });
+
+       if (stageRef.current?.changeSaveMode) {
+          stageRef.current.changeSaveMode('originals');
+          console.log(stageRef.current.changeSaveMode);
+        }
 
        console.log("서버 씬 초기화 완료:", response.data);
        window.location.reload();

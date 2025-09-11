@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { saveCanvasToIndexedDB, loadCanvasFromIndexedDB } from '../utils/indexedDBUtils';
 import { useServerSync } from './useServerSync';
+import client from "../api/client.js";
 
 export const useAutoSave = (projectId, sceneId, fabricCanvas, options = {}) => {
   const {
@@ -19,6 +20,8 @@ export const useAutoSave = (projectId, sceneId, fabricCanvas, options = {}) => {
   const [lastSaveTime, setLastSaveTime] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
+  const [saveMode, setSaveMode] = useState('originals'); // 'originals' 또는 'processed'
+
 
   const timeoutRef = useRef(null);
 
@@ -29,17 +32,7 @@ export const useAutoSave = (projectId, sceneId, fabricCanvas, options = {}) => {
     lastSyncTime: lastServerSyncTime,
     syncError: serverSyncError,
     setEnabled: setServerSyncEnabled
-  } = useServerSync(projectId, sceneId, fabricCanvas, {
-    enabled: serverSync,
-    onSync: (data) => {
-      console.log('Server sync completed:', data);
-      if (onServerSync) onServerSync(data);
-    },
-    onError: (error) => {
-      console.error('Server sync failed:', error);
-      if (onServerSyncError) onServerSyncError(error);
-    }
-  });
+  } = useServerSync(projectId, sceneId, fabricCanvas, {});
 
   // 서버 동기화를 위한 타이머 ref 추가
   const serverSyncTimerRef = useRef(null);
@@ -118,21 +111,42 @@ export const useAutoSave = (projectId, sceneId, fabricCanvas, options = {}) => {
     return true;
   }, [autoSaveEnabled, sceneId, fabricCanvas, delay, onSave, onError, includeMetadata]);
 
+  const changeSaveMode = useCallback((newMode) => {
+    console.log('🔄 Changing save mode from', saveMode, 'to', newMode);
+
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+      console.log('⏹️ Cancelled pending auto-save');
+    }
+    if (serverSyncTimerRef.current) {
+      clearTimeout(serverSyncTimerRef.current);
+      serverSyncTimerRef.current = null;
+      console.log('⏹️ Cancelled pending server sync');
+    }
+
+    setSaveMode(newMode);
+    console.log('✅ Save mode changed to:', newMode);
+  }, [saveMode]);
+
   // 서버 동기화 스케줄링 함수 추가
   const scheduleServerSync = useCallback((canvasData) => {
+    console.log('⏰ Scheduling server sync with mode:', saveMode);
+
     if (serverSyncTimerRef.current) {
       clearTimeout(serverSyncTimerRef.current);
     }
 
     serverSyncTimerRef.current = setTimeout(async () => {
       try {
-        await syncToServer(canvasData, 'original');
-        console.log('Scheduled server sync completed');
+        console.log('🚀 Executing scheduled sync with mode:', saveMode);
+        await syncToServer(canvasData, saveMode);
+        console.log('✅ Scheduled server sync completed with mode:', saveMode);
       } catch (error) {
-        console.error('Scheduled server sync failed:', error);
+        console.error('❌ Scheduled server sync failed:', error);
       }
     }, serverSyncInterval);
-  }, [syncToServer, serverSyncInterval]);
+  }, [syncToServer, serverSyncInterval, saveMode]);
 
   // 즉시 저장 (딜레이 없음)
   const saveImmediately = useCallback(async (metadata = {}) => {
@@ -244,6 +258,35 @@ export const useAutoSave = (projectId, sceneId, fabricCanvas, options = {}) => {
     };
   }, []);
 
+  useEffect(() => {
+    const determineInitialSaveMode = async () => {
+      console.log('🔍 Determining save mode for sceneId:', sceneId, 'projectId:', projectId);
+
+      if (!sceneId || !projectId) return;
+
+      try {
+        const response = await client.get(`/projects/${projectId}/scenes/${sceneId}`);
+        const s3Key = response.data?.scene?.s3_key;
+
+        console.log('📝 Scene s3_key:', s3Key);
+
+        if (!s3Key || s3Key.startsWith('originals')) {
+          setSaveMode('originals');
+          console.log('✅ Save mode set to: originals');
+        } else if (s3Key.startsWith('processed')) {
+          setSaveMode('processed');
+          console.log('✅ Save mode set to: processed');
+        }
+      } catch (error) {
+        console.warn('❌ Failed to determine save mode:', error);
+        setSaveMode('originals');
+        console.log('✅ Save mode defaulted to: originals');
+      }
+    };
+
+    determineInitialSaveMode();
+  }, [sceneId, projectId]);
+
   return {
     // 상태
     isAutoSaveEnabled: autoSaveEnabled,
@@ -256,6 +299,7 @@ export const useAutoSave = (projectId, sceneId, fabricCanvas, options = {}) => {
     saveImmediately,
     loadSavedState,
     setEnabled,
+    changeSaveMode,
 
     // 편의 함수들
     clearError: () => setSaveError(null),
