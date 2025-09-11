@@ -9,6 +9,8 @@ import { useEffect, useLayoutEffect, useState } from "react";
  * width: 팝오버 예상 너비(정렬 계산용)
  * align: 'start' | 'end'
  * offset: 기준요소와의 간격(px)
+ * placement: 'bottom' | 'right'
+ * padding: 내부 여백(px)
  */
 export default function PortalPopover({
   anchorRef,
@@ -18,6 +20,8 @@ export default function PortalPopover({
   width = 320,
   align = "start",
   offset = 8,
+  placement = "bottom",
+  padding = 12,
 }) {
   const [pos, setPos] = useState({ top: 0, left: 0 });
 
@@ -26,8 +30,15 @@ export default function PortalPopover({
     if (!el) return;
     const r = el.getBoundingClientRect();
 
-    let left = align === "end" ? r.right - width : r.left;
-    let top = r.bottom + offset;
+    let left, top;
+
+    if (placement === 'right') {
+      left = r.right + offset;
+      top = r.top;
+    } else { // default to bottom
+      left = align === "end" ? r.right - width : r.left;
+      top = r.bottom + offset;
+    }
 
     // 화면 밖으로 나가지 않도록 보정
     const maxLeft = window.innerWidth - width - 8;
@@ -49,7 +60,7 @@ export default function PortalPopover({
       window.removeEventListener("resize", recalc, opts);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, anchorRef, width, align, offset]);
+  }, [open, anchorRef, width, align, offset, placement]);
 
   useEffect(() => {
     if (!open) return;
@@ -83,7 +94,7 @@ export default function PortalPopover({
         borderRadius: 12,
         border: "1px solid rgba(0,0,0,0.08)",
         boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
-        padding: 12,
+        padding: padding,
         width,
         boxSizing: "border-box",
       }}
