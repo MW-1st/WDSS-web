@@ -62,7 +62,7 @@ async def get_scenes(project_id: str, user: UserResponse = Depends(get_current_u
                     project_id=str(scene["project_id"]),
                     scene_num=scene["scene_num"],
                     s3_key=scene["s3_key"],
-                    display_url=get_display_url(scene["s3_key"]),
+                    # display_url=get_display_url(scene["s3_key"]),
                     # created_at=None,  # DB에 created_at, updated_at이 없으므로 None
                     # updated_at=None,
                 )
@@ -137,7 +137,7 @@ async def create_scene(
                     project_id=project_id,
                     scene_num=scene["scene_num"],
                     s3_key=scene["s3_key"],
-                    display_url=get_display_url(scene["s3_key"]),
+                    # display_url=get_display_url(scene["s3_key"]),
                 ),
             )
 
@@ -175,7 +175,7 @@ async def get_scene(
                 project_id=str(scene["project_id"]),
                 scene_num=scene["scene_num"],
                 s3_key=scene["s3_key"],
-                display_url=get_display_url(scene["s3_key"]),
+                # display_url=get_display_url(scene["s3_key"]),
             ),
         )
 
@@ -321,7 +321,7 @@ async def patch_scene(
                 project_id=project_id,
                 scene_num=existing_scene["scene_num"],  # 기존 값 유지
                 s3_key=None,
-                display_url=None,
+                # display_url=None,
             ),
         )
 
@@ -498,7 +498,7 @@ async def convert_canvas_to_dots(
                         WHERE scene_id = $2 AND project_id = $3
                     )
                     """,
-                permanent_processed_path,
+                f"processed/{scene_id}.json",
                 scene_id,
                 project_id,
             )
@@ -506,7 +506,7 @@ async def convert_canvas_to_dots(
         return {
             "success": True,
             "message": "Canvas converted to dots successfully",
-            "processed_url": f"processed/{scene_id}.json",
+            "output_url": f"processed/{scene_id}.json",
         }
 
     except Exception as e:
