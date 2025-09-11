@@ -468,31 +468,23 @@ export default function EditorPage({ projectId = DUMMY }) {
       let finalUrl = '';
       let newS3Key = null;
 
-      const checkResp = await client.get(`/projects/${pid}/scenes/${selectedId}/originals`);
-      const originalExists = checkResp.data.exists;
+      // 씬 정보를 가져와서 s3_key 확인
+      const sceneResp = await client.get(`/projects/${pid}/scenes/${selectedId}`);
+      const sceneData = sceneResp.data;
+      const s3Key = sceneData.s3_key;
 
-      if (originalExists) {
-        console.log("원본이 존재하여 재변환을 요청합니다.");
-        const rgbColor = hexToRgb(drawingColor);
-        const resp = await client.post(
-            `/projects/${pid}/scenes/${selectedId}/processed`,
-            {
-              target_dots: targetDots,
-              color_r: rgbColor.r,
-              color_g: rgbColor.g,
-              color_b: rgbColor.b,
-            }
-        );
-        finalUrl = getImageUrl(resp.data.output_url);
+      // s3_key가 null이거나 'originals'로 시작하면 원본 파일과 함께 변환 요청
+      const needsOriginalFile = !s3Key || s3Key.startsWith('originals');
 
-      } else {
-        console.log("원본이 없어 최초 생성을 요청합니다.");
+      if (needsOriginalFile) {
+        console.log("원본 파일이 필요하여 최초 생성을 요청합니다.");
         const hasContent = stageRef.current.hasDrawnContent && stageRef.current.hasDrawnContent();
         if (!hasContent) {
           alert("변환할 내용이 없습니다. 먼저 이미지를 추가하거나 그림을 그려주세요.");
           setProcessing(false);
           return;
         }
+
         const canvasImage = stageRef.current.exportCanvasAsImage();
         const blob = await new Promise(resolve => {
           const img = new Image();
@@ -510,11 +502,24 @@ export default function EditorPage({ projectId = DUMMY }) {
         fd.append("image", file);
 
         const resp = await client.post(
-            `/projects/${pid}/scenes/${selectedId}/originals?target_dots=${targetDots}`,
-            fd
+          `/projects/${pid}/scenes/${selectedId}/processed?target_dots=${targetDots}`,
+          fd
         );
         finalUrl = getImageUrl(resp.data.output_url);
         newS3Key = resp.data.s3_key;
+
+      } else {
+        console.log("기존 원본을 사용하여 재변환을 요청합니다.");
+        const rgbColor = hexToRgb(drawingColor);
+        const resp = await client.post(
+          `/projects/${pid}/scenes/${selectedId}/processed?target_dots=${targetDots}`,
+          {
+            color_r: rgbColor.r,
+            color_g: rgbColor.g,
+            color_b: rgbColor.b,
+          }
+        );
+        finalUrl = getImageUrl(resp.data.output_url);
       }
 
       console.log("변환 완료! 최종 URL:", finalUrl);
@@ -525,26 +530,26 @@ export default function EditorPage({ projectId = DUMMY }) {
         }
 
         setScenes(prevScenes =>
-            prevScenes.map(scene => {
-              if (scene.id === selectedId) {
-                const updatedScene = {
-                  ...scene,
-                  // display_url: finalUrl,
-                };
-                if (newS3Key) {
-                  updatedScene.s3_key = newS3Key;
-                }
-                return updatedScene;
+          prevScenes.map(scene => {
+            if (scene.id === selectedId) {
+              const updatedScene = {
+                ...scene,
+                // display_url: finalUrl,
+              };
+              if (newS3Key) {
+                updatedScene.s3_key = newS3Key;
               }
-              return scene;
-            })
+              return updatedScene;
+            }
+            return scene;
+          })
         );
 
         setTimeout(() => {
           if (stageRef.current && stageRef.current.loadFabricJsonNative) {
             fetch(finalUrl)
-                .then(response => console.log("수동 fetch 결과:", response.status))
-                .catch(err => console.error("수동 fetch 실패:", err));
+              .then(response => console.log("수동 fetch 결과:", response.status))
+              .catch(err => console.error("수동 fetch 실패:", err));
 
             // 캔버스에 이미지 로드
             stageRef.current.loadFabricJsonNative(finalUrl);
