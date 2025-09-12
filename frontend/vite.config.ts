@@ -29,6 +29,10 @@ export default defineConfig({
       '/originals': {
         target: 'http://localhost:8000',
         changeOrigin: true,
+      },
+      '/thumbnails': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
       }
     },
   },
