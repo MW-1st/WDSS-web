@@ -1458,19 +1458,33 @@ export default function Canvas({
     };
   };
 
-  // 현재 캔버스 전체를 이미지로 내보내기
+  // 현재 캔버스 전체를 이미지로 내보내기 (원본 위치 기준, 팬 이동 무시)
   const exportCanvasAsImage = () => {
     if (!fabricCanvas.current) return null;
 
     const canvas = fabricCanvas.current;
-    // 캔버스를 데이터 URL로 변환 (PNG 형태)
-    const dataURL = canvas.toDataURL({
-      format: "png",
-      quality: 1.0,
-      multiplier: 1,
-    });
-
-    return dataURL;
+    
+    // 현재 viewport 변환 정보 저장
+    const currentViewportTransform = canvas.viewportTransform ? [...canvas.viewportTransform] : null;
+    
+    try {
+      // 일시적으로 viewport를 원점으로 리셋 (팬 이동 취소)
+      canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
+      
+      // 원본 위치 기준으로 캔버스를 데이터 URL로 변환
+      const dataURL = canvas.toDataURL({
+        format: "png",
+        quality: 1.0,
+        multiplier: 1,
+      });
+      
+      return dataURL;
+    } finally {
+      // viewport 변환을 원래대로 복원
+      if (currentViewportTransform) {
+        canvas.setViewportTransform(currentViewportTransform);
+      }
+    }
   };
 
   // 펜으로 그린 선만 별도로 이미지로 내보내기

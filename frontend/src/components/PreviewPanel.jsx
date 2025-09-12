@@ -46,6 +46,9 @@ const PreviewPanel = React.forwardRef(({
     setIsGeneratingPreview(true);
     setError(null);
 
+    // UI 업데이트를 위한 짧은 지연
+    await new Promise(resolve => setTimeout(resolve, 10));
+
     try {
       console.log('고품질 클라이언트 미리보기 생성 시작');
       
@@ -182,7 +185,7 @@ const PreviewPanel = React.forwardRef(({
     } finally {
       setIsGeneratingPreview(false);
     }
-  }, [enabled, stageRef, isGeneratingPreview, processing, projectId, sceneId, targetDots, drawingColor]);
+  }, [enabled, stageRef, processing, projectId, sceneId, targetDots, drawingColor]);
 
   // 헬퍼 함수들 (서버 로직 기반)
   const applyGaussianBlur = (pixels, width, height, kernelSize) => {
