@@ -17,7 +17,7 @@ export default function Canvas({
   height = 500,
   imageUrl = "",
   stageRef: externalStageRef,
-  drawingMode: externalDrawingMode = "draw",
+  drawingMode: externalDrawingMode = "select",
   eraserSize: externalEraserSize = 20,
   drawingColor: externalDrawingColor = '#222222',
   activeLayerId: externalActiveLayerId,
@@ -140,7 +140,6 @@ export default function Canvas({
     canvas.clipPath = clipPath;
 
     // 그리기 모드 설정 (성능 최적화)
-    canvas.isDrawingMode = true;
     const brush = new fabric.PencilBrush(canvas);
     brush.width = 2; // 원래 크기로 복원
     brush.color = externalDrawingColor; // 외부에서 전달받은 색상 사용
@@ -670,10 +669,20 @@ const loadFabricCanvasFromData = async (fabricJsonData) => { // 'async' 키워�
     try {
         // type이 없는 경우를 대비하고, 앞뒤 공백을 제거합니다.
         const type = objData.type ? objData.type.trim().toLowerCase() : '';
+        
 
         if (type === 'circle') {
             // --- Circle 타입 처리 ---
-            const newCircle = new fabric.Circle(objData);
+            const newCircle = new fabric.Circle({
+                ...objData,
+                customType: 'svgDot', // 지우개로 지울 수 있도록 customType 설정
+                selectable: true, // 선택 가능하도록 변경
+                evented: true, // 이벤트 활성화
+                hasControls: false, // 변형 컨트롤 비활성화 (크기 조절 등)
+                hasBorders: true, // 선택 테두리는 표시
+                hoverCursor: 'crosshair',
+                moveCursor: 'crosshair'
+            });
             successfullyCreated.push(newCircle);
 
         } else if (type === 'path') {
@@ -914,7 +923,7 @@ const loadFabricCanvasFromData = async (fabricJsonData) => { // 'async' 키워�
 
         // 최대 개수 체크를 continueDraw에서도 해야 함
         const currentDots = canvas.getObjects().filter(obj =>
-          obj.customType === 'svgDot' || obj.customType === 'drawnDot'
+          obj.type === 'circle' || obj.customType === 'svgDot' || obj.customType === 'drawnDot'
         );
         const maxDrone = window.editorAPI?.targetDots || 2000;
 
@@ -942,7 +951,7 @@ const loadFabricCanvasFromData = async (fabricJsonData) => { // 'async' 키워�
         // 현재 도트 개수 확인
         const allObjects = canvas.getObjects();
         const currentDots = allObjects.filter(obj =>
-          obj.customType === 'svgDot' || obj.customType === 'drawnDot'
+          obj.type === 'circle' || obj.customType === 'svgDot' || obj.customType === 'drawnDot'
         );
         console.log('전체 객체 수:', allObjects.length);
         console.log('인식된 도트 수:', currentDots.length);
@@ -1099,13 +1108,14 @@ const loadFabricCanvasFromData = async (fabricJsonData) => { // 'async' 키워�
         const eraserRadius = eraserSize / 2;
 
         objects.forEach((obj) => {
-          // 그려진 패스들, SVG 도트들, 그려진 도트들 모두 지우기 가능
+          // 그려진 패스들, SVG 도트들, 그려진 도트들, 모든 원형 객체 지우기 가능
           if (
             obj.type === "path" ||
+            obj.type === "circle" ||
             obj.customType === "svgDot" ||
             obj.customType === "drawnDot"
           ) {
-            if (obj.customType === "svgDot" || obj.customType === "drawnDot") {
+            if (obj.type === "circle" || obj.customType === "svgDot" || obj.customType === "drawnDot") {
               // 도트들의 경우 원의 중심점과의 거리 계산
               const dotCenterX = obj.left + obj.radius;
               const dotCenterY = obj.top + obj.radius;
@@ -1454,7 +1464,7 @@ const loadFabricCanvasFromData = async (fabricJsonData) => { // 'async' 키워�
     objects.forEach((obj, index) => {
       // console.log(`객체 ${index}: type=${obj.type}, customType=${obj.customType}, fill=${obj.fill}, stroke=${obj.stroke}`);
       
-      if (obj.customType === 'svgDot' || obj.customType === 'drawnDot') {
+      if (obj.type === 'circle' || obj.customType === 'svgDot' || obj.customType === 'drawnDot') {
         // 도트의 중심점 계산
         const centerX = obj.left + obj.radius;
         const centerY = obj.top + obj.radius;

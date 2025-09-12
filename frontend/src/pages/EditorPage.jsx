@@ -1,4 +1,4 @@
-﻿import React, {useCallback, useEffect, useMemo, useRef, useState} from "react";
+import React, {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import EditorToolbar from "../components/EditorToolbar.jsx";
 import MainCanvasSection from "../components/MainCanvasSection.jsx";
 import SceneCarousel from "../components/SceneCarousel.jsx";
@@ -437,12 +437,11 @@ export default function EditorPage({projectId = DUMMY}) {
             const firstScene = list[0];
             const isFirstSceneTransformed = firstScene.s3_key && firstScene.s3_key.startsWith('processed');
             
-            if (isFirstSceneTransformed) {
-              handleModeChange('brush');
-            } else {
-              handleModeChange('draw');
-            }
-          }, 100);
+                            if (isFirstSceneTransformed) {
+                              handleModeChange('select');
+                            } else {
+                              handleModeChange('select');
+                            }          }, 100);
         }
       } catch (e) {
         console.error(e);
@@ -627,9 +626,9 @@ export default function EditorPage({projectId = DUMMY}) {
   const nextSceneTransformed = nextScene?.saveMode === 'processed' || nextScene?.isTransformed === true;
 
   if (nextSceneTransformed) {
-    handleModeChange('brush');
+    handleModeChange('select');
   } else {
-    handleModeChange('draw');
+    handleModeChange('select');
   }
 
   const items = [...scenes, {id: "__ADD__", isAdd: true}];
