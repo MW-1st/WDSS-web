@@ -21,7 +21,7 @@ const VISIBLE = 4;
 const DUMMY = "11111111-1111-1111-1111-111111111111";
 
 const LEFT_TOOL_WIDTH = 100;
-const RIGHT_PANEL_WIDTH = 260;
+const RIGHT_PANEL_WIDTH = 300; // 미리보기 패널을 위해 40px 증가
 
 function useDebounced(fn, delay = 400) {
   const t = useRef(null);
