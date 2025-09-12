@@ -26,7 +26,6 @@ export default function Navbar({ transparent: propTransparent = false }) {
     const sceneId = editorState.selectedId;
 
     // Export prerequisites and last JSON URL
-    const [transformClicked, setTransformClicked] = React.useState(false);
     const [jsonBuilt, setJsonBuilt] = React.useState(false);
     const [lastJsonUrl, setLastJsonUrl] = React.useState("");
 
@@ -37,6 +36,20 @@ export default function Navbar({ transparent: propTransparent = false }) {
       };
       window.addEventListener("editor:updated", handler);
       return () => window.removeEventListener("editor:updated", handler);
+    }, []);
+
+    // JSON 생성 완료 이벤트 수신
+    React.useEffect(() => {
+      const handler = (e) => {
+        const { jsonUrl } = e.detail || {};
+        if (jsonUrl) {
+          console.log('JSON URL received from editor:', jsonUrl);
+          setLastJsonUrl(jsonUrl);
+          setJsonBuilt(true);
+        }
+      };
+      window.addEventListener("editor:json-ready", handler);
+      return () => window.removeEventListener("editor:json-ready", handler);
     }, []);
 
     const [localDots, setLocalDots] = React.useState(
@@ -58,66 +71,6 @@ export default function Navbar({ transparent: propTransparent = false }) {
       api.setTargetDots(safe);
     };
 
-    const handleJsonGeneration = async () => {
-      try {
-        const pathSegments = location.pathname.split("/");
-        const projectId = pathSegments[2];
-
-        if (!projectId) {
-          alert("프로젝트 ID를 찾을 수 없습니다.");
-          return;
-        }
-
-        // 현재 씬이 있고 수정사항이 있으면 먼저 저장
-        if (sceneId && api?.stageRef?.current?.getCurrentCanvasAsSvg) {
-          const canvasSvgData = api.stageRef.current.getCurrentCanvasAsSvg();
-          if (canvasSvgData && canvasSvgData.totalDots > 0) {
-            const svgBlob = new Blob([canvasSvgData.svgString], {
-              type: "image/svg+xml",
-            });
-
-            const saveFormData = new FormData();
-            saveFormData.append(
-              "svg_file",
-              new File([svgBlob], `${sceneId}.svg`, { type: "image/svg+xml" })
-            );
-
-            await client.put(
-              `/projects/${projectId}/scenes/${sceneId}/processed`,
-              saveFormData
-            );
-          }
-        }
-
-        // 모든 씬을 JSON으로 변환
-        const response = await client.post(`/projects/${projectId}/json`);
-        const { json_url, unity_sent, scenes_processed, total_scenes } =
-          response.data;
-
-        if (json_url) {
-          const base = client.defaults.baseURL?.replace(/\/$/, "") || "";
-          const full = json_url.startsWith("http")
-            ? json_url
-            : `${base}/${json_url.replace(/^\//, "")}`;
-          try {
-            setJsonBuilt(true);
-            setLastJsonUrl(full);
-          } catch {}
-          // window.open(full, "_blank", "noopener");
-
-          alert(
-            unity_sent
-              ? `${scenes_processed}/${total_scenes}개 씬이 JSON으로 변환되고 Unity로 전송되었습니다!`
-              : `${scenes_processed}/${total_scenes}개 씬이 JSON으로 변환되었습니다!`
-          );
-        } else {
-          alert("JSON 생성에 실패했습니다.");
-        }
-      } catch (e) {
-        console.error("Export all scenes error", e);
-        alert("전체 프로젝트 내보내기 중 오류가 발생했습니다.");
-      }
-    };
 
     return (
       <nav className="px-4 py-2 mb-4 flex justify-center font-nanumhuman">
@@ -135,31 +88,7 @@ export default function Navbar({ transparent: propTransparent = false }) {
             </div>
           </div>
 
-          <div className="flex flex-1 justify-between">
-            <button
-              onClick={() => {
-                setTransformClicked(true);
-                setJsonBuilt(false);
-                setLastJsonUrl("");
-                api?.handleTransform && api.handleTransform();
-              }}
-              disabled={editorState.processing || !editorState.selectedId}
-              className={`px-3 py-1.5 rounded text-white ${
-                editorState.processing
-                  ? "!bg-blue-600"
-                  : "!bg-blue-600 hover:!bg-blue-700"
-              }`}
-              title={
-                editorState.processing
-                  ? "변환 중"
-                  : !editorState.selectedId
-                  ? "먼저 씬을 선택하세요"
-                  : undefined
-              }
-            >
-              변환
-            </button>
-
+          <div className="flex flex-1 justify-end">
             {/* Dashboard + JSON + Unity */}
             <div className="flex items-center gap-2">
               <Link
@@ -170,7 +99,18 @@ export default function Navbar({ transparent: propTransparent = false }) {
                 Dashboard
               </Link>
               <button
-                onClick={handleJsonGeneration}
+                onClick={async () => {
+                  // EditorPage의 JSON 생성 함수 사용
+                  if (api?.handleJsonGeneration) {
+                    const jsonUrl = await api.handleJsonGeneration();
+                    if (jsonUrl) {
+                      setLastJsonUrl(jsonUrl);
+                      setJsonBuilt(true);
+                    }
+                  } else {
+                    alert("JSON 생성 기능을 사용할 수 없습니다.");
+                  }
+                }}
                 className="px-3 py-1.5 rounded !bg-blue-600 hover:!bg-blue-700 text-white"
               >
                 JSON 파일로만들기
@@ -178,15 +118,9 @@ export default function Navbar({ transparent: propTransparent = false }) {
 
               <button
                 onClick={() => {
-                  if (!transformClicked || !jsonBuilt) {
+                  if (!jsonBuilt || !lastJsonUrl) {
                     alert(
-                      "먼저 '변환' 버튼과 'JSON 파일로만들기' 버튼을 순서대로 실행해 주세요."
-                    );
-                    return;
-                  }
-                  if (!lastJsonUrl) {
-                    alert(
-                      "다운로드할 JSON URL이 없습니다. 'JSON 파일로만들기'를 먼저 실행해 주세요."
+                      "먼저 변환을 완료하거나 'JSON 파일로만들기' 버튼을 실행해 주세요."
                     );
                     return;
                   }

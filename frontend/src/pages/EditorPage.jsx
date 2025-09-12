@@ -750,6 +750,7 @@ export default function EditorPage({ projectId = DUMMY }) {
               console.log('변환 완료: 브러쉬 모드로 자동 전환');
               handleModeChange('brush');
             }, 100);
+
             
             // 이미지 로드 완료 후 useAutoSave를 통해 즉시 저장
             setTimeout(async () => {
@@ -1083,6 +1084,47 @@ const handleClearAll = React.useCallback(async () => {
     }
   }, [updateLayerState]);
 
+  // JSON 생성 함수 (Navbar와 공유)
+  const handleJsonGeneration = React.useCallback(async () => {
+    if (!pid) {
+      console.warn('Project ID not available for JSON generation');
+      return null;
+    }
+
+    try {
+      console.log('Generating JSON for project:', pid);
+      
+      // 프로젝트의 모든 씬을 JSON으로 변환
+      const response = await client.post(`/projects/${pid}/json`);
+      const { json_url, unity_sent, scenes_processed, total_scenes } = response.data;
+
+      if (json_url) {
+        const base = client.defaults?.baseURL?.replace(/\/$/, "") || "";
+        const full = json_url.startsWith("http")
+          ? json_url
+          : `${base}/${json_url.replace(/^\//, "")}`;
+          
+        console.log('JSON generated successfully:', full);
+        
+        // 성공 메시지
+        const message = unity_sent
+          ? `${scenes_processed}/${total_scenes}개 씬이 JSON으로 변환되고 Unity로 전송되었습니다!`
+          : `${scenes_processed}/${total_scenes}개 씬이 JSON으로 변환되었습니다!`;
+        
+        alert(message);
+        
+        return full; // JSON URL 반환
+      } else {
+        alert("JSON 생성에 실패했습니다.");
+        return null;
+      }
+    } catch (error) {
+      console.error("JSON generation error:", error);
+      alert("JSON 생성 중 오류가 발생했습니다.");
+      return null;
+    }
+  }, [pid]);
+
   // Bridge editor controls to navbar via window for project routes
   useEffect(() => {
     window.editorAPI = {
@@ -1096,7 +1138,8 @@ const handleClearAll = React.useCallback(async () => {
       stageRef,
       setTargetDots,
       handleTransform,
-      handleManualSave
+      handleManualSave,
+      handleJsonGeneration
     };
     // notify listeners (e.g., Navbar) that editor state changed
     window.dispatchEvent(
