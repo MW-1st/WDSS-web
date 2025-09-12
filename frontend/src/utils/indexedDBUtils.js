@@ -2,8 +2,92 @@ const DB_NAME = 'CanvasAutoSave';
 const DB_VERSION = 1;
 const STORE_NAME = 'canvasStates';
 
+// 메모리 캐시 설정
+const memoryCache = new Map();
+const MEMORY_CACHE_SIZE = 5; // 최근 5개 씬만 메모리에 보관
+const CACHE_ACCESS_ORDER = []; // LRU 순서 추적
+
+// DB 연결 재사용
+let dbConnection = null;
+let dbInitPromise = null;
+
 /**
- * IndexedDB 초기화
+ * DB 연결 재사용을 위한 헬퍼 함수
+ */
+const getDBConnection = () => {
+  if (dbConnection) return Promise.resolve(dbConnection);
+  if (dbInitPromise) return dbInitPromise;
+
+  dbInitPromise = initIndexedDB().then(db => {
+    dbConnection = db;
+    dbInitPromise = null;
+    return db;
+  }).catch(error => {
+    dbInitPromise = null; // 실패 시 재시도 가능하도록
+    throw error;
+  });
+
+  return dbInitPromise;
+};
+
+/**
+ * LRU 캐시 관리
+ */
+const updateCacheAccess = (sceneId) => {
+  // 기존 위치에서 제거
+  const existingIndex = CACHE_ACCESS_ORDER.indexOf(sceneId);
+  if (existingIndex > -1) {
+    CACHE_ACCESS_ORDER.splice(existingIndex, 1);
+  }
+
+  // 맨 앞에 추가 (가장 최근 사용)
+  CACHE_ACCESS_ORDER.unshift(sceneId);
+
+  // 캐시 크기 초과 시 가장 오래된 것 제거
+  if (memoryCache.size >= MEMORY_CACHE_SIZE) {
+    const oldestSceneId = CACHE_ACCESS_ORDER.pop();
+    if (oldestSceneId && memoryCache.has(oldestSceneId)) {
+      memoryCache.delete(oldestSceneId);
+      console.log(`Memory cache evicted: ${oldestSceneId}`);
+    }
+  }
+};
+
+/**
+ * 메모리 캐시에 데이터 저장
+ */
+const setMemoryCache = (sceneId, data) => {
+  if (!data) return;
+
+  updateCacheAccess(sceneId);
+  memoryCache.set(sceneId, {
+    data: data,
+    timestamp: Date.now(),
+    hits: (memoryCache.get(sceneId)?.hits || 0) + 1
+  });
+
+  console.log(`Memory cache stored: ${sceneId} (cache size: ${memoryCache.size})`);
+};
+
+/**
+ * 메모리 캐시에서 데이터 조회
+ */
+const getMemoryCache = (sceneId) => {
+  if (!memoryCache.has(sceneId)) return null;
+
+  const cached = memoryCache.get(sceneId);
+  updateCacheAccess(sceneId);
+
+  // 히트 카운트 증가
+  cached.hits++;
+  cached.lastAccess = Date.now();
+
+  console.log(`Memory cache hit: ${sceneId} (hits: ${cached.hits})`);
+  return cached.data;
+};
+
+/**
+ * IndexedDB 초기화 (기존과 동일)
  */
 const initIndexedDB = () => {
   if (!window.indexedDB) {
@@ -26,11 +110,9 @@ const initIndexedDB = () => {
     request.onupgradeneeded = (event) => {
       const db = event.target.result;
 
-      // canvasStates 스토어가 없으면 생성
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         const store = db.createObjectStore(STORE_NAME, { keyPath: 'sceneId' });
 
-        // 인덱스 생성
         store.createIndex('timestamp', 'timestamp', { unique: false });
         store.createIndex('savedAt', 'savedAt', { unique: false });
 
@@ -41,10 +123,7 @@ const initIndexedDB = () => {
 };
 
 /**
- * 캔버스 상태를 IndexedDB에 저장
- * @param {string} sceneId - 씬 ID
- * @param {Object} canvasData - Fabric.js toJSON() 결과
- * @param {Object} metadata - 추가 메타데이터 (선택사항)
+ * 캔버스 상태를 IndexedDB에 저장 (메모리 캐시도 함께 업데이트)
  */
 export const saveCanvasToIndexedDB = async (sceneId, canvasData, metadata = {}) => {
   if (!sceneId || !canvasData) {
@@ -52,7 +131,7 @@ export const saveCanvasToIndexedDB = async (sceneId, canvasData, metadata = {}) 
   }
 
   try {
-    const db = await initIndexedDB();
+    const db = await getDBConnection();
     const transaction = db.transaction([STORE_NAME], 'readwrite');
     const store = transaction.objectStore(STORE_NAME);
 
@@ -71,6 +150,10 @@ export const saveCanvasToIndexedDB = async (sceneId, canvasData, metadata = {}) 
 
       request.onsuccess = () => {
         console.log(`Canvas state saved to IndexedDB: ${sceneId} (${canvasState.objectCount} objects)`);
+
+        // 메모리 캐시도 업데이트
+        setMemoryCache(sceneId, canvasData);
+
         resolve(canvasState);
       };
 
@@ -86,8 +169,7 @@ export const saveCanvasToIndexedDB = async (sceneId, canvasData, metadata = {}) 
 };
 
 /**
- * IndexedDB에서 캔버스 상태 로드
- * @param {string} sceneId - 씬 ID
+ * IndexedDB에서 캔버스 상태 로드 (메모리 캐시 우선 확인)
  */
 export const loadCanvasFromIndexedDB = async (sceneId) => {
   if (!sceneId) {
@@ -95,9 +177,16 @@ export const loadCanvasFromIndexedDB = async (sceneId) => {
   }
 
   try {
-    const db = await initIndexedDB();
+    // 1. 메모리 캐시 확인 (가장 빠름)
+    const cachedData = getMemoryCache(sceneId);
+    if (cachedData) {
+      return cachedData;
+    }
+
+    // 2. IndexedDB에서 로드
+    const db = await getDBConnection();
     const transaction = db.transaction([STORE_NAME], 'readonly');
-    const store = transaction.objectStore('canvasStates');
+    const store = transaction.objectStore(STORE_NAME);
 
     return new Promise((resolve, reject) => {
       const request = store.get(sceneId);
@@ -106,6 +195,10 @@ export const loadCanvasFromIndexedDB = async (sceneId) => {
         const result = request.result;
         if (result) {
           console.log(`Canvas state loaded from IndexedDB: ${sceneId} (saved: ${result.savedAt})`);
+
+          // 메모리 캐시에 저장
+          setMemoryCache(sceneId, result.canvasData);
+
           resolve(result.canvasData);
         } else {
           console.log(`No saved canvas state found for scene: ${sceneId}`);
@@ -125,8 +218,7 @@ export const loadCanvasFromIndexedDB = async (sceneId) => {
 };
 
 /**
- * 특정 씬의 캔버스 상태 삭제
- * @param {string} sceneId - 씬 ID
+ * 특정 씬의 캔버스 상태 삭제 (메모리 캐시에서도 제거)
  */
 export const deleteCanvasFromIndexedDB = async (sceneId) => {
   if (!sceneId) {
@@ -134,7 +226,17 @@ export const deleteCanvasFromIndexedDB = async (sceneId) => {
   }
 
   try {
-    const db = await initIndexedDB();
+    // 메모리 캐시에서 제거
+    if (memoryCache.has(sceneId)) {
+      memoryCache.delete(sceneId);
+      const index = CACHE_ACCESS_ORDER.indexOf(sceneId);
+      if (index > -1) {
+        CACHE_ACCESS_ORDER.splice(index, 1);
+      }
+      console.log(`Removed from memory cache: ${sceneId}`);
+    }
+
+    const db = await getDBConnection();
     const transaction = db.transaction([STORE_NAME], 'readwrite');
     const store = transaction.objectStore(STORE_NAME);
 
@@ -158,11 +260,46 @@ export const deleteCanvasFromIndexedDB = async (sceneId) => {
 };
 
 /**
- * 모든 저장된 캔버스 상태 목록 조회
+ * 메모리 캐시 상태 확인 (디버깅용)
+ */
+export const getCacheStats = () => {
+  const stats = {
+    memoryCache: {
+      size: memoryCache.size,
+      maxSize: MEMORY_CACHE_SIZE,
+      entries: []
+    },
+    accessOrder: [...CACHE_ACCESS_ORDER]
+  };
+
+  for (const [sceneId, cacheEntry] of memoryCache.entries()) {
+    stats.memoryCache.entries.push({
+      sceneId,
+      timestamp: cacheEntry.timestamp,
+      lastAccess: cacheEntry.lastAccess,
+      hits: cacheEntry.hits,
+      objectCount: cacheEntry.data?.objects?.length || 0
+    });
+  }
+
+  return stats;
+};
+
+/**
+ * 메모리 캐시 클리어 (필요시 사용)
+ */
+export const clearMemoryCache = () => {
+  memoryCache.clear();
+  CACHE_ACCESS_ORDER.length = 0;
+  console.log('Memory cache cleared');
+};
+
+/**
+ * 모든 저장된 캔버스 상태 목록 조회 (기존과 동일)
  */
 export const getAllCanvasStates = async () => {
   try {
-    const db = await initIndexedDB();
+    const db = await getDBConnection();
     const transaction = db.transaction([STORE_NAME], 'readonly');
     const store = transaction.objectStore(STORE_NAME);
 
@@ -192,12 +329,11 @@ export const getAllCanvasStates = async () => {
 };
 
 /**
- * 오래된 캔버스 상태 정리 (7일 이상 된 것들)
- * @param {number} maxAgeInDays - 최대 보관 기간 (기본: 7일)
+ * 오래된 캔버스 상태 정리 (기존과 동일)
  */
 export const cleanupOldCanvasStates = async (maxAgeInDays = 7) => {
   try {
-    const db = await initIndexedDB();
+    const db = await getDBConnection();
     const transaction = db.transaction([STORE_NAME], 'readwrite');
     const store = transaction.objectStore(STORE_NAME);
     const index = store.index('timestamp');
@@ -212,6 +348,17 @@ export const cleanupOldCanvasStates = async (maxAgeInDays = 7) => {
       request.onsuccess = (event) => {
         const cursor = event.target.result;
         if (cursor) {
+          const sceneId = cursor.value.sceneId;
+
+          // 메모리 캐시에서도 제거
+          if (memoryCache.has(sceneId)) {
+            memoryCache.delete(sceneId);
+            const index = CACHE_ACCESS_ORDER.indexOf(sceneId);
+            if (index > -1) {
+              CACHE_ACCESS_ORDER.splice(index, 1);
+            }
+          }
+
           cursor.delete();
           deletedCount++;
           cursor.continue();
@@ -233,13 +380,12 @@ export const cleanupOldCanvasStates = async (maxAgeInDays = 7) => {
 };
 
 /**
- * IndexedDB 저장소 크기 추정 (대략적인 값)
+ * IndexedDB 저장소 크기 추정 (기존과 동일)
  */
 export const getStorageUsage = async () => {
   try {
     const states = await getAllCanvasStates();
 
-    // 각 상태의 대략적인 크기 계산
     let totalSize = 0;
     for (const state of states) {
       const fullState = await loadCanvasFromIndexedDB(state.sceneId);
@@ -251,7 +397,8 @@ export const getStorageUsage = async () => {
     return {
       totalStates: states.length,
       estimatedSizeBytes: totalSize,
-      estimatedSizeMB: (totalSize / 1024 / 1024).toFixed(2)
+      estimatedSizeMB: (totalSize / 1024 / 1024).toFixed(2),
+      memoryCache: getCacheStats()
     };
   } catch (error) {
     console.error('Error calculating storage usage:', error);
@@ -260,9 +407,11 @@ export const getStorageUsage = async () => {
 };
 
 export default {
-    saveCanvasToIndexedDB,
-    loadCanvasFromIndexedDB,
-    deleteCanvasFromIndexedDB,
-    getAllCanvasStates,
-    cleanupOldCanvasStates,
-}
+  saveCanvasToIndexedDB,
+  loadCanvasFromIndexedDB,
+  deleteCanvasFromIndexedDB,
+  getAllCanvasStates,
+  cleanupOldCanvasStates,
+  getCacheStats,
+  clearMemoryCache,
+};
