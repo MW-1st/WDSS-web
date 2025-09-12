@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from "react";
+﻿import React, {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import EditorToolbar from "../components/EditorToolbar.jsx";
 import MainCanvasSection from "../components/MainCanvasSection.jsx";
 import SceneCarousel from "../components/SceneCarousel.jsx";
@@ -6,6 +6,7 @@ import ImageGallery from "../components/ImageGallery.jsx";
 import LayerPanel from "../components/LayerPanel.jsx";
 import ObjectPropertiesPanel from "../components/ObjectPropertiesPanel.jsx";
 import { useAutoSave } from '../hooks/useAutoSave';
+import { useServerSync } from '../hooks/useServerSync';
 import client from "../api/client";
 import { getImageUrl } from '../utils/imageUtils';
 import { useUnity } from "../contexts/UnityContext.jsx";
@@ -22,23 +23,7 @@ const DUMMY = "11111111-1111-1111-1111-111111111111";
 const LEFT_TOOL_WIDTH = 100;
 const RIGHT_PANEL_WIDTH = 260;
 
-function useDebounced(fn, delay = 400) {
-  const t = useRef(null);
-  const fnRef = useRef(fn);
-  useEffect(() => {
-    fnRef.current = fn;
-  }, [fn]);
-  const debounced = React.useCallback(
-    (...args) => {
-      if (t.current) clearTimeout(t.current);
-      t.current = setTimeout(() => fnRef.current(...args), delay);
-    },
-    [delay]
-  );
-  return debounced;
-}
-
-export default function EditorPage({ projectId = DUMMY }) {
+export default function EditorPage({projectId = DUMMY}) {
   const {project_id} = useParams();
   const [pid, setPid] = useState(project_id);
   const [scenes, setScenes] = useState([]);
@@ -109,14 +94,14 @@ export default function EditorPage({ projectId = DUMMY }) {
   // 상태(const [originalCanvasState, setOriginalCanvasState],const [imageUrl, setImageUrl])들 대신, 아래 두 줄로 정보를 파생시킵니다.
   const imageUrl = getImageUrl(selectedScene?.s3_key) || "";
   const originalCanvasState = selectedScene ? selectedScene.originalCanvasState : null;
-  
+
   // 레이어 상태를 업데이트하는 함수
   const updateLayerState = React.useCallback(() => {
     if (stageRef.current && stageRef.current.layers) {
       try {
         const layers = stageRef.current.layers.getLayers() || [];
         const activeId = stageRef.current.layers.getActiveLayerId();
-        
+
         setLayersState(prevLayers => {
           const layersChanged = JSON.stringify(prevLayers.map(l => ({id: l.id, zIndex: l.zIndex, name: l.name, visible: l.visible, locked: l.locked}))) !== 
                                JSON.stringify(layers.map(l => ({id: l.id, zIndex: l.zIndex, name: l.name, visible: l.visible, locked: l.locked})));
@@ -128,7 +113,7 @@ export default function EditorPage({ projectId = DUMMY }) {
             return prevLayers;
           }
         });
-        
+
         setActiveLayerIdState(prevActiveId => {
           if (prevActiveId !== activeId) {
             console.log('Active layer changed:', prevActiveId, '->', activeId);
@@ -137,7 +122,7 @@ export default function EditorPage({ projectId = DUMMY }) {
             return prevActiveId;
           }
         });
-        
+
       } catch (error) {
         console.warn('Error updating layer state:', error);
       }
@@ -165,11 +150,11 @@ export default function EditorPage({ projectId = DUMMY }) {
       console.log(`Auto-saved scene ${data.sceneId} with ${data.objectCount} objects`);
       if (data.s3_key) {
         setScenes(prevScenes =>
-          prevScenes.map(scene =>
-            scene.id === data.sceneId
-              ? { ...scene, s3_key: data.s3_key }
-              : scene
-          )
+            prevScenes.map(scene =>
+                scene.id === data.sceneId
+                    ? {...scene, s3_key: data.s3_key}
+                    : scene
+            )
         );
         console.log(`Scene ${data.sceneId} s3_key updated to: ${data.s3_key}`);
       }
@@ -181,11 +166,11 @@ export default function EditorPage({ projectId = DUMMY }) {
       console.log('Server sync completed:', data);
       if (data.s3_key) {
         setScenes(prevScenes =>
-          prevScenes.map(scene =>
-            scene.id === data.sceneId
-              ? { ...scene, s3_key: data.s3_key }
-              : scene
-          )
+            prevScenes.map(scene =>
+                scene.id === data.sceneId
+                    ? {...scene, s3_key: data.s3_key}
+                    : scene
+            )
         );
         console.log(`Scene ${data.sceneId} s3_key updated after server sync: ${data.s3_key}`);
       }
@@ -195,6 +180,23 @@ export default function EditorPage({ projectId = DUMMY }) {
     },
     selectedScene
   });
+  const {syncToServer, uploadThumbnail} = useServerSync(pid, selectedId, stageRef);
+
+  const handleSaveThumbnail = useCallback(async () => {
+      if (!stageRef.current || !uploadThumbnail) return;
+
+      const thumbnailDataUrl = stageRef.current.toDataURL({
+          format: 'png',
+          quality: 0.8
+      });
+
+      try {
+          await uploadThumbnail(thumbnailDataUrl);
+      } catch (error) {
+          console.error("썸네일 저장 실패:", error);
+      }
+  }, [uploadThumbnail]);
+
 
   // 수동 저장 함수
   const handleManualSave = async () => {
@@ -216,6 +218,8 @@ export default function EditorPage({ projectId = DUMMY }) {
       const success = await syncToServer(canvasData, saveMode);
 
       if (success) {
+        await handleSaveThumbnail();
+        console.log(`수동 저장 시 썸네일 저장 완료: Scene ${selectedId}`);
         console.log(`Scene ${selectedId} manually saved with mode: ${saveMode}`);
         // 성공 알림 (선택사항)
         // alert('저장되었습니다.');
@@ -240,10 +244,13 @@ export default function EditorPage({ projectId = DUMMY }) {
 
   // 브라우저 이벤트 리스너
   useEffect(() => {
-    const handleBeforeUnload = (event) => {
+    const handleBeforeUnload = async (event) => {
       if (selectedId && stageRef.current) {
         console.log('Page unloading, syncing to server...');
-        syncToServerNow();
+        await Promise.all([
+          syncToServerNow(),
+          handleSaveThumbnail() // 썸네일 저장 함수 호출
+        ]);
       }
     };
 
@@ -270,7 +277,7 @@ export default function EditorPage({ projectId = DUMMY }) {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('popstate', handlePopState);
     };
-  }, [selectedId, syncToServerNow]);
+  }, [selectedId, syncToServerNow, handleSaveThumbnail]);
 
   // 색상이 변경될 때 즉시 캔버스에 반영
   useEffect(() => {
@@ -283,10 +290,10 @@ export default function EditorPage({ projectId = DUMMY }) {
   useEffect(() => {
     let timeoutId = null;
     let isCleanedUp = false;
-    
+
     const checkCanvasReady = () => {
       if (isCleanedUp) return;
-      
+
       if (stageRef.current && stageRef.current.layers) {
         setCanvasReady(true);
         // 초기 진입 시 도구를 클릭(선택) 모드로 강제 설정
@@ -294,9 +301,10 @@ export default function EditorPage({ projectId = DUMMY }) {
           if (stageRef.current.setDrawingMode) {
             stageRef.current.setDrawingMode('select');
           }
-        } catch (_) {}
+        } catch (_) {
+        }
         updateLayerState();
-        
+
         // 캔버스 선택 이벤트 리스너 추가
         const canvas = stageRef.current;
         const handleSelectionChanged = () => {
@@ -307,11 +315,11 @@ export default function EditorPage({ projectId = DUMMY }) {
             setSelectedObjectLayerId(null);
           }
         };
-        
+
         canvas.on('selection:created', handleSelectionChanged);
         canvas.on('selection:updated', handleSelectionChanged);
         canvas.on('selection:cleared', () => setSelectedObjectLayerId(null));
-        
+
         return () => {
           if (canvas) {
             canvas.off('selection:created', handleSelectionChanged);
@@ -323,9 +331,9 @@ export default function EditorPage({ projectId = DUMMY }) {
         timeoutId = setTimeout(checkCanvasReady, 100);
       }
     };
-    
+
     const cleanup = checkCanvasReady();
-    
+
     return () => {
       isCleanedUp = true;
       if (timeoutId) clearTimeout(timeoutId);
@@ -387,6 +395,7 @@ export default function EditorPage({ projectId = DUMMY }) {
               ...s,
               name: s.name || `Scene ${s.scene_num ?? i + 1}`,
               imageUrl: getImageUrl(s.s3_key),
+              preview: `/thumbnails/${s.id}.png`,
             }))
         );
         if (list[0]) setSelectedId(list[0].id);
@@ -468,8 +477,8 @@ export default function EditorPage({ projectId = DUMMY }) {
       const projectIdReady = await ensureProjectId();
       console.log("확인된 Project ID:", projectIdReady);
       const numericSceneNums = (scenes || [])
-        .map((s) => s?.scene_num)
-        .filter((n) => typeof n === "number" && !Number.isNaN(n));
+          .map((s) => s?.scene_num)
+          .filter((n) => typeof n === "number" && !Number.isNaN(n));
       const maxSceneNum = numericSceneNums.length ? Math.max(...numericSceneNums) : 0;
       const scene_num = Math.max(maxSceneNum, scenes.length) + 1;
       console.log("확인된 scene_num:", scene_num);
@@ -515,6 +524,12 @@ export default function EditorPage({ projectId = DUMMY }) {
   // 선택
   const handleSelect = async (id) => {
     if (id === "__ADD__") return;
+
+    if (selectedId && selectedId !== id) {
+      // 썸네일 저장 함수를 호출합니다. (async/await 사용)
+      await handleSaveThumbnail();
+      console.log(`썸네일 저장 완료: Scene ${selectedId}`);
+    }
 
     // 현재 씬이 있고, 다른 씬을 선택하는 경우
     if (selectedId && selectedId !== id && stageRef.current && pid) {
@@ -573,7 +588,7 @@ export default function EditorPage({ projectId = DUMMY }) {
     return scenes.map((s, idx) => {
       const n = (s?.name || "").trim();
       const isDefault = /^Scene\s+\d+$/i.test(n) || n === "";
-      return isDefault ? { ...s, name: `Scene ${idx + 1}` } : s;
+      return isDefault ? {...s, name: `Scene ${idx + 1}`} : s;
     });
   }, [scenes]);
 
@@ -631,8 +646,8 @@ export default function EditorPage({ projectId = DUMMY }) {
         fd.append("image", file);
 
         const resp = await client.post(
-          `/projects/${pid}/scenes/${selectedId}/processed?target_dots=${targetDots}`,
-          fd
+            `/projects/${pid}/scenes/${selectedId}/processed?target_dots=${targetDots}`,
+            fd
         );
         finalUrl = getImageUrl(resp.data.output_url);
         newS3Key = resp.data.s3_key;
@@ -641,12 +656,12 @@ export default function EditorPage({ projectId = DUMMY }) {
         console.log("기존 원본을 사용하여 재변환을 요청합니다.");
         const rgbColor = hexToRgb(drawingColor);
         const resp = await client.post(
-          `/projects/${pid}/scenes/${selectedId}/processed?target_dots=${targetDots}`,
-          {
-            color_r: rgbColor.r,
-            color_g: rgbColor.g,
-            color_b: rgbColor.b,
-          }
+            `/projects/${pid}/scenes/${selectedId}/processed?target_dots=${targetDots}`,
+            {
+              color_r: rgbColor.r,
+              color_g: rgbColor.g,
+              color_b: rgbColor.b,
+            }
         );
         finalUrl = getImageUrl(resp.data.output_url);
       }
@@ -664,26 +679,26 @@ export default function EditorPage({ projectId = DUMMY }) {
         }
 
         setScenes(prevScenes =>
-          prevScenes.map(scene => {
-            if (scene.id === selectedId) {
-              const updatedScene = {
-                ...scene,
-                // display_url: finalUrl,
-              };
-              if (newS3Key) {
-                updatedScene.s3_key = newS3Key;
+            prevScenes.map(scene => {
+              if (scene.id === selectedId) {
+                const updatedScene = {
+                  ...scene,
+                  // display_url: finalUrl,
+                };
+                if (newS3Key) {
+                  updatedScene.s3_key = newS3Key;
+                }
+                return updatedScene;
               }
-              return updatedScene;
-            }
-            return scene;
-          })
+              return scene;
+            })
         );
 
         setTimeout(() => {
           if (stageRef.current && stageRef.current.loadFabricJsonNative) {
             fetch(finalUrl)
-              .then(response => console.log("수동 fetch 결과:", response.status))
-              .catch(err => console.error("수동 fetch 실패:", err));
+                .then(response => console.log("수동 fetch 결과:", response.status))
+                .catch(err => console.error("수동 fetch 실패:", err));
 
             // 캔버스에 이미지 로드
             stageRef.current.loadFabricJsonNative(finalUrl);
@@ -739,38 +754,39 @@ export default function EditorPage({ projectId = DUMMY }) {
   // 캔버스 핸들러 함수들
 // EditorPage.jsx - handleModeChange 함수 수정 (기존 함수를 찾아서 수정)
   const handleModeChange = React.useCallback(
-    (mode) => {
-      // 팬 모드 처리
-      if (mode === 'pan') {
-        const canvas = stageRef.current;
-        if (canvas && typeof canvas.enterPanMode === 'function') {
-          canvas.enterPanMode();
-        }
-        setIsPanMode(true);
-        setDrawingMode('pan');
-        return;
-      }
-
-      // 다른 모드 처리 (기존 로직)
-      try {
-        const canvas = stageRef.current;
-        const panActive = isPanMode || (canvas && typeof canvas.getPanMode === 'function' && canvas.getPanMode());
-        if (panActive && canvas && typeof canvas.exitPanMode === 'function') {
-          canvas.exitPanMode();
-        }
-      } catch (e) {}
-      setIsPanMode(false);
-      setDrawingMode(mode);
-      if (stageRef.current && stageRef.current.setDrawingMode) {
-        stageRef.current.setDrawingMode(mode);
-        setTimeout(() => {
-          if (stageRef.current && stageRef.current.setDrawingColor) {
-            stageRef.current.setDrawingColor(drawingColor);
+      (mode) => {
+        // 팬 모드 처리
+        if (mode === 'pan') {
+          const canvas = stageRef.current;
+          if (canvas && typeof canvas.enterPanMode === 'function') {
+            canvas.enterPanMode();
           }
-        }, 20);
-      }
-    },
-    [drawingColor, isPanMode]
+          setIsPanMode(true);
+          setDrawingMode('pan');
+          return;
+        }
+
+        // 다른 모드 처리 (기존 로직)
+        try {
+          const canvas = stageRef.current;
+          const panActive = isPanMode || (canvas && typeof canvas.getPanMode === 'function' && canvas.getPanMode());
+          if (panActive && canvas && typeof canvas.exitPanMode === 'function') {
+            canvas.exitPanMode();
+          }
+        } catch (e) {
+        }
+        setIsPanMode(false);
+        setDrawingMode(mode);
+        if (stageRef.current && stageRef.current.setDrawingMode) {
+          stageRef.current.setDrawingMode(mode);
+          setTimeout(() => {
+            if (stageRef.current && stageRef.current.setDrawingColor) {
+              stageRef.current.setDrawingColor(drawingColor);
+            }
+          }, 20);
+        }
+      },
+      [drawingColor, isPanMode]
   );
 
   // 키보드 단축키 추가
@@ -778,9 +794,9 @@ export default function EditorPage({ projectId = DUMMY }) {
     const handler = (e) => {
       const target = e.target;
       const isTyping = target &&
-        (target.tagName === "INPUT" ||
-         target.tagName === "TEXTAREA" ||
-         target.isContentEditable);
+          (target.tagName === "INPUT" ||
+              target.tagName === "TEXTAREA" ||
+              target.isContentEditable);
       if (isTyping) return;
 
       const key = e.key?.toLowerCase();
@@ -797,42 +813,42 @@ export default function EditorPage({ projectId = DUMMY }) {
     return () => window.removeEventListener("keydown", handler);
   }, [handleModeChange]);
 
-const handleClearAll = React.useCallback(async () => {
- if (stageRef.current && stageRef.current.clear) {
-   if (
-       confirm(
-           "캔버스의 모든 내용을 지우시겠습니까? 이 작업은 되돌릴 수 없습니다."
-       )
-   ) {
-     try {
-       // 1. 캔버스 초기화
-       stageRef.current.clear();
-       console.log("캔버스가 초기화되었습니다");
+  const handleClearAll = React.useCallback(async () => {
+    if (stageRef.current && stageRef.current.clear) {
+      if (
+          confirm(
+              "캔버스의 모든 내용을 지우시겠습니까? 이 작업은 되돌릴 수 없습니다."
+          )
+      ) {
+        try {
+          // 1. 캔버스 초기화
+          stageRef.current.clear();
+          console.log("캔버스가 초기화되었습니다");
 
-       // 2. 서버에 씬 초기화 요청
-       const response = await client.patch(`/projects/${pid}/scenes/${selectedId}`, {
-         status: 'reset'
-       });
+          // 2. 서버에 씬 초기화 요청
+          const response = await client.patch(`/projects/${pid}/scenes/${selectedId}`, {
+            status: 'reset'
+          });
 
-       if (stageRef.current?.changeSaveMode) {
-          stageRef.current.changeSaveMode('originals');
-          console.log(stageRef.current.changeSaveMode);
+          if (stageRef.current?.changeSaveMode) {
+            stageRef.current.changeSaveMode('originals');
+            console.log(stageRef.current.changeSaveMode);
+          }
+
+          console.log("서버 씬 초기화 완료:", response.data);
+          window.location.reload();
+
+          // 3. 성공 메시지 (선택사항)
+          // alert("씬이 완전히 초기화되었습니다.");
+
+        } catch (error) {
+          console.error("씬 초기화 중 오류 발생:", error);
+          // 에러 처리 - 사용자에게 알림
+          alert("씬 초기화 중 오류가 발생했습니다. 다시 시도해주세요.");
         }
-
-       console.log("서버 씬 초기화 완료:", response.data);
-       window.location.reload();
-
-       // 3. 성공 메시지 (선택사항)
-       // alert("씬이 완전히 초기화되었습니다.");
-
-     } catch (error) {
-       console.error("씬 초기화 중 오류 발생:", error);
-       // 에러 처리 - 사용자에게 알림
-       alert("씬 초기화 중 오류가 발생했습니다. 다시 시도해주세요.");
-     }
-   }
- }
-}, [client, pid, selectedId]); // client, projectId, sceneId를 dependency에 추가
+      }
+    }
+  }, [client, pid, selectedId]); // client, projectId, sceneId를 dependency에 추가
 
   const handleColorChange = React.useCallback((color) => {
     setDrawingColor(color);
@@ -859,12 +875,12 @@ const handleClearAll = React.useCallback(async () => {
       if (!obj) return;
       // If path/line or non-fillable but has stroke, apply to stroke
       if (obj.type === "path" || obj.type === "line" || (!obj.fill && ("stroke" in obj))) {
-        obj.set({ stroke: hex });
+        obj.set({stroke: hex});
         return;
       }
       // Otherwise, apply to fill for fillable shapes (dots/circles etc.)
       if ("fill" in obj) {
-        obj.set({ fill: hex, originalFill: hex });
+        obj.set({fill: hex, originalFill: hex});
       }
     };
 
@@ -875,21 +891,21 @@ const handleClearAll = React.useCallback(async () => {
     }
 
     canvas.renderAll && canvas.renderAll();
-    setSelectedObject((prev) => (prev ? { ...prev, fill: hex, stroke: hex } : prev));
+    setSelectedObject((prev) => (prev ? {...prev, fill: hex, stroke: hex} : prev));
   }, []);
 
   // 레이어 관련 핸들러들
   const handleLayerSelect = React.useCallback((layerId) => {
     console.log('EditorPage handleLayerSelect called:', layerId);
-    
+
     if (stageRef.current && stageRef.current.layers && stageRef.current.layers.setActiveLayer) {
       try {
         console.log('Calling setActiveLayer with:', layerId);
         stageRef.current.layers.setActiveLayer(layerId);
         console.log('setActiveLayer called, now calling updateLayerState');
-        
+
         updateLayerState();
-        
+
         setTimeout(() => {
           console.log('Delayed updateLayerState call');
           updateLayerState();
@@ -908,19 +924,19 @@ const handleClearAll = React.useCallback(async () => {
       const currentLayers = stageRef.current.layers.getLayers() || [];
       const drawingLayers = currentLayers.filter(layer => layer.type === 'drawing');
       let layerNumber = drawingLayers.length + 1;
-      
+
       while (currentLayers.some(layer => layer.name === `레이어 ${layerNumber}`)) {
         layerNumber++;
       }
-      
+
       const defaultName = `레이어 ${layerNumber}`;
       const layerName = prompt('새 레이어 이름을 입력하세요:', defaultName);
-      
+
       if (layerName !== null) {
         try {
-          const finalName = (layerName.trim() === '' || layerName.trim() === defaultName) 
-            ? null 
-            : layerName.trim();
+          const finalName = (layerName.trim() === '' || layerName.trim() === defaultName)
+              ? null
+              : layerName.trim();
           stageRef.current.layers.createLayer(finalName);
           console.log('Layer created successfully');
           setTimeout(updateLayerState, 10);
@@ -1063,84 +1079,84 @@ const handleClearAll = React.useCallback(async () => {
         >
           <div style={{height: "100%", overflowY: "auto", padding: 16}}>
 
-          <div style={{ position: "relative", display: "inline-block", marginBottom: 12 }}>
-            <button
-              ref={toolButtonRef}
-              onClick={() => setToolSelectionOpen(prev => !prev)}
-              title="도구 선택"
-              aria-label="도구 선택"
-              style={{
-                border: `2px solid ${isSelectOrPan ? '#007bff' : '#e0e0e0'}`,
-                padding: "8px 16px",
-                borderRadius: 8,
-                cursor: "pointer",
-                fontSize: 16,
-                transition: "all 0.2s ease",
-                backgroundColor: isSelectOrPan ? '#007bff' : '#ffffff',
-                color: isSelectOrPan ? 'white' : '#333333',
-                boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-              }}
-            >
-              {isPanMode ? <IoHandRightOutline /> : <LuMousePointer />}
-            </button>
-            <PortalPopover
-              anchorRef={toolButtonRef}
-              open={isToolSelectionOpen}
-              onClose={() => setToolSelectionOpen(false)}
-              placement="right"
-              align="start"
-              offset={8}
-              width={100}
-              padding={4}
-            >
-                <button
-                  onClick={() => {
-                    handleModeChange("select");
-                    setToolSelectionOpen(false);
-                  }}
-                  title="선택 도구 (V)"
-                  aria-label="선택 도구"
+            <div style={{position: "relative", display: "inline-block", marginBottom: 12}}>
+              <button
+                  ref={toolButtonRef}
+                  onClick={() => setToolSelectionOpen(prev => !prev)}
+                  title="도구 선택"
+                  aria-label="도구 선택"
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    padding: "8px 12px",
-                    border: "none",
-                    backgroundColor: drawingMode === 'select' && !isPanMode ? '#007bff' : 'transparent',
-                    color: drawingMode === 'select' && !isPanMode ? 'white' : '#333333',
-                    width: "100%",
-                    textAlign: "left",
-                    cursor: "pointer"
+                    border: `2px solid ${isSelectOrPan ? '#007bff' : '#e0e0e0'}`,
+                    padding: "8px 16px",
+                    borderRadius: 8,
+                    cursor: "pointer",
+                    fontSize: 16,
+                    transition: "all 0.2s ease",
+                    backgroundColor: isSelectOrPan ? '#007bff' : '#ffffff',
+                    color: isSelectOrPan ? 'white' : '#333333',
+                    boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
                   }}
+              >
+                {isPanMode ? <IoHandRightOutline/> : <LuMousePointer/>}
+              </button>
+              <PortalPopover
+                  anchorRef={toolButtonRef}
+                  open={isToolSelectionOpen}
+                  onClose={() => setToolSelectionOpen(false)}
+                  placement="right"
+                  align="start"
+                  offset={8}
+                  width={100}
+                  padding={4}
+              >
+                <button
+                    onClick={() => {
+                      handleModeChange("select");
+                      setToolSelectionOpen(false);
+                    }}
+                    title="선택 도구 (V)"
+                    aria-label="선택 도구"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "8px 12px",
+                      border: "none",
+                      backgroundColor: drawingMode === 'select' && !isPanMode ? '#007bff' : 'transparent',
+                      color: drawingMode === 'select' && !isPanMode ? 'white' : '#333333',
+                      width: "100%",
+                      textAlign: "left",
+                      cursor: "pointer"
+                    }}
                 >
-                  <LuMousePointer />
+                  <LuMousePointer/>
                   <span>선택</span>
                 </button>
                 <button
-                  onClick={() => {
-                    handleModeChange("pan");
-                    setToolSelectionOpen(false);
-                  }}
-                  title="이동 도구 (H)"
-                  aria-label="이동 도구"
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    padding: "8px 12px",
-                    border: "none",
-                    backgroundColor: isPanMode ? '#007bff' : 'transparent',
-                    color: isPanMode ? 'white' : '#333333',
-                    width: "100%",
-                    textAlign: "left",
-                    cursor: "pointer"
-                  }}
+                    onClick={() => {
+                      handleModeChange("pan");
+                      setToolSelectionOpen(false);
+                    }}
+                    title="이동 도구 (H)"
+                    aria-label="이동 도구"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "8px 12px",
+                      border: "none",
+                      backgroundColor: isPanMode ? '#007bff' : 'transparent',
+                      color: isPanMode ? 'white' : '#333333',
+                      width: "100%",
+                      textAlign: "left",
+                      cursor: "pointer"
+                    }}
                 >
-                  <IoHandRightOutline />
+                  <IoHandRightOutline/>
                   <span>이동</span>
                 </button>
-            </PortalPopover>
-          </div>
+              </PortalPopover>
+            </div>
             <EditorToolbar
                 pid={pid}
                 selectedId={selectedId}
@@ -1165,8 +1181,8 @@ const handleClearAll = React.useCallback(async () => {
                 stageRef={stageRef}
                 layout="sidebar"
                 onGalleryStateChange={setGalleryOpen}
-                isServerSyncing = {isServerSyncing}
-                handleManualSave = {handleManualSave}
+                isServerSyncing={isServerSyncing}
+                handleManualSave={handleManualSave}
             />
             <div style={{marginTop: "auto"}}>
               <button
@@ -1217,7 +1233,7 @@ const handleClearAll = React.useCallback(async () => {
               onChange={handleSceneChange}
               onPreviewChange={(dataUrl) => {
                 if (!dataUrl || !selectedId) return;
-                setScenes(prev => prev.map(s => s.id === selectedId ? { ...s, preview: dataUrl } : s));
+                setScenes(prev => prev.map(s => s.id === selectedId ? {...s, preview: dataUrl} : s));
               }}
               drawingMode={drawingMode}
               eraserSize={eraserSize}
@@ -1262,27 +1278,27 @@ const handleClearAll = React.useCallback(async () => {
           <div style={{height: "100%", overflowY: "auto", padding: 16}}>
             {/* 레이어 패널 */}
             {canvasReady ? (
-              <LayerPanel
-                layers={layersState}
-                activeLayerId={activeLayerIdState}
-                selectedObjectLayerId={selectedObjectLayerId}
-                onLayerSelect={handleLayerSelect}
-                onCreateLayer={handleCreateLayer}
-                onDeleteLayer={handleDeleteLayer}
-                onToggleVisibility={handleToggleVisibility}
-                onToggleLock={handleToggleLock}
-                onRenameLayer={handleRenameLayer}
-                onLayerReorder={handleLayerReorder}
-              />
+                <LayerPanel
+                    layers={layersState}
+                    activeLayerId={activeLayerIdState}
+                    selectedObjectLayerId={selectedObjectLayerId}
+                    onLayerSelect={handleLayerSelect}
+                    onCreateLayer={handleCreateLayer}
+                    onDeleteLayer={handleDeleteLayer}
+                    onToggleVisibility={handleToggleVisibility}
+                    onToggleLock={handleToggleLock}
+                    onRenameLayer={handleRenameLayer}
+                    onLayerReorder={handleLayerReorder}
+                />
             ) : (
-              <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
-                캔버스 준비 중...
-              </div>
+                <div style={{padding: '20px', textAlign: 'center', color: '#666'}}>
+                  캔버스 준비 중...
+                </div>
             )}
-            
+
             {/* 구분선 */}
-            <div style={{ margin: '16px 0', borderTop: '1px solid #eee' }} />
-            
+            <div style={{margin: '16px 0', borderTop: '1px solid #eee'}}/>
+
             {/* 객체 속성 패널 */}
             <ObjectPropertiesPanel
                 selection={selectedObject}
