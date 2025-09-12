@@ -404,9 +404,26 @@ export default function EditorPage({ projectId = DUMMY }) {
               ...s,
               name: s.name || `Scene ${s.scene_num ?? i + 1}`,
               imageUrl: getImageUrl(s.s3_key),
+              // 변환 상태 추론: s3_key가 'processed'로 시작하면 변환됨
+              saveMode: s.s3_key && s.s3_key.startsWith('processed') ? 'processed' : 'originals',
+              isTransformed: s.s3_key && s.s3_key.startsWith('processed'),
             }))
         );
-        if (list[0]) setSelectedId(list[0].id);
+        if (list[0]) {
+          setSelectedId(list[0].id);
+          
+          // 첫 번째 씬의 변환 상태에 맞는 도구로 설정
+          setTimeout(() => {
+            const firstScene = list[0];
+            const isFirstSceneTransformed = firstScene.s3_key && firstScene.s3_key.startsWith('processed');
+            
+            if (isFirstSceneTransformed) {
+              handleModeChange('brush');
+            } else {
+              handleModeChange('draw');
+            }
+          }, 100);
+        }
       } catch (e) {
         console.error(e);
       }
@@ -432,7 +449,16 @@ export default function EditorPage({ projectId = DUMMY }) {
           );
           const detail = data.scene || {};
           setScenes((prev) =>
-              prev.map((s) => (s.id === selectedId ? {...s, ...detail} : s))
+              prev.map((s) => {
+                if (s.id === selectedId) {
+                  const updated = {...s, ...detail};
+                  // 변환 상태 재계산
+                  updated.saveMode = updated.s3_key && updated.s3_key.startsWith('processed') ? 'processed' : 'originals';
+                  updated.isTransformed = updated.s3_key && updated.s3_key.startsWith('processed');
+                  return updated;
+                }
+                return s;
+              })
           );
         } catch (e) {
           console.error(e);
@@ -1350,22 +1376,51 @@ const handleClearAll = React.useCallback(async () => {
                 onChangeFill={handleSelectedFillChange}
             />
 
-            {/* 구분선 */}
-            <div style={{ margin: '16px 0', borderTop: '1px solid #eee' }} />
+            {/* 미리보기 패널 - 변환 전에만 표시 */}
+            {!isSceneTransformed && (
+              <>
+                {/* 구분선 */}
+                <div style={{ margin: '16px 0', borderTop: '1px solid #eee' }} />
 
-            {/* 미리보기 패널 */}
-            <PreviewPanel
-                ref={previewPanelRef}
-                projectId={pid}
-                sceneId={selectedId}
-                stageRef={stageRef}
-                targetDots={targetDots}
-                drawingColor={drawingColor}
-                onTransformComplete={handleTransform}
-                processing={processing}
-                enabled={true}
-                layersState={layersState}
-            />
+                {/* 미리보기 패널 */}
+                <PreviewPanel
+                    ref={previewPanelRef}
+                    projectId={pid}
+                    sceneId={selectedId}
+                    stageRef={stageRef}
+                    targetDots={targetDots}
+                    drawingColor={drawingColor}
+                    onTransformComplete={handleTransform}
+                    processing={processing}
+                    enabled={true}
+                    layersState={layersState}
+                />
+              </>
+            )}
+            
+            {/* 변환 완료 상태 표시 */}
+            {isSceneTransformed && (
+              <>
+                {/* 구분선 */}
+                <div style={{ margin: '16px 0', borderTop: '1px solid #eee' }} />
+                
+                <div style={{
+                  padding: "20px",
+                  textAlign: "center",
+                  border: "1px solid #e9ecef",
+                  borderRadius: "8px",
+                  backgroundColor: "#f8f9fa",
+                  color: "#6c757d"
+                }}>
+                  <div style={{ fontSize: "16px", fontWeight: "600", marginBottom: "8px" }}>
+                    ✅ 변환 완료
+                  </div>
+                  <div style={{ fontSize: "14px" }}>
+                    브러쉬 도구로 추가 편집이 가능합니다
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </aside>
 
