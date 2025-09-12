@@ -382,7 +382,7 @@ const PreviewPanel = React.forwardRef(({
     try {
       // 기존 변환 로직과 동일하게 실행
       if (onTransformComplete) {
-        await onTransformComplete();
+        await onTransformComplete(sceneId);
       }
     } catch (err) {
       console.error('Transform confirmation error:', err);
