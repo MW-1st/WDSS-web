@@ -253,16 +253,18 @@ async def export_project_to_json(
 
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     out_name = f"{project_id}_{ts}.json"
-    out_path = os.path.join(SVG_JSON_DIR, out_name)
+    user_dir = os.path.join(SVG_JSON_DIR, str(user.id))
+    os.makedirs(user_dir, exist_ok=True)
+    out_path = os.path.join(user_dir, out_name)
 
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(project_json, f, ensure_ascii=False, indent=2)
 
     # Unity로 전송
-    await manager.broadcast(json.dumps(project_json))
+    await manager.send_to_user(str(user.id), json.dumps(project_json))
 
     return {
-        "json_url": f"/svg-json/{out_name}",
+        "json_url": f"/svg-json/{user.id}/{out_name}",
         "unity_sent": True,
         "scenes_processed": len(all_scenes_data),
         "total_scenes": len(scenes),

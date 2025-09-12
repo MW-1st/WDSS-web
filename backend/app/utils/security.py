@@ -56,3 +56,27 @@ def decode_email_verification_token(token: str) -> str:
     if not sub:
         raise jwt.InvalidTokenError("Token missing subject")
     return str(sub)
+
+
+def create_ws_token(user_id: str, expires_delta: Optional[timedelta] = None) -> str:
+    """Create a short-lived token dedicated to WebSocket auth for Unity clients."""
+    if expires_delta is None:
+        expires_delta = config.get_ws_token_expiry()
+    expire = datetime.now(tz=timezone.utc) + expires_delta
+    to_encode = {
+        "exp": expire,
+        "sub": str(user_id),
+        "purpose": "ws",
+    }
+    return jwt.encode(to_encode, config.SECRET_KEY, algorithm=config.ALGORITHM)
+
+
+def decode_ws_token(token: str) -> str:
+    """Validate WS token and return user_id if valid and purpose matches."""
+    payload = decode_token(token)
+    if payload.get("purpose") != "ws":
+        raise jwt.InvalidTokenError("Invalid token purpose for websocket")
+    sub = payload.get("sub")
+    if not sub:
+        raise jwt.InvalidTokenError("Token missing subject")
+    return str(sub)

@@ -20,6 +20,12 @@ def get_access_token_expiry() -> timedelta:
 # Email verification token expiry (hours)
 EMAIL_VERIFY_EXPIRE_HOURS = int(os.getenv("EMAIL_VERIFY_EXPIRE_HOURS", "24"))
 
+# WebSocket short-lived token expiry (minutes)
+WS_TOKEN_EXPIRE_MINUTES = int(os.getenv("WS_TOKEN_EXPIRE_MINUTES", "5"))
+
+def get_ws_token_expiry() -> timedelta:
+    return timedelta(minutes=WS_TOKEN_EXPIRE_MINUTES)
+
 # Service URLs
 BACKEND_BASE_URL = os.getenv("BACKEND_BASE_URL", "http://localhost:8000")
 

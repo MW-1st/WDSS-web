@@ -234,6 +234,7 @@ async def process_uploaded_image(
 @router.post("/svg-to-json")
 async def svg_to_json_endpoint(
     file: UploadFile = File(...),
+    current_user: UserResponse = Depends(get_current_user),
     show_name: str = "svg-import",
     scene_number: int = 1,
     scene_holder: int = 0,
@@ -295,15 +296,17 @@ async def svg_to_json_endpoint(
         base = os.path.splitext(os.path.basename(file.filename or "import.svg"))[0]
         safe_base = base or "svg"
         out_name = f"{safe_base}_{ts}_{uuid.uuid4().hex[:6]}.json"
-        out_path = os.path.join(SVG_JSON_DIR, out_name)
+        user_dir = os.path.join(SVG_JSON_DIR, str(current_user.id))
+        os.makedirs(user_dir, exist_ok=True)
+        out_path = os.path.join(user_dir, out_name)
 
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
 
         # Unity로 JSON 데이터 전송
-        await manager.broadcast(json.dumps(data))
+        await manager.send_to_user(str(current_user.id), json.dumps(data))
 
-        return {"json_url": f"/svg-json/{out_name}", "unity_sent": True}
+        return {"json_url": f"/svg-json/{current_user.id}/{out_name}", "unity_sent": True}
     finally:
         try:
             os.remove(temp_path)
