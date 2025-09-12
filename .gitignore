@@ -165,4 +165,5 @@ backend/uploads/
 backend/processed/
 backend/originals/
 backend/svg_json/
-backend/temp
+backend/temp/
+backend/thumbnails/
