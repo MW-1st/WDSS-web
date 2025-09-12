@@ -19,7 +19,7 @@ from app.schemas import (
     ScenePatch,
 )
 
-from app.config import ORIGINALS_DIR, PROCESSED_DIR, TMP_DIR
+from app.config import ORIGINALS_DIR, PROCESSED_DIR, TMP_DIR, THUMBNAILS_DIR
 from app.schemas import TransformOptions
 from app.services.image_service import process_image
 
@@ -567,6 +567,52 @@ async def save_dot_canvas(
         raise HTTPException(
             status_code=500, detail=f"Failed to save dot canvas data: {e}"
         )
+
+
+@router.post("/{scene_id}/thumbnail")
+async def upload_scene_thumbnail(
+    project_id: uuid.UUID,
+    scene_id: uuid.UUID,
+    thumbnail: UploadFile = File(...),
+    user: UserResponse = Depends(get_current_user),
+):
+    """씬 썸네일 이미지 업로드"""
+
+    # 1. 씬 존재 여부 확인
+    async with get_conn() as conn:
+        scene_exists = await conn.fetchrow(
+            """
+            SELECT s.id
+            FROM project_scenes ps
+                     JOIN scene s ON ps.scene_id = s.id
+            WHERE s.id = $1
+              AND ps.project_id = $2
+            """,
+            scene_id,
+            project_id,
+        )
+        if not scene_exists:
+            raise HTTPException(status_code=404, detail="Scene not found")
+
+    # 썸네일 저장 경로 정의
+    thumbnail_filename = f"{scene_id}.png"
+    thumbnail_save_path = os.path.join(THUMBNAILS_DIR, thumbnail_filename)
+
+    try:
+        # 2. 썸네일 파일 저장
+        async with aiofiles.open(thumbnail_save_path, "wb") as f:
+            content = await thumbnail.read()
+            await f.write(content)
+
+        return {
+            "success": True,
+            "message": "Thumbnail uploaded successfully",
+            "thumbnail_url": f"thumbnails/{thumbnail_filename}",
+        }
+
+    except Exception as e:
+        # 파일 저장 또는 DB 업데이트 중 오류 발생 시
+        raise HTTPException(status_code=500, detail=f"Failed to upload thumbnail: {e}")
 
 
 def get_display_url(original_s3_key: str) -> str:

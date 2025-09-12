@@ -15,7 +15,6 @@ import {
   Rect,
 } from "fabric";
 import useLayers from "../hooks/useLayers";
-import { useAutoSave } from '../hooks/useAutoSave';
 import * as fabricLayerUtils from "../utils/fabricLayerUtils";
 import {loadCanvasFromIndexedDB, saveCanvasToIndexedDB} from "../utils/indexedDBUtils.js";
 

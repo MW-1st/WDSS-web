@@ -301,6 +301,50 @@ export const useServerSync = (projectId, sceneId, fabricCanvas, options = {}) =>
     console.log(`Server sync ${enabled ? 'enabled' : 'disabled'} for scene ${sceneId}`);
   }, [sceneId, stopPeriodicSync]);
 
+  // 썸네일 저장
+  const uploadThumbnail = useCallback(async (dataUrl) => {
+    if (!projectId || !sceneId) {
+      throw new Error('Project ID와 Scene ID가 필요합니다.');
+    }
+    if (!dataUrl) {
+      console.warn('업로드할 썸네일 데이터가 없습니다.');
+      return null;
+    }
+
+    try {
+      // 1. dataUrl을 Blob 객체로 변환합니다.
+      const response = await fetch(dataUrl);
+      const blob = await response.blob();
+
+      // 2. FormData 객체를 생성하여 이미지 파일을 담습니다.
+      const formData = new FormData();
+      // 'thumbnail'은 서버에서 파일을 받을 때 사용할 키(key) 이름입니다.
+      // 'thumbnail.png'는 서버에 저장될 파일 이름입니다.
+      formData.append('thumbnail', blob, 'thumbnail.png');
+
+      // 3. 서버에 POST 요청을 보냅니다.
+      // Axios는 formData를 전송할 때 자동으로 Content-Type을 multipart/form-data로 설정합니다.
+      const res = await client.post(
+        `/projects/${projectId}/scenes/${sceneId}/thumbnail`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      );
+
+      console.log('✅ 썸네일 업로드 성공:', res.data);
+      // 서버 응답에서 썸네일 URL 등을 반환할 수 있습니다.
+      return res.data;
+
+    } catch (error) {
+      console.error('❌ 썸네일 업로드 실패:', error);
+      const errorMessage = error.response?.data?.detail || error.message || 'Unknown error';
+      throw new Error(errorMessage);
+    }
+  }, [projectId, sceneId]);
+
   // 컴포넌트 언마운트 시 인터벌 정리
   useEffect(() => {
     return () => {
@@ -323,6 +367,7 @@ export const useServerSync = (projectId, sceneId, fabricCanvas, options = {}) =>
     saveDotCanvasToServer,
     loadDotCanvasFromServer,
     convertToDotsOnServer,
+    uploadThumbnail,
 
     // 동기화 함수들
     syncToServer,

@@ -61,6 +61,12 @@ app.mount(
     name="svg_json",
 )
 
+app.mount(
+    "/thumbnails",
+    StaticFiles(directory="thumbnails"),
+    name="thumbnails",
+)
+
 
 @app.on_event("startup")
 async def startup():
