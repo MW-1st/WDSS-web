@@ -7,13 +7,7 @@ import {
 } from "react";
 import { MdDelete } from "react-icons/md";
 // fabric.js 최적화: 필요한 부분만 import
-import {
-  Canvas as FabricCanvas,
-  Circle,
-  FabricImage,
-  PencilBrush,
-  Rect,
-} from "fabric";
+import * as fabric from 'fabric';
 import useLayers from "../hooks/useLayers";
 import * as fabricLayerUtils from "../utils/fabricLayerUtils";
 import {loadCanvasFromIndexedDB, saveCanvasToIndexedDB} from "../utils/indexedDBUtils.js";
@@ -124,7 +118,7 @@ export default function Canvas({
     if (!canvasRef.current) return;
 
     // 최적화된 fabric.js 캔버스 초기화
-    const canvas = new FabricCanvas(canvasRef.current, {
+    const canvas = new fabric.Canvas(canvasRef.current, {
       width: width,
       height: height,
       backgroundColor: "#fafafa",
@@ -136,7 +130,7 @@ export default function Canvas({
     });
 
     // 그리기 영역을 캔버스 경계로 제한
-    const clipPath = new Rect({
+    const clipPath = new fabric.Rect({
       left: 0,
       top: 0,
       width: width,
@@ -147,7 +141,7 @@ export default function Canvas({
 
     // 그리기 모드 설정 (성능 최적화)
     canvas.isDrawingMode = true;
-    const brush = new PencilBrush(canvas);
+    const brush = new fabric.PencilBrush(canvas);
     brush.width = 2; // 원래 크기로 복원
     brush.color = externalDrawingColor; // 외부에서 전달받은 색상 사용
     brush.decimate = 2; // 브러시 포인트 간소화
@@ -198,7 +192,7 @@ export default function Canvas({
 
     // 캔버스 경계 표시 (실제 변환될 영역)
     const addCanvasBoundary = () => {
-      const boundary = new Rect({
+      const boundary = new fabric.Rect({
         left: 0,
         top: 0,
         width: width,
@@ -651,38 +645,91 @@ export default function Canvas({
       })();
     }
     // Fabric Canvas 로드 함수 (공통 로직 분리)
-    const loadFabricCanvasFromData = (fabricJsonData) => {
-      // 기존 객체들 제거
-      const existingObjects = canvas.getObjects()
+    // Replace the loadFabricCanvasFromData function with this advanced debugger.
+
+const loadFabricCanvasFromData = async (fabricJsonData) => { // 'async' 키워드 추가
+    const canvas = fabricCanvas.current;
+
+    if (!canvas) {return;}
+
+    if (!fabricJsonData || !fabricJsonData.objects || fabricJsonData.objects.length === 0) {
+        console.warn("렌더링할 객체가 없습니다.");
+        return;
+    }
+
+    // 1. 기존 객체들을 모두 지웁니다.
+    const existingObjects = canvas.getObjects()
         .filter(obj => obj.customType === "svgDot" || obj.customType === "jsonDot" || obj.type === "image");
       existingObjects.forEach(obj => canvas.remove(obj));
 
-      // Fabric.js 내장 메서드로 JSON 로드
-      canvas.loadFromJSON(fabricJsonData, () => {
-        // 로드 완료 후 customType 추가 및 이벤트 설정
-        canvas.getObjects().forEach(obj => {
-          if (obj.type === "circle") {
-            obj.set({
-              customType: "jsonDot",
-              selectable: false,
-              evented: true,
-              hoverCursor: 'crosshair',
-              moveCursor: 'crosshair'
-            });
+    const objectsToRender = fabricJsonData.objects;
+    const successfullyCreated = [];
 
-            // JSON 도트는 배경 레이어에 할당
-            const backgroundLayer = getLayer('background');
-            if (backgroundLayer) {
-              fabricLayerUtils.assignObjectToLayer(obj, backgroundLayer.id, backgroundLayer.name);
-            }
-          }
+    // for...of 루프를 사용하여 비동기 작업을 순차적으로 처리합니다.
+    for (const [i, objData] of objectsToRender.entries()) {
+    try {
+        // type이 없는 경우를 대비하고, 앞뒤 공백을 제거합니다.
+        const type = objData.type ? objData.type.trim().toLowerCase() : '';
+
+        if (type === 'circle') {
+            // --- Circle 타입 처리 ---
+            const newCircle = new fabric.Circle(objData);
+            successfullyCreated.push(newCircle);
+
+        } else if (type === 'path') {
+            // --- Path 타입 처리 ---
+            const newPath = new fabric.Path(objData.path, objData);
+            successfullyCreated.push(newPath);
+
+        } else if (type === 'image') {
+           const image = await new Promise((resolve, reject) => {
+                    const imgSrc = objData.src;
+
+                    if (!imgSrc) {
+                        return reject(new Error(`#${i} Image 객체에 'src' 속성이 없습니다.`));
+                    }
+
+                    // 1. 브라우저의 기본 Image 객체 생성
+                    const imgEl = new Image();
+                    imgEl.crossOrigin = 'anonymous'; // CORS 설정
+
+                    // 2. 이미지 로드 성공 시
+                    imgEl.onload = () => {
+                        // 3. 로드된 이미지(imgEl)를 사용하여 Fabric 이미지 객체 생성
+                        const fabricImage = new fabric.Image(imgEl, objData);
+                        resolve(fabricImage);
+                    };
+
+                    // 4. 이미지 로드 실패 시
+                    imgEl.onerror = () => {
+                        console.error(`[DEBUG] #${i} 이미지 로드 실패.`);
+                        reject(new Error(`#${i} 이미지 로드 실패: ${imgSrc}`));
+                    };
+
+                    // 5. 이미지 소스(src)를 설정하여 로드 시작
+                    imgEl.src = imgSrc;
+                });
+                successfullyCreated.push(image);
+
+        } else {
+             console.warn(`#${i} 객체는 정의되지 않은 '${type}' 타입 입니다. 건너뜁니다.`);
+        }
+
+    } catch (error) {
+        console.error(`객체 생성 실패: #${i} 객체에서 문제가 발생했습니다.`, {
+            problematicObjectData: objData,
+            errorDetails: error
         });
+        return;
+    }
+}
 
-        setCanvasRevision(c => c + 1);
-        canvas.renderAll();
-        postLoadActions();
-      });
-    };
+    canvas.renderOnAddRemove = false;
+    canvas.add(...successfullyCreated);
+    canvas.renderOnAddRemove = true;
+    canvas.renderAll();
+    postLoadActions();
+};
   }, [imageUrl,scene?.id]); // selectedId도 dependency에 추가
 
 
@@ -828,7 +875,7 @@ export default function Canvas({
       canvas.moveCursor = "crosshair";
       canvas.freeDrawingCursor = "crosshair";
 
-      const brush = new PencilBrush(canvas);
+      const brush = new fabric.PencilBrush(canvas);
       brush.width = 2; // 원래 크기로 복원
       brush.color = currentColor; // 현재 색상 사용
       brush.decimate = 2; // 브러시 포인트 간소화
@@ -922,7 +969,7 @@ export default function Canvas({
 
         // 변환된 도트와 같은 크기로 브러쉬 도트 생성 (고정 2px)
         const dotRadius = 2;
-        const newDot = new Circle({
+        const newDot = new fabric.Circle({
           left: pointer.x - dotRadius,
           top: pointer.y - dotRadius,
           radius: dotRadius,
@@ -1172,7 +1219,7 @@ export default function Canvas({
 
       // 픽셀 지우개용 브러시 설정 (배경색으로 칠하기)
       const backgroundColor = "#fafafa"; // 실제 캔버스 배경색 사용
-      const eraserBrush = new PencilBrush(canvas);
+      const eraserBrush = new fabric.PencilBrush(canvas);
       eraserBrush.width = eraserSize;
       eraserBrush.color = backgroundColor;
       canvas.freeDrawingBrush = eraserBrush;
@@ -1308,7 +1355,7 @@ export default function Canvas({
 
     const canvas = fabricCanvas.current;
 
-    FabricImage.fromURL(imageUrl, {
+    fabric.FabricImage.fromURL(imageUrl, {
       crossOrigin: "anonymous",
     })
       .then((img) => {
