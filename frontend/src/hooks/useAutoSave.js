@@ -158,11 +158,6 @@ export const useAutoSave = (projectId, sceneId, fabricCanvas, options = {}, scen
       try {
         console.log('🚀 Executing scheduled sync with mode:', saveMode);
         await syncToServer(canvasData, saveMode);
-        if (success) {
-          console.log('✅ Scheduled server sync completed with mode:', saveMode);
-        } else {
-          console.warn('⚠️ Scheduled server sync returned false');
-        }
       } catch (error) {
         console.error('❌ Scheduled server sync failed:', error);
       }
