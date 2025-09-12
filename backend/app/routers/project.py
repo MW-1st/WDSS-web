@@ -237,8 +237,8 @@ async def export_project_to_json(
         "format": (project["format"] or "dsj").strip(),
         "show": {
             "show_name": project["project_name"] or "Untitled Show",
-            "max_scene": int(project["max_scene"] or 1),
             "max_drone": int(project["max_drone"] or 1),  # DB의 max_scene 값 사용
+            "max_scene": int(project["max_scene"] or 1),
         },
         "constraints": {
             "max_speed": float(project["max_speed"] or 6.0),
