@@ -395,6 +395,7 @@ export default function EditorPage({projectId = DUMMY}) {
               ...s,
               name: s.name || `Scene ${s.scene_num ?? i + 1}`,
               imageUrl: getImageUrl(s.s3_key),
+              preview: `/thumbnails/${s.id}.png`,
             }))
         );
         if (list[0]) setSelectedId(list[0].id);

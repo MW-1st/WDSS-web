@@ -7,8 +7,6 @@ import "../styles/DashboardPage.css";
 import { CiMenuBurger } from "react-icons/ci";
 import { TiDelete } from "react-icons/ti";
 import ProjectSettingsModal from "../components/ProjectSettingsModal";
-import { getImageUrl } from "../utils/imageUtils";
-
 
 const PlusIcon = () => (
   <svg
@@ -111,8 +109,8 @@ export default function DashboardPage() {
             }
             if (!target) target = list[0];
 
-            const raw = target?.s3_key;
-            const url = getImageUrl(raw);
+            const sceneId = target?.id;
+            const url = sceneId ? `/thumbnails/${sceneId}.png` : null;
             return [p.id, url || null];
           } catch (e) {
             console.warn("Failed to load scenes for project", p.id, e?.response?.data || e?.message);
