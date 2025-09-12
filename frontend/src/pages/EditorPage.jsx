@@ -117,6 +117,12 @@ export default function EditorPage({ projectId = DUMMY }) {
       [scenes, selectedId]
   );
 
+  // 씬의 변환 상태 확인 (기본값: 변환 전)
+  const isSceneTransformed = useMemo(() => {
+    if (!selectedScene) return false;
+    return selectedScene.saveMode === 'processed' || selectedScene.isTransformed === true;
+  }, [selectedScene]);
+
   // 상태(const [originalCanvasState, setOriginalCanvasState],const [imageUrl, setImageUrl])들 대신, 아래 두 줄로 정보를 파생시킵니다.
   const imageUrl = getImageUrl(selectedScene?.s3_key) || "";
   const originalCanvasState = selectedScene ? selectedScene.originalCanvasState : null;
@@ -545,7 +551,19 @@ export default function EditorPage({ projectId = DUMMY }) {
     }
 
     setSelectedId(id);
-    handleModeChange('select'); // Reset mode to select
+    
+    // 씬 변경 후 해당 씬의 변환 상태에 맞는 도구로 자동 전환
+    const nextScene = scenes.find(s => s.id === id);
+    const nextSceneTransformed = nextScene?.saveMode === 'processed' || nextScene?.isTransformed === true;
+    
+    if (nextSceneTransformed) {
+      // 변환된 씬: 브러쉬 도구로 전환
+      handleModeChange('brush');
+    } else {
+      // 변환 전 씬: 펜 그리기 도구로 전환
+      handleModeChange('draw');
+    }
+    
     const items = [...scenes, {id: "__ADD__", isAdd: true}];
     const idx = items.findIndex(it => it.id === id);
     if (idx < start) setStart(idx);
@@ -679,6 +697,8 @@ export default function EditorPage({ projectId = DUMMY }) {
             if (scene.id === selectedId) {
               const updatedScene = {
                 ...scene,
+                saveMode: 'processed', // 변환 상태 업데이트
+                isTransformed: true, // 백업 필드
                 // display_url: finalUrl,
               };
               if (newS3Key) {
@@ -698,6 +718,13 @@ export default function EditorPage({ projectId = DUMMY }) {
 
             // 캔버스에 이미지 로드
             stageRef.current.loadFabricJsonNative(finalUrl);
+            
+            // 변환 완료 후 브러쉬 모드로 자동 전환
+            setTimeout(() => {
+              console.log('변환 완료: 브러쉬 모드로 자동 전환');
+              handleModeChange('brush');
+            }, 100);
+            
             // 이미지 로드 완료 후 useAutoSave를 통해 즉시 저장
             setTimeout(async () => {
               try {
@@ -746,6 +773,12 @@ export default function EditorPage({ projectId = DUMMY }) {
       b: 0
     };
   };
+
+  // 변환 상태에 따른 허용 도구 확인 (이제 통합된 그리기 도구로 인해 필요 없음)
+  const isToolAllowed = React.useCallback((mode) => {
+    // 모든 도구를 허용 (그리기 도구는 이미 통합되어 자동으로 전환됨)
+    return true;
+  }, [isSceneTransformed]);
 
   // 캔버스 핸들러 함수들
 // EditorPage.jsx - handleModeChange 함수 수정 (기존 함수를 찾아서 수정)
@@ -829,6 +862,20 @@ const handleClearAll = React.useCallback(async () => {
           stageRef.current.changeSaveMode('originals');
           console.log(stageRef.current.changeSaveMode);
         }
+
+        // 씬 상태를 초기화된 상태로 업데이트
+        setScenes(prevScenes =>
+          prevScenes.map(scene => {
+            if (scene.id === selectedId) {
+              return {
+                ...scene,
+                saveMode: 'originals', // 변환 상태를 원본으로 리셋
+                isTransformed: false, // 백업 필드
+              };
+            }
+            return scene;
+          })
+        );
 
        console.log("서버 씬 초기화 완료:", response.data);
        window.location.reload();
@@ -1178,6 +1225,8 @@ const handleClearAll = React.useCallback(async () => {
                 onGalleryStateChange={setGalleryOpen}
                 isServerSyncing = {isServerSyncing}
                 handleManualSave = {handleManualSave}
+                isSceneTransformed={isSceneTransformed}
+                isToolAllowed={isToolAllowed}
             />
             <div style={{marginTop: "auto"}}>
               <button

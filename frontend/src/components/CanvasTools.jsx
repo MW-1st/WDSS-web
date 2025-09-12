@@ -15,13 +15,14 @@ const CanvasTools = React.memo(function CanvasTools({
   onClearAll,
   onColorChange,
   onColorPreview,
+  isSceneTransformed = false, // 씬 변환 상태
+  isToolAllowed, // 도구 허용 여부 확인 함수
 }) {
   const [hovered, setHovered] = useState(null);
 
   const anchorRefs = {
-    draw: useRef(null),
+    drawTool: useRef(null),
     select: useRef(null),
-    brush: useRef(null),
     erase: useRef(null),
     pixelErase: useRef(null),
     clear: useRef(null),
@@ -31,20 +32,32 @@ const CanvasTools = React.memo(function CanvasTools({
   const [tooltipPos, setTooltipPos] = useState({ top: 0, left: 0 });
 
   const getTooltipText = (mode) => {
-    switch (mode) {
-      case "draw":
-        return "그리기(P): 자유곡선을 그립니다.";
-      // case "select":
-      //   return "선택(V): 객체 이동/크기 조절.";
-      case "brush":
-        return "브러시(B): 점을 찍습니다.";
-      case "erase":
-        return "지우개(E): 선과 점을 지웁니다.";
-      case "pixelErase":
-        return "픽셀 지우개: 배경을 칠합니다.";
-      default:
-        return "";
-    }
+    const baseText = (() => {
+      switch (mode) {
+        case "drawTool":
+          return isSceneTransformed ? 
+            "브러시(P): 점을 찍습니다." : 
+            "그리기(P): 자유곡선을 그립니다.";
+        case "erase":
+          return "지우개(E): 선과 점을 지웁니다.";
+        case "pixelErase":
+          return "픽셀 지우개: 배경을 칠합니다.";
+        default:
+          return "";
+      }
+    })();
+    
+    return baseText;
+  };
+
+  const handleDrawToolClick = () => {
+    // 씬의 변환 상태에 따라 자동으로 펜 또는 브러쉬 모드로 전환
+    const targetMode = isSceneTransformed ? 'brush' : 'draw';
+    onModeChange(targetMode);
+  };
+
+  const handleToolClick = (mode) => {
+    onModeChange(mode);
   };
 
   useEffect(() => {
@@ -80,11 +93,25 @@ const CanvasTools = React.memo(function CanvasTools({
     gap: "6px",
   };
 
-  const getButtonStyle = (mode) => ({
-    ...buttonStyle,
-    backgroundColor: drawingMode === mode ? "#007bff" : "#f8f9fa",
-    color: drawingMode === mode ? "white" : "black",
-  });
+  const getButtonStyle = (mode) => {
+    let isActive = false;
+    
+    if (mode === "drawTool") {
+      // 통합된 그리기 도구: draw 또는 brush 모드가 활성화되어 있으면 활성 상태
+      isActive = drawingMode === 'draw' || drawingMode === 'brush';
+    } else {
+      isActive = drawingMode === mode;
+    }
+    
+    return {
+      ...buttonStyle,
+      backgroundColor: isActive ? "#007bff" : "#f8f9fa",
+      color: isActive ? "white" : "black",
+      cursor: "pointer",
+      opacity: 1,
+      border: isActive ? "1px solid #007bff" : "1px solid #ccc",
+    };
+  };
 
   const clearButtonStyle = {
     ...buttonStyle,
@@ -139,47 +166,17 @@ const CanvasTools = React.memo(function CanvasTools({
         }}
       >
         <div
-          ref={anchorRefs.draw}
+          ref={anchorRefs.drawTool}
           style={{ position: "relative", display: "inline-flex", zIndex: 1000 }}
-          onMouseEnter={() => setHovered("draw")}
+          onMouseEnter={() => setHovered("drawTool")}
           onMouseLeave={() => setHovered(null)}
         >
           <button
-            onClick={() => onModeChange("draw")}
-            style={getButtonStyle("draw")}
-            aria-label="그리기"
+            onClick={handleDrawToolClick}
+            style={getButtonStyle("drawTool")}
+            aria-label={isSceneTransformed ? "브러시" : "그리기"}
           >
-            <FaPen />
-          </button>
-        </div>
-
-        <div
-          ref={anchorRefs.select}
-          style={{ position: "relative", display: "inline-flex", zIndex: 1000 }}
-          onMouseEnter={() => setHovered("select")}
-          onMouseLeave={() => setHovered(null)}
-        >
-          {/* <button
-            onClick={() => onModeChange("select")}
-            style={getButtonStyle("select")}
-            aria-label="선택"
-          >
-            <PiSelectionPlusBold />
-          </button> */}
-        </div>
-
-        <div
-          ref={anchorRefs.brush}
-          style={{ position: "relative", display: "inline-flex", zIndex: 1000 }}
-          onMouseEnter={() => setHovered("brush")}
-          onMouseLeave={() => setHovered(null)}
-        >
-          <button
-            onClick={() => onModeChange("brush")}
-            style={getButtonStyle("brush")}
-            aria-label="브러시"
-          >
-            <FaPaintBrush />
+            {isSceneTransformed ? <FaPaintBrush /> : <FaPen />}
           </button>
         </div>
 
@@ -190,7 +187,7 @@ const CanvasTools = React.memo(function CanvasTools({
           onMouseLeave={() => setHovered(null)}
         >
           <button
-            onClick={() => onModeChange("erase")}
+            onClick={() => handleToolClick("erase")}
             style={getButtonStyle("erase")}
             aria-label="지우개"
           >
@@ -205,7 +202,7 @@ const CanvasTools = React.memo(function CanvasTools({
           onMouseLeave={() => setHovered(null)}
         >
           <button
-            onClick={() => onModeChange("pixelErase")}
+            onClick={() => handleToolClick("pixelErase")}
             style={getButtonStyle("pixelErase")}
             aria-label="픽셀 지우개"
           >
