@@ -28,6 +28,8 @@ const Inner = ({
   showUnity,
   hideUnity,
   onGalleryStateChange, // 부모에서 상태 관리
+  isSceneTransformed, // 씬 변환 상태
+  isToolAllowed, // 도구 허용 여부 확인 함수
 }) => {
   // 🔸 로컬에서 열림여부를 갖지 않고, 부모에게 토글만 알림
   const [galleryHovered, setGalleryHovered] = React.useState(false);
@@ -73,13 +75,12 @@ const Inner = ({
       const key = e.key?.toLowerCase();
       if (key === "p") {
         e.preventDefault();
-        onModeChange && onModeChange("draw");
+        // 씬의 변환 상태에 따라 자동으로 펜 또는 브러쉬 모드로 전환
+        const targetMode = isSceneTransformed ? 'brush' : 'draw';
+        onModeChange && onModeChange(targetMode);
       } else if (key === "e") {
         e.preventDefault();
         onModeChange && onModeChange("erase");
-      } else if (key === "b") {
-        e.preventDefault();
-        onModeChange && onModeChange("brush");
       } else if (key === "v") {
         e.preventDefault();
         onModeChange && onModeChange("select");
@@ -87,7 +88,7 @@ const Inner = ({
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [onModeChange]);
+  }, [onModeChange, isSceneTransformed]);
 
   const Tooltip = () =>
     galleryHovered
@@ -152,6 +153,8 @@ const Inner = ({
           onColorChange={onColorChange}
           onColorPreview={onColorPreview}
           onClearAll={onClearAll}
+          isSceneTransformed={isSceneTransformed}
+          isToolAllowed={isToolAllowed}
         />
       </div>
 

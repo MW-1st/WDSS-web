@@ -5,6 +5,7 @@ import SceneCarousel from "../components/SceneCarousel.jsx";
 import ImageGallery from "../components/ImageGallery.jsx";
 import LayerPanel from "../components/LayerPanel.jsx";
 import ObjectPropertiesPanel from "../components/ObjectPropertiesPanel.jsx";
+import PreviewPanel from "../components/PreviewPanel.jsx";
 import { useAutoSave } from '../hooks/useAutoSave';
 import { useServerSync } from '../hooks/useServerSync';
 import client from "../api/client";
@@ -21,7 +22,7 @@ const VISIBLE = 4;
 const DUMMY = "11111111-1111-1111-1111-111111111111";
 
 const LEFT_TOOL_WIDTH = 100;
-const RIGHT_PANEL_WIDTH = 260;
+const RIGHT_PANEL_WIDTH = 300; // 미리보기 패널을 위해 40px 증가
 
 export default function EditorPage({projectId = DUMMY}) {
   const {project_id} = useParams();
@@ -68,6 +69,16 @@ export default function EditorPage({projectId = DUMMY}) {
   const [isToolSelectionOpen, setToolSelectionOpen] = useState(false);
   const previousSceneId = useRef(selectedId);
 
+  // 미리보기 패널 관련 상태
+  const previewPanelRef = useRef(null);
+
+  // 캔버스 변경 시 미리보기 업데이트
+  const handleCanvasChange = React.useCallback(() => {
+    if (previewPanelRef.current && previewPanelRef.current.triggerPreview) {
+      previewPanelRef.current.triggerPreview();
+    }
+  }, []);
+
   // 레이어 관련 상태
   const [canvasReady, setCanvasReady] = useState(false);
   const [layersState, setLayersState] = useState([]);
@@ -90,6 +101,12 @@ export default function EditorPage({projectId = DUMMY}) {
       () => scenes.find((s) => s.id === selectedId) || null,
       [scenes, selectedId]
   );
+
+  // 씬의 변환 상태 확인 (기본값: 변환 전)
+  const isSceneTransformed = useMemo(() => {
+    if (!selectedScene) return false;
+    return selectedScene.saveMode === 'processed' || selectedScene.isTransformed === true;
+  }, [selectedScene]);
 
   // 상태(const [originalCanvasState, setOriginalCanvasState],const [imageUrl, setImageUrl])들 대신, 아래 두 줄로 정보를 파생시킵니다.
   const imageUrl = getImageUrl(selectedScene?.s3_key) || "";
@@ -395,10 +412,27 @@ export default function EditorPage({projectId = DUMMY}) {
               ...s,
               name: s.name || `Scene ${s.scene_num ?? i + 1}`,
               imageUrl: getImageUrl(s.s3_key),
+              // 변환 상태 추론: s3_key가 'processed'로 시작하면 변환됨
+              saveMode: s.s3_key && s.s3_key.startsWith('processed') ? 'processed' : 'originals',
+              isTransformed: s.s3_key && s.s3_key.startsWith('processed'),
               preview: `/thumbnails/${s.id}.png`,
             }))
         );
-        if (list[0]) setSelectedId(list[0].id);
+        if (list[0]) {
+          setSelectedId(list[0].id);
+          
+          // 첫 번째 씬의 변환 상태에 맞는 도구로 설정
+          setTimeout(() => {
+            const firstScene = list[0];
+            const isFirstSceneTransformed = firstScene.s3_key && firstScene.s3_key.startsWith('processed');
+            
+            if (isFirstSceneTransformed) {
+              handleModeChange('brush');
+            } else {
+              handleModeChange('draw');
+            }
+          }, 100);
+        }
       } catch (e) {
         console.error(e);
       }
@@ -424,7 +458,16 @@ export default function EditorPage({projectId = DUMMY}) {
           );
           const detail = data.scene || {};
           setScenes((prev) =>
-              prev.map((s) => (s.id === selectedId ? {...s, ...detail} : s))
+              prev.map((s) => {
+                if (s.id === selectedId) {
+                  const updated = {...s, ...detail};
+                  // 변환 상태 재계산
+                  updated.saveMode = updated.s3_key && updated.s3_key.startsWith('processed') ? 'processed' : 'originals';
+                  updated.isTransformed = updated.s3_key && updated.s3_key.startsWith('processed');
+                  return updated;
+                }
+                return s;
+              })
           );
         } catch (e) {
           console.error(e);
@@ -549,7 +592,19 @@ export default function EditorPage({projectId = DUMMY}) {
     }
 
     setSelectedId(id);
-    handleModeChange('select'); // Reset mode to select
+    
+    // 씬 변경 후 해당 씬의 변환 상태에 맞는 도구로 자동 전환
+    const nextScene = scenes.find(s => s.id === id);
+    const nextSceneTransformed = nextScene?.saveMode === 'processed' || nextScene?.isTransformed === true;
+    
+    if (nextSceneTransformed) {
+      // 변환된 씬: 브러쉬 도구로 전환
+      handleModeChange('brush');
+    } else {
+      // 변환 전 씬: 펜 그리기 도구로 전환
+      handleModeChange('draw');
+    }
+    
     const items = [...scenes, {id: "__ADD__", isAdd: true}];
     const idx = items.findIndex(it => it.id === id);
     if (idx < start) setStart(idx);
@@ -679,16 +734,16 @@ export default function EditorPage({projectId = DUMMY}) {
         }
 
         setScenes(prevScenes =>
-            prevScenes.map(scene => {
-              if (scene.id === selectedId) {
-                const updatedScene = {
-                  ...scene,
-                  // display_url: finalUrl,
-                };
-                if (newS3Key) {
-                  updatedScene.s3_key = newS3Key;
-                }
-                return updatedScene;
+          prevScenes.map(scene => {
+            if (scene.id === selectedId) {
+              const updatedScene = {
+                ...scene,
+                saveMode: 'processed', // 변환 상태 업데이트
+                isTransformed: true, // 백업 필드
+                // display_url: finalUrl,
+              };
+              if (newS3Key) {
+                updatedScene.s3_key = newS3Key;
               }
               return scene;
             })
@@ -702,6 +757,13 @@ export default function EditorPage({projectId = DUMMY}) {
 
             // 캔버스에 이미지 로드
             stageRef.current.loadFabricJsonNative(finalUrl);
+            
+            // 변환 완료 후 브러쉬 모드로 자동 전환
+            setTimeout(() => {
+              console.log('변환 완료: 브러쉬 모드로 자동 전환');
+              handleModeChange('brush');
+            }, 100);
+            
             // 이미지 로드 완료 후 useAutoSave를 통해 즉시 저장
             setTimeout(async () => {
               try {
@@ -750,6 +812,12 @@ export default function EditorPage({projectId = DUMMY}) {
       b: 0
     };
   };
+
+  // 변환 상태에 따른 허용 도구 확인 (이제 통합된 그리기 도구로 인해 필요 없음)
+  const isToolAllowed = React.useCallback((mode) => {
+    // 모든 도구를 허용 (그리기 도구는 이미 통합되어 자동으로 전환됨)
+    return true;
+  }, [isSceneTransformed]);
 
   // 캔버스 핸들러 함수들
 // EditorPage.jsx - handleModeChange 함수 수정 (기존 함수를 찾아서 수정)
@@ -830,11 +898,23 @@ export default function EditorPage({projectId = DUMMY}) {
             status: 'reset'
           });
 
+          // 씬 상태를 초기화된 상태로 업데이트
+          setScenes(prevScenes =>
+            prevScenes.map(scene => {
+              if (scene.id === selectedId) {
+                return {
+                  ...scene,
+                  saveMode: 'originals', // 변환 상태를 원본으로 리셋
+                  isTransformed: false, // 백업 필드
+                };
+              }
+              return scene;
+            })
+          );
           if (stageRef.current?.changeSaveMode) {
-            stageRef.current.changeSaveMode('originals');
-            console.log(stageRef.current.changeSaveMode);
+              stageRef.current.changeSaveMode('originals');
+              console.log(stageRef.current.changeSaveMode);
           }
-
           console.log("서버 씬 초기화 완료:", response.data);
           window.location.reload();
 
@@ -1181,8 +1261,10 @@ export default function EditorPage({projectId = DUMMY}) {
                 stageRef={stageRef}
                 layout="sidebar"
                 onGalleryStateChange={setGalleryOpen}
-                isServerSyncing={isServerSyncing}
-                handleManualSave={handleManualSave}
+                isServerSyncing = {isServerSyncing}
+                handleManualSave = {handleManualSave}
+                isSceneTransformed={isSceneTransformed}
+                isToolAllowed={isToolAllowed}
             />
             <div style={{marginTop: "auto"}}>
               <button
@@ -1235,6 +1317,7 @@ export default function EditorPage({projectId = DUMMY}) {
                 if (!dataUrl || !selectedId) return;
                 setScenes(prev => prev.map(s => s.id === selectedId ? {...s, preview: dataUrl} : s));
               }}
+              onCanvasChange={handleCanvasChange}
               drawingMode={drawingMode}
               eraserSize={eraserSize}
               drawingColor={drawingColor}
@@ -1304,6 +1387,52 @@ export default function EditorPage({projectId = DUMMY}) {
                 selection={selectedObject}
                 onChangeFill={handleSelectedFillChange}
             />
+
+            {/* 미리보기 패널 - 변환 전에만 표시 */}
+            {!isSceneTransformed && (
+              <>
+                {/* 구분선 */}
+                <div style={{ margin: '16px 0', borderTop: '1px solid #eee' }} />
+
+                {/* 미리보기 패널 */}
+                <PreviewPanel
+                    ref={previewPanelRef}
+                    projectId={pid}
+                    sceneId={selectedId}
+                    stageRef={stageRef}
+                    targetDots={targetDots}
+                    drawingColor={drawingColor}
+                    onTransformComplete={handleTransform}
+                    processing={processing}
+                    enabled={true}
+                    layersState={layersState}
+                />
+              </>
+            )}
+            
+            {/* 변환 완료 상태 표시 */}
+            {isSceneTransformed && (
+              <>
+                {/* 구분선 */}
+                <div style={{ margin: '16px 0', borderTop: '1px solid #eee' }} />
+                
+                <div style={{
+                  padding: "20px",
+                  textAlign: "center",
+                  border: "1px solid #e9ecef",
+                  borderRadius: "8px",
+                  backgroundColor: "#f8f9fa",
+                  color: "#6c757d"
+                }}>
+                  <div style={{ fontSize: "16px", fontWeight: "600", marginBottom: "8px" }}>
+                    ✅ 변환 완료
+                  </div>
+                  <div style={{ fontSize: "14px" }}>
+                    브러쉬 도구로 추가 편집이 가능합니다
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </aside>
 
