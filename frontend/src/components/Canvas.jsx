@@ -921,8 +921,8 @@ export default function Canvas({
         const currentLayers = layersRef.current;
         const activeLayer = currentLayers.find(layer => layer.id === currentActiveLayerId);
 
-        // 새로운 도트 생성 (SVG circle과 같은 크기 2px 사용)
-        const dotRadius = 1;
+        // 변환된 도트와 같은 크기로 브러쉬 도트 생성 (고정 2px)
+        const dotRadius = 2;
         const newDot = new Circle({
           left: pointer.x - dotRadius,
           top: pointer.y - dotRadius,
