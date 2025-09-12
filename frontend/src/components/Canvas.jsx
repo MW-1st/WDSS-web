@@ -17,7 +17,7 @@ export default function Canvas({
   height = 500,
   imageUrl = "",
   stageRef: externalStageRef,
-  drawingMode: externalDrawingMode = "draw",
+  drawingMode: externalDrawingMode = "select",
   eraserSize: externalEraserSize = 20,
   drawingColor: externalDrawingColor = '#222222',
   activeLayerId: externalActiveLayerId,
@@ -140,7 +140,6 @@ export default function Canvas({
     canvas.clipPath = clipPath;
 
     // 그리기 모드 설정 (성능 최적화)
-    canvas.isDrawingMode = true;
     const brush = new fabric.PencilBrush(canvas);
     brush.width = 2; // 원래 크기로 복원
     brush.color = externalDrawingColor; // 외부에서 전달받은 색상 사용
