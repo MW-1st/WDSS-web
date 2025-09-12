@@ -683,33 +683,33 @@ const loadFabricCanvasFromData = async (fabricJsonData) => { // 'async' 키워�
 
         } else if (type === 'image') {
            const image = await new Promise((resolve, reject) => {
-                    const imgSrc = objData.src;
+                const imgSrc = objData.src;
 
-                    if (!imgSrc) {
-                        return reject(new Error(`#${i} Image 객체에 'src' 속성이 없습니다.`));
-                    }
+                if (!imgSrc) {
+                    return reject(new Error(`#${i} Image 객체에 'src' 속성이 없습니다.`));
+                }
 
-                    // 1. 브라우저의 기본 Image 객체 생성
-                    const imgEl = new Image();
-                    imgEl.crossOrigin = 'anonymous'; // CORS 설정
+                // 1. 브라우저의 기본 Image 객체 생성
+                const imgEl = new Image();
+                imgEl.crossOrigin = 'anonymous'; // CORS 설정
 
-                    // 2. 이미지 로드 성공 시
-                    imgEl.onload = () => {
-                        // 3. 로드된 이미지(imgEl)를 사용하여 Fabric 이미지 객체 생성
-                        const fabricImage = new fabric.Image(imgEl, objData);
-                        resolve(fabricImage);
-                    };
+                // 2. 이미지 로드 성공 시
+                imgEl.onload = () => {
+                    // 3. 로드된 이미지(imgEl)를 사용하여 Fabric 이미지 객체 생성
+                    const fabricImage = new fabric.Image(imgEl, objData);
+                    resolve(fabricImage);
+                };
 
-                    // 4. 이미지 로드 실패 시
-                    imgEl.onerror = () => {
-                        console.error(`[DEBUG] #${i} 이미지 로드 실패.`);
-                        reject(new Error(`#${i} 이미지 로드 실패: ${imgSrc}`));
-                    };
+                // 4. 이미지 로드 실패 시
+                imgEl.onerror = () => {
+                    console.error(`[DEBUG] #${i} 이미지 로드 실패.`);
+                    reject(new Error(`#${i} 이미지 로드 실패: ${imgSrc}`));
+                };
 
-                    // 5. 이미지 소스(src)를 설정하여 로드 시작
-                    imgEl.src = imgSrc;
-                });
-                successfullyCreated.push(image);
+                // 5. 이미지 소스(src)를 설정하여 로드 시작
+                imgEl.src = imgSrc;
+            });
+            successfullyCreated.push(image);
 
         } else {
              console.warn(`#${i} 객체는 정의되지 않은 '${type}' 타입 입니다. 건너뜁니다.`);
