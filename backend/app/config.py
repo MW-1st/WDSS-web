@@ -11,6 +11,7 @@ ORIGINALS_DIR = BASE_DIR / "originals"
 PROCESSED_DIR = BASE_DIR / "processed"
 SVG_JSON_DIR = BASE_DIR / "svg_json"
 TMP_DIR = BASE_DIR / "tmp"
+THUMBNAILS_DIR = BASE_DIR / "thumbnails"
 
 
 # --- 서버 시작 시 폴더 자동 생성 ---
@@ -21,3 +22,4 @@ def create_upload_directories():
     PROCESSED_DIR.mkdir(exist_ok=True)
     TMP_DIR.mkdir(exist_ok=True)
     SVG_JSON_DIR.mkdir(exist_ok=True)
+    THUMBNAILS_DIR.mkdir(exist_ok=True)
