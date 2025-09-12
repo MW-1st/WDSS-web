@@ -543,10 +543,15 @@ export default function EditorPage({projectId = DUMMY}) {
       };
       const nextScenes = [...scenes, createdNorm];
       setScenes(nextScenes);
-      if (createdId) setSelectedId(createdId);
+      if (createdId) {
+        await handleSelect(createdId);
+      } else {
+        // 만약의 경우를 대비해 폴백
+        setSelectedId(null);
+      }
 
       const nextTotal = nextScenes.length + 1;
-      if (nextTotal > VISIBLE) setStart(nextTotal - VISIBLE);
+      if (nextTotal > VISIBLE) setStart(nextTotal - VISIBLE)
 
     } catch (e) {
       console.error(e);
