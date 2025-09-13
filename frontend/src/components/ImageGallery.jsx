@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback  } from "react";
 import client from "../api/client.js";
 import { getImageUrl } from '../utils/imageUtils';
+import { FiUpload, FiImage } from "react-icons/fi";
 
 export default function ImageGallery({ onImageDragStart }) {
   
@@ -142,114 +143,124 @@ export default function ImageGallery({ onImageDragStart }) {
   };
 
   return (
-    <div style={{ 
-      width: '250px', 
-      padding: '10px', 
+    <div style={{
+      width: '100%',
+      height: 'calc(100vh - 100px)',
+      overflowY: 'auto',
       backgroundColor: '#f8f9fa',
       borderRight: '1px solid #dee2e6',
-      height: '100%',
-      overflowY: 'auto'
     }}>
-      <h3 style={{ marginBottom: '15px', fontSize: '16px' }}>이미지 갤러리</h3>
-      
-      {/* 이미지 업로드 섹션 */}
-      <div style={{ marginBottom: '20px' }}>
-        <input
-          type="file"
-          accept="image/*"
-          multiple
-          onChange={handleFileUpload}
-          style={{
-            width: '100%',
-            padding: '8px',
-            border: '1px solid #ddd',
-            borderRadius: '4px',
-            fontSize: '14px'
-          }}
-        />
-      </div>
+      <div style={{ padding: '16px' }}>
+        <h3 style={{ margin: '0 0 15px 0', fontSize: '16px', fontWeight: 600 }}>이미지 갤러리</h3>
 
-      {/* 업로드된 이미지들 */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        {uploadedImages.map((imageUrl, index) => (
-          <div key={index} style={{ 
-            position: 'relative',
-            border: '1px solid #ddd',
-            borderRadius: '4px',
-            overflow: 'hidden',
-            backgroundColor: 'white'
+        {/* 이미지 업로드 섹션 */}
+        <div style={{ marginBottom: '20px' }}>
+          <label htmlFor="file-upload" style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            width: '100%',
+            padding: '12px',
+            border: '2px dashed #007bff',
+            borderRadius: '8px',
+            backgroundColor: '#e7f3ff',
+            color: '#007bff',
+            cursor: 'pointer',
+            transition: 'background-color 0.2s ease'
           }}>
-            <img
-              src={imageUrl}
-              alt={`업로드된 이미지 ${index + 1}`}
-              draggable={true}
-              onDragStart={(e) => handleDragStart(e, imageUrl)}
-              style={{
-                width: '100%',
-                height: '120px',
-                objectFit: 'cover',
-                cursor: 'grab',
-                userSelect: 'none'
-              }}
-              onDragEnd={(e) => {
-                e.target.style.cursor = 'grab';
-              }}
-              onMouseDown={(e) => {
-                e.target.style.cursor = 'grabbing';
-              }}
-              onMouseUp={(e) => {
-                e.target.style.cursor = 'grab';
-              }}
-            />
-            <button
-              // onClick={() => removeImage(index)}
-              onClick={() => removeImage(imageUrl)}
-              style={{
-                position: 'absolute',
-                top: '5px',
-                right: '5px',
-                background: 'rgba(255, 255, 255, 0.8)',
-                border: 'none',
-                borderRadius: '50%',
-                width: '24px',
-                height: '24px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              ×
-            </button>
-            <div style={{
-              position: 'absolute',
-              bottom: '0',
-              left: '0',
-              right: '0',
-              background: 'rgba(0,0,0,0.7)',
-              color: 'white',
-              padding: '4px 8px',
-              fontSize: '12px',
-              textAlign: 'center'
+            <FiUpload style={{ marginRight: '8px' }} />
+            <span>이미지 업로드</span>
+          </label>
+          <input
+            id="file-upload"
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={handleFileUpload}
+            style={{ display: 'none' }}
+          />
+        </div>
+
+        {/* 업로드된 이미지들 */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+          {uploadedImages.length > 0 ? uploadedImages.map((imageUrl, index) => (
+            <div key={index} style={{
+              position: 'relative',
+              border: '1px solid #ddd',
+              borderRadius: '8px',
+              overflow: 'hidden',
+              backgroundColor: 'white',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
             }}>
-              드래그해서 캔버스에 추가
+              <img
+                src={imageUrl}
+                alt={`업로드된 이미지 ${index + 1}`}
+                draggable={true}
+                onDragStart={(e) => handleDragStart(e, imageUrl)}
+                style={{
+                  width: '100%',
+                  height: '150px',
+                  objectFit: 'cover',
+                  cursor: 'grab',
+                  userSelect: 'none'
+                }}
+              />
+              <button
+                onClick={() => removeImage(imageUrl)}
+                style={{
+                  position: 'absolute',
+                  top: '8px',
+                  right: '8px',
+                  background: 'rgba(255, 255, 255, 0.9)',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '28px',
+                  height: '28px',
+                  cursor: 'pointer',
+                  fontSize: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                ×
+              </button>
+              <div style={{
+                position: 'absolute',
+                bottom: '0',
+                left: '0',
+                right: '0',
+                background: 'linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%)',
+                color: 'white',
+                padding: '12px 8px 8px',
+                fontSize: '12px',
+                textAlign: 'center',
+                pointerEvents: 'none'
+              }}>
+                드래그해서 캔버스에 추가
+              </div>
             </div>
-          </div>
-        ))}
-        
-        {uploadedImages.length === 0 && (
-          <div style={{
-            textAlign: 'center',
-            color: '#6c757d',
-            fontSize: '14px',
-            marginTop: '20px',
-            padding: '20px'
-          }}>
-            이미지를 업로드하면<br/>
-            여기에 표시됩니다
-          </div>
-        )}
+          )) : (
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              textAlign: 'center',
+              color: '#6c757d',
+              padding: '20px',
+            }}>
+              <FiImage size={48} style={{ marginBottom: '16px', color: '#adb5bd' }} />
+              <h4 style={{ margin: '0 0 8px 0', fontSize: '16px', fontWeight: 600 }}>이미지 없음</h4>
+              <p style={{ margin: 0, fontSize: '14px', lineHeight: 1.5 }}>
+                위 버튼을 클릭하여<br/>
+                이미지를 추가해 보세요.
+              </p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
