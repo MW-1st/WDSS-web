@@ -1177,7 +1177,7 @@ export default function EditorPage({projectId = DUMMY}) {
           className="editor-shell font-nanumhuman"
           style={{
             width: "100%",
-            minHeight: "100vh",
+            height: "100%",
             background: "#fff",
             display: "flex",
             alignItems: "flex-start",
@@ -1194,7 +1194,7 @@ export default function EditorPage({projectId = DUMMY}) {
               borderRight: "1px solid #eee",
               position: "sticky",
               top: 0,
-              height: "100vh",
+              height: "100%",
               background: "#fff",
               flex: "0 0 auto",
               boxSizing: "border-box",
@@ -1396,7 +1396,7 @@ export default function EditorPage({projectId = DUMMY}) {
               borderLeft: "1px solid #eee",
               position: "sticky",
               top: 0,
-              height: "100vh",
+              height: "100%",
               background: "#fff",
               flex: "0 0 auto",
               boxSizing: "border-box",
