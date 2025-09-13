@@ -6,7 +6,7 @@ import client from "../api/client.js";
 export const useAutoSave = (projectId, sceneId, fabricCanvas, options = {}, sceneData) => {
   const {
     enabled = true,
-    delay = 1500,
+    delay = 100,
     onSave = null,
     onError = null,
     includeMetadata = true,
@@ -165,8 +165,12 @@ export const useAutoSave = (projectId, sceneId, fabricCanvas, options = {}, scen
   }, [syncToServer, serverSyncInterval, saveMode]);
 
   // 즉시 저장 (딜레이 없음)
-  const saveImmediately = useCallback(async (metadata = {}) => {
+  const saveImmediately = useCallback(async (canvasData, metadata = {}) => {
     if (!sceneId || !fabricCanvas?.current) {
+      return false;
+    }
+    if (!canvasData || !Array.isArray(canvasData.objects)) {
+      console.warn('saveImmediately: 유효하지 않은 canvasData를 받았습니다.');
       return false;
     }
 
@@ -174,27 +178,17 @@ export const useAutoSave = (projectId, sceneId, fabricCanvas, options = {}, scen
     setSaveError(null);
 
     try {
-      const canvas = fabricCanvas.current;
-      const canvasData = canvas.toJSON([
-        'layerId', 'layerName', 'customType', 'originalFill',
-        'originalCx', 'originalCy'
-      ]);
-
-      const allObjects = canvas.getObjects();
-
-      // 실제 그린 객체만 카운트 (경계선 제외)
+      const allObjects = fabricCanvas.current.getObjects();
       const drawnObjects = allObjects.filter(obj =>
-        obj.name !== 'canvasBoundary' &&
-        obj.excludeFromExport !== true
+        obj.name !== 'canvasBoundary' && obj.excludeFromExport !== true
       );
-
       const actualObjectCount = drawnObjects.length;
 
       const saveMetadata = {
         objectCount: actualObjectCount,
         canvasSize: {
-          width: canvas.getWidth(),
-          height: canvas.getHeight()
+          width: fabricCanvas.current.getWidth(),
+          height: fabricCanvas.current.getHeight()
         },
         manualSave: true,
         ...metadata
@@ -203,16 +197,14 @@ export const useAutoSave = (projectId, sceneId, fabricCanvas, options = {}, scen
       await saveCanvasToIndexedDB(sceneId, canvasData, saveMetadata);
       setLastSaveTime(new Date());
 
-      // 🔥 즉시 저장 시에도 가상의 s3_key 생성
       if (onSave) {
         const virtualS3Key = `${saveMode}/${sceneId}.json`;
-
         onSave({
           sceneId,
           objectCount: actualObjectCount,
           manual: true,
-          s3_key: virtualS3Key, // 가상의 s3_key 추가
-          source: 'indexedDB' // 출처 표시
+          s3_key: virtualS3Key,
+          source: 'indexedDB'
         });
       }
 
@@ -220,16 +212,12 @@ export const useAutoSave = (projectId, sceneId, fabricCanvas, options = {}, scen
     } catch (error) {
       console.error('Manual save failed:', error);
       setSaveError(error.message);
-
-      if (onError) {
-        onError(error);
-      }
-
+      if (onError) onError(error);
       return false;
     } finally {
       setIsSaving(false);
     }
-  }, [sceneId, fabricCanvas, onSave, onError]);
+  }, [sceneId, fabricCanvas, onSave, onError, saveMode]);
 
   // 저장된 상태 로드
   const loadSavedState = useCallback(async (targetSceneId = sceneId) => {
@@ -281,7 +269,7 @@ export const useAutoSave = (projectId, sceneId, fabricCanvas, options = {}, scen
         clearTimeout(serverSyncTimerRef.current);
       }
     };
-  }, []);
+  }, [sceneId]);
 
   useEffect(() => {
     const determineInitialSaveMode = async () => {

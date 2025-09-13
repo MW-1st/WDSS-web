@@ -1,4 +1,4 @@
-﻿import React, {useCallback, useEffect, useMemo, useRef, useState} from "react";
+import React, {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import EditorToolbar from "../components/EditorToolbar.jsx";
 import MainCanvasSection from "../components/MainCanvasSection.jsx";
 import SceneCarousel from "../components/SceneCarousel.jsx";
@@ -17,6 +17,7 @@ import { LuMousePointer } from "react-icons/lu";
 import { IoHandRightOutline } from "react-icons/io5";
 import ProjectSettingsModal from "../components/ProjectSettingsModal";
 import PortalPopover from "../components/PortalPopover.jsx";
+import { saveCanvasToIndexedDB } from "../utils/indexedDBUtils.js";
 
 const VISIBLE = 4;
 const DUMMY = "11111111-1111-1111-1111-111111111111";
@@ -68,6 +69,10 @@ export default function EditorPage({projectId = DUMMY}) {
   const [isPanMode, setIsPanMode] = useState(false);
   const [isToolSelectionOpen, setToolSelectionOpen] = useState(false);
   const previousSceneId = useRef(selectedId);
+  const selectedIdRef = useRef(selectedId);
+  useEffect(() => {
+    selectedIdRef.current = selectedId;
+  }, [selectedId]);
 
   // 미리보기 패널 관련 상태
   const previewPanelRef = useRef(null);
@@ -199,19 +204,25 @@ export default function EditorPage({projectId = DUMMY}) {
   });
   const {syncToServer, uploadThumbnail} = useServerSync(pid, selectedId, stageRef);
 
-  const handleSaveThumbnail = useCallback(async () => {
-      if (!stageRef.current || !uploadThumbnail) return;
+  const handleSaveThumbnail = useCallback(async (pregeneratedDataUrl = null) => {
+    // 캔버스나 업로드 함수가 준비되지 않았으면 실행하지 않음
+    if (!stageRef.current || !uploadThumbnail) {
+      console.warn("썸네일 저장 실패: 캔버스나 업로드 함수가 준비되지 않았습니다.");
+      return;
+    }
 
-      const thumbnailDataUrl = stageRef.current.toDataURL({
-          format: 'png',
-          quality: 0.8
-      });
+    const thumbnailDataUrl = pregeneratedDataUrl || stageRef.current.toDataURL({
+      format: 'png',
+      quality: 0.8
+    });
 
-      try {
-          await uploadThumbnail(thumbnailDataUrl);
-      } catch (error) {
-          console.error("썸네일 저장 실패:", error);
-      }
+    try {
+      // 결정된 데이터를 사용해 업로드
+      await uploadThumbnail(thumbnailDataUrl);
+      console.log("✅ 썸네일이 백그라운드에서 성공적으로 저장되었습니다.");
+    } catch (error) {
+      console.error("❌ 썸네일 저장에 실패했습니다:", error);
+    }
   }, [uploadThumbnail]);
 
 
@@ -426,12 +437,11 @@ export default function EditorPage({projectId = DUMMY}) {
             const firstScene = list[0];
             const isFirstSceneTransformed = firstScene.s3_key && firstScene.s3_key.startsWith('processed');
             
-            if (isFirstSceneTransformed) {
-              handleModeChange('brush');
-            } else {
-              handleModeChange('draw');
-            }
-          }, 100);
+                            if (isFirstSceneTransformed) {
+                              handleModeChange('select');
+                            } else {
+                              handleModeChange('select');
+                            }          }, 100);
         }
       } catch (e) {
         console.error(e);
@@ -570,51 +580,62 @@ export default function EditorPage({projectId = DUMMY}) {
   }, [saveMode]);
 
   // 선택
-  const handleSelect = async (id) => {
-    if (id === "__ADD__") return;
+  const handleSelect = (id) => {
+  if (id === "__ADD__" || id === selectedId) return;
 
-    if (selectedId && selectedId !== id) {
-      // 썸네일 저장 함수를 호출합니다. (async/await 사용)
-      await handleSaveThumbnail();
-      console.log(`썸네일 저장 완료: Scene ${selectedId}`);
-    }
+  // --- 1. 데이터 캡쳐 ---
+  // 씬이 바뀌기 직전, 현재 캔버스의 데이터를 미리 변수에 저장합니다.
+  let dataToSave = null;
+  let thumbnailToSave = null;
+  const sceneIdToSave = selectedId; // 떠나는 씬의 ID
+  const saveModeToUse = previousSaveModeRef.current; // 떠나는 씬의 저장 모드
 
-    // 현재 씬이 있고, 다른 씬을 선택하는 경우
-    if (selectedId && selectedId !== id && stageRef.current && pid) {
-      try {
-        const canvas = stageRef.current;
-        const canvasData = canvas.toJSON([
-          'layerId', 'layerName', 'customType', 'originalFill',
-          'originalCx', 'originalCy'
-        ]);
+  if (sceneIdToSave && stageRef.current) {
+    const canvas = stageRef.current;
+    dataToSave = canvas.toJSON([
+      'layerId', 'layerName', 'customType', 'originalFill',
+      'originalCx', 'originalCy'
+    ]);
+    thumbnailToSave = canvas.toDataURL({ format: 'png', quality: 0.5 });
+  }
+  console.log(`🚀 데이터 저장`, dataToSave, thumbnailToSave);
 
-        // 현재 씬(곧 이전 씬이 될)을 서버에 저장
-        syncToServerNow(canvasData, previousSaveModeRef);
-        console.log(`Scene ${selectedId} saved before switching`);
-      } catch (error) {
-        console.error('Failed to save current scene before switching:', error);
-      }
-    }
+  // --- 2. UI 즉시 업데이트 ---
+  // 캡쳐한 스냅샷으로 전환 효과를 주고, 씬 ID를 변경하여 UI를 즉시 전환합니다.
+  setSelectedId(id);
 
-    setSelectedId(id);
-    
-    // 씬 변경 후 해당 씬의 변환 상태에 맞는 도구로 자동 전환
-    const nextScene = scenes.find(s => s.id === id);
-    const nextSceneTransformed = nextScene?.saveMode === 'processed' || nextScene?.isTransformed === true;
-    
-    if (nextSceneTransformed) {
-      // 변환된 씬: 브러쉬 도구로 전환
-      handleModeChange('brush');
-    } else {
-      // 변환 전 씬: 펜 그리기 도구로 전환
-      handleModeChange('draw');
-    }
-    
-    const items = [...scenes, {id: "__ADD__", isAdd: true}];
-    const idx = items.findIndex(it => it.id === id);
-    if (idx < start) setStart(idx);
-    if (idx >= start + VISIBLE) setStart(idx - VISIBLE + 1);
-  };
+  // --- 3. 백그라운드에서 저장 실행 ---
+  // 캡쳐해 둔 데이터가 있을 경우, 'await' 없이 저장 함수들을 호출하여
+  // 백그라운드에서 작업을 실행시킵니다.
+  if (dataToSave) {
+    // IndexedDB에 저장
+    saveImmediately(dataToSave)
+      .catch(e => console.error('백그라운드 IndexedDB 저장 실패:', e));
+
+    // 서버에 저장
+    syncToServerNow(dataToSave, saveModeToUse)
+      .catch(e => console.error('백그라운드 서버 저장 실패:', e));
+
+    // 썸네일 저장 (미리 생성한 썸네일 데이터를 전달)
+    handleSaveThumbnail(thumbnailToSave)
+      .catch(e => console.error('백그라운드 썸네일 저장 실패:', e));
+  }
+
+  // --- 캐러셀 스크롤 등 나머지 UI 로직 ---
+  const nextScene = scenes.find(s => s.id === id);
+  const nextSceneTransformed = nextScene?.saveMode === 'processed' || nextScene?.isTransformed === true;
+
+  if (nextSceneTransformed) {
+    handleModeChange('select');
+  } else {
+    handleModeChange('select');
+  }
+
+  const items = [...scenes, {id: "__ADD__", isAdd: true}];
+  const idx = items.findIndex(it => it.id === id);
+  if (idx < start) setStart(idx);
+  if (idx >= start + VISIBLE) setStart(idx - VISIBLE + 1);
+};
 
   // scenes/selectedId 변경 시 선택 유효성 보정
   useEffect(() => {
@@ -651,176 +672,6 @@ export default function EditorPage({projectId = DUMMY}) {
       return isDefault ? {...s, name: `Scene ${idx + 1}`} : s;
     });
   }, [scenes]);
-
-  // 이미지 변환 핸들러
-  const handleTransform = async () => {
-  if (!selectedId) {
-    alert("먼저 씬을 추가하거나 선택해 주세요.");
-    return;
-  }
-  if (!pid) {
-    alert("프로젝트 ID가 없습니다. 페이지를 새로고침해 주세요.");
-    return;
-  }
-  if (!stageRef.current) {
-    alert("캔버스가 아직 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.");
-    return;
-  }
-
-  setProcessing(true);
-
-  try {
-    let finalUrl = '';
-    let newS3Key = null;
-
-    // 씬 정보를 가져와서 s3_key 확인
-    const sceneResp = await client.get(`/projects/${pid}/scenes/${selectedId}`);
-    const sceneData = sceneResp.data;
-    const s3Key = sceneData.s3_key;
-
-    // s3_key가 null이거나 'originals'로 시작하면 원본 파일과 함께 변환 요청
-    const needsOriginalFile = !s3Key || s3Key.startsWith('originals');
-
-    if (needsOriginalFile) {
-      console.log("원본 파일이 필요하여 최초 생성을 요청합니다.");
-      const hasContent = stageRef.current.hasDrawnContent && stageRef.current.hasDrawnContent();
-      if (!hasContent) {
-        alert("변환할 내용이 없습니다. 먼저 이미지를 추가하거나 그림을 그려주세요.");
-        setProcessing(false);
-        return;
-      }
-      const canvasImage = stageRef.current.exportCanvasAsImage();
-      const blob = await new Promise(resolve => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          canvas.width = img.width;
-          canvas.height = img.height;
-          canvas.getContext('2d').drawImage(img, 0, 0);
-          canvas.toBlob(resolve, 'image/png');
-        };
-        img.src = canvasImage;
-      });
-      const file = new File([blob], "canvas_drawing.png", { type: "image/png" });
-      const fd = new FormData();
-      fd.append("image", file);
-
-      const resp = await client.post(
-        `/projects/${pid}/scenes/${selectedId}/processed?target_dots=${targetDots}`,
-        fd
-      );
-      finalUrl = getImageUrl(resp.data.output_url);
-      newS3Key = resp.data.s3_key;
-
-    } else {
-      console.log("기존 원본을 사용하여 재변환을 요청합니다.");
-      const rgbColor = hexToRgb(drawingColor);
-      const resp = await client.post(
-        `/projects/${pid}/scenes/${selectedId}/processed?target_dots=${targetDots}`,
-        {
-          color_r: rgbColor.r,
-          color_g: rgbColor.g,
-          color_b: rgbColor.b,
-        }
-      );
-      finalUrl = getImageUrl(resp.data.output_url);
-    }
-
-    if (stageRef.current?.changeSaveMode) {
-      stageRef.current.changeSaveMode('processed');
-      console.log(stageRef.current.changeSaveMode);
-    }
-
-    console.log("변환 완료! 최종 URL:", finalUrl);
-
-    if (finalUrl) {
-      if (stageRef.current && stageRef.current.clear) {
-        stageRef.current.clear();
-      }
-
-      // 괄호 및 로직 수정된 부분
-      setScenes(prevScenes =>
-        prevScenes.map(scene => {
-          if (scene.id === selectedId) {
-            const updatedScene = {
-              ...scene,
-              saveMode: 'processed', // 변환 상태 업데이트
-              isTransformed: true,   // 백업 필드
-            };
-            if (newS3Key) {
-              updatedScene.s3_key = newS3Key;
-            }
-            return updatedScene; // 수정: 업데이트된 scene 객체를 반환
-          }
-          return scene; // 추가: ID가 일치하지 않는 경우 원래 scene을 반환
-        })
-      );
-
-      setTimeout(() => {
-        if (stageRef.current && stageRef.current.loadFabricJsonNative) {
-          fetch(finalUrl)
-            .then(response => console.log("수동 fetch 결과:", response.status))
-            .catch(err => console.error("수동 fetch 실패:", err));
-
-          // 캔버스에 이미지 로드
-          stageRef.current.loadFabricJsonNative(finalUrl);
-
-          // 변환 완료 후 브러쉬 모드로 자동 전환
-          setTimeout(() => {
-            console.log('변환 완료: 브러쉬 모드로 자동 전환');
-            handleModeChange('brush');
-          }, 100);
-
-          // 이미지 로드 완료 후 useAutoSave를 통해 즉시 저장
-          setTimeout(async () => {
-            try {
-              const transformMetadata = {
-                imageUrl: finalUrl,
-                projectId: pid,
-                transformedAt: new Date().toISOString(),
-                targetDots: targetDots,
-                drawingColor: drawingColor,
-                type: 'transformed',
-                source: 'transform_complete'
-              };
-
-              const saveSuccess = await saveImmediately(transformMetadata);
-
-              if (saveSuccess) {
-                console.log(`변환된 이미지 상태가 자동 저장되었습니다: ${selectedId}`);
-              } else {
-                console.warn('변환된 이미지 자동 저장에 실패했습니다.');
-              }
-            } catch (error) {
-              console.error('변환된 캔버스 상태 저장 중 오류:', error);
-            }
-          }, 500); // 이미지 로드 완료를 위한 지연
-        }
-      }, 200);
-    }
-  } catch (e) {
-    console.error("Transform error", e);
-    const errorMsg = e.response?.data?.detail || e.message;
-    alert(`이미지 변환 중 오류가 발생했습니다: ${errorMsg}`);
-  } finally {
-    setProcessing(false);
-  }
-};
-
-  const hexToRgb = (hex) => {
-    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    return result ? {r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16)} : {
-      r: 0,
-      g: 0,
-      b: 0
-    };
-  };
-
-  // 변환 상태에 따른 허용 도구 확인 (이제 통합된 그리기 도구로 인해 필요 없음)
-  const isToolAllowed = React.useCallback((mode) => {
-    // 모든 도구를 허용 (그리기 도구는 이미 통합되어 자동으로 전환됨)
-    return true;
-  }, [isSceneTransformed]);
 
   // 캔버스 핸들러 함수들
 // EditorPage.jsx - handleModeChange 함수 수정 (기존 함수를 찾아서 수정)
@@ -859,6 +710,155 @@ export default function EditorPage({projectId = DUMMY}) {
       },
       [drawingColor, isPanMode]
   );
+
+  // 이미지 변환 핸들러
+ const handleTransform = useCallback(async (sceneIdToTransform) => {
+
+    if (!sceneIdToTransform) {
+    alert("먼저 씬을 추가하거나 선택해 주세요.");
+    return;
+  }
+  if (!pid) {
+    alert("프로젝트 ID가 없습니다. 페이지를 새로고침해 주세요.");
+    return;
+  }
+  if (!stageRef.current) {
+    alert("캔버스가 아직 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.");
+    return;
+  }
+
+  setProcessing(true);
+
+  try {
+    let finalUrl = '';
+    let newS3Key = null;
+
+    // 씬 정보를 가져와서 s3_key 확인
+    const sceneResp = await client.get(`/projects/${pid}/scenes/${sceneIdToTransform}`);
+    const sceneData = sceneResp.data;
+    const s3Key = sceneData.s3_key;
+
+    // s3_key가 null이거나 'originals'로 시작하면 원본 파일과 함께 변환 요청
+    const needsOriginalFile = !s3Key || s3Key.startsWith('originals');
+
+    if (needsOriginalFile) {
+      console.log("원본 파일이 필요하여 최초 생성을 요청합니다.");
+      const hasContent = stageRef.current.hasDrawnContent && stageRef.current.hasDrawnContent();
+      if (!hasContent) {
+        alert("변환할 내용이 없습니다. 먼저 이미지를 추가하거나 그림을 그려주세요.");
+        setProcessing(false);
+        return;
+      }
+      const canvasImage = stageRef.current.exportCanvasAsImage();
+      const blob = await new Promise(resolve => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          canvas.getContext('2d').drawImage(img, 0, 0);
+          canvas.toBlob(resolve, 'image/png');
+        };
+        img.src = canvasImage;
+      });
+      const file = new File([blob], "canvas_drawing.png", { type: "image/png" });
+      const fd = new FormData();
+      fd.append("image", file);
+
+      const resp = await client.post(
+        `/projects/${pid}/scenes/${sceneIdToTransform}/processed?target_dots=${targetDots}`,
+        fd
+      );
+      finalUrl = getImageUrl(resp.data.output_url);
+      newS3Key = resp.data.s3_key;
+
+    } else {
+      console.log("기존 원본을 사용하여 재변환을 요청합니다.");
+      const rgbColor = hexToRgb(drawingColor);
+      const resp = await client.post(
+        `/projects/${pid}/scenes/${sceneIdToTransform}/processed?target_dots=${targetDots}`,
+        {
+          color_r: rgbColor.r,
+          color_g: rgbColor.g,
+          color_b: rgbColor.b,
+        }
+      );
+      finalUrl = getImageUrl(resp.data.output_url);
+    }
+
+    if (stageRef.current?.changeSaveMode) {
+      stageRef.current.changeSaveMode('processed');
+      console.log(stageRef.current.changeSaveMode);
+    }
+
+    if (!finalUrl) {
+      throw new Error("변환 후 URL을 받지 못했습니다.");
+    }
+
+    // 1. 서버에서 변환된 JSON 데이터를 직접 가져옵니다.
+    const jsonDataResponse = await fetch(finalUrl);
+    if (!jsonDataResponse.ok) {
+      throw new Error("변환된 JSON 데이터를 가져오는 데 실패했습니다.");
+    }
+    const transformedJsonData = await jsonDataResponse.json();
+
+    // 2. 가져온 데이터를 IndexedDB에 먼저 저장합니다.
+    await saveCanvasToIndexedDB(sceneIdToTransform, transformedJsonData);
+    console.log(`✅ 변환된 데이터가 ${sceneIdToTransform} 씬의 IndexedDB에 저장되었습니다.`);
+
+    // 3. scenes 배열의 상태를 업데이트합니다. (기존과 동일)
+    setScenes(prevScenes =>
+      prevScenes.map(scene => {
+        if (scene.id === sceneIdToTransform) {
+          return {
+            ...scene,
+            saveMode: 'processed',
+            isTransformed: true,
+            s3_key: newS3Key || scene.s3_key,
+          };
+        }
+        return scene;
+      })
+    );
+
+    // 4. 현재 씬이 변환하던 씬일 경우, IndexedDB에 저장된 데이터를 캔버스에 로드합니다.
+    if (stageRef.current && selectedIdRef.current === sceneIdToTransform) {
+        if (stageRef.current.clear) {
+          stageRef.current.clear();
+        }
+        // loadFromJSON은 Fabric.js의 기본 함수이며, Canvas.jsx에 이미 구현되어 있습니다.
+        // 여기서는 이미 JSON 객체를 가지고 있으므로 직접 로드합니다.
+        stageRef.current.loadFromJSON(transformedJsonData, () => {
+          stageRef.current.renderAll();
+          console.log("변환된 데이터가 현재 캔버스에 로드되었습니다.", selectedId, sceneIdToTransform);
+          handleModeChange('brush');
+        });
+    } else {
+        console.log(`변환은 완료되었지만 사용자가 다른 씬(${selectedId})으로 이동하여 캔버스는 업데이트하지 않습니다.`);
+    }
+
+  } catch (e) {
+    console.error("Transform error", e);
+    alert(`이미지 변환 중 오류가 발생했습니다: ${e.response?.data?.detail || e.message}`);
+  } finally {
+    setProcessing(false);
+  }
+}, [pid, targetDots, drawingColor, setScenes, setProcessing, handleModeChange, saveImmediately])
+
+  const hexToRgb = (hex) => {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16)} : {
+      r: 0,
+      g: 0,
+      b: 0
+    };
+  };
+
+  // 변환 상태에 따른 허용 도구 확인 (이제 통합된 그리기 도구로 인해 필요 없음)
+  const isToolAllowed = React.useCallback((mode) => {
+    // 모든 도구를 허용 (그리기 도구는 이미 통합되어 자동으로 전환됨)
+    return true;
+  }, [isSceneTransformed]);
 
   // 키보드 단축키 추가
   useEffect(() => {
