@@ -832,7 +832,7 @@ export default function EditorPage({projectId = DUMMY}) {
         stageRef.current.loadFromJSON(transformedJsonData, () => {
           stageRef.current.renderAll();
           console.log("변환된 데이터가 현재 캔버스에 로드되었습니다.", selectedId, sceneIdToTransform);
-          handleModeChange('brush');
+          handleModeChange('select');
         });
     } else {
         console.log(`변환은 완료되었지만 사용자가 다른 씬(${selectedId})으로 이동하여 캔버스는 업데이트하지 않습니다.`);
