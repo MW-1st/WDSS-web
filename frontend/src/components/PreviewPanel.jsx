@@ -481,7 +481,7 @@ const PreviewPanel = React.forwardRef(({
 
         {!previewImage && !isGeneratingPreview && !error && (
           <div className="preview-empty">
-            <p>캔버스에 내용을 추가하면<br/>변환 미리보기가 표시됩니다</p>
+            <p>캔버스에 내용을 추가하면 변환 미리보기가 표시됩니다</p>
           </div>
         )}
       </div>
