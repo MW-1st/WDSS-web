@@ -1372,6 +1372,7 @@ export default function EditorPage({projectId = DUMMY}) {
               onPanChange={setIsPanMode}
               changeSaveMode={changeSaveMode}
               triggerAutoSave={triggerAutoSave}
+              isSceneTransformed={isSceneTransformed}
           />
 
           {/* 씬 캐러셀 */}
