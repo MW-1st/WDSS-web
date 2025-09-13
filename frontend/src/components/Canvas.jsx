@@ -58,6 +58,11 @@ export default function Canvas({
 
   const schedulePreview = useCallback(() => {
     if (!onPreviewChange || !fabricCanvas.current) return;
+    
+    const canvas = fabricCanvas.current;
+    // fabric.js에서 현재 그리기 중인지 확인
+    if (canvas.isDrawingMode && canvas._isCurrentlyDrawing) return;
+    
     if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
     previewTimerRef.current = setTimeout(() => {
       try {
@@ -364,6 +369,7 @@ export default function Canvas({
             availableLayers: currentLayers.map(l => ({id: l.id, name: l.name, type: l.type}))
           });
         }
+        
       }
     };
 
