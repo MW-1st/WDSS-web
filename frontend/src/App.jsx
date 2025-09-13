@@ -14,6 +14,7 @@ import DashboardPage from "./pages/DashboardPage.jsx";
 import Navbar from "./components/Navbar";
 import { UnityProvider, useUnity } from "./contexts/UnityContext.jsx";
 import { AuthProvider, useAuth } from "./contexts/AuthContext.jsx";
+import { EditorProvider } from "./contexts/EditorContext.jsx";
 
 import PrivateRoute from "./routes/PrivateRoute.jsx";
 import PublicRoute from "./routes/PublicRoute.jsx";
@@ -143,7 +144,9 @@ export default function App() {
   return (
     <AuthProvider>
       <UnityProvider>
-        <AppContent />
+        <EditorProvider>
+          <AppContent />
+        </EditorProvider>
       </UnityProvider>
     </AuthProvider>
   );

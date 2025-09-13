@@ -1,4 +1,4 @@
-﻿import React, {useCallback, useEffect, useMemo, useRef, useState} from "react";
+import React, {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import EditorToolbar from "../components/EditorToolbar.jsx";
 import MainCanvasSection from "../components/MainCanvasSection.jsx";
 import SceneCarousel from "../components/SceneCarousel.jsx";
@@ -18,6 +18,7 @@ import { IoHandRightOutline } from "react-icons/io5";
 import ProjectSettingsModal from "../components/ProjectSettingsModal";
 import PortalPopover from "../components/PortalPopover.jsx";
 import { saveCanvasToIndexedDB } from "../utils/indexedDBUtils.js";
+import { useEditor } from "../contexts/EditorContext.jsx";
 
 const VISIBLE = 4;
 const DUMMY = "11111111-1111-1111-1111-111111111111";
@@ -33,6 +34,7 @@ export default function EditorPage({projectId = DUMMY}) {
   const [projectMeta, setProjectMeta] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
   const [start, setStart] = useState(0);
+  const { setDotCount } = useEditor();
 
   // 갤러리 열림 상태
   const [galleryOpen, setGalleryOpen] = useState(() => {
@@ -368,6 +370,31 @@ export default function EditorPage({projectId = DUMMY}) {
       if (cleanup) cleanup();
     };
   }, []);
+
+  useEffect(() => {
+    const canvas = stageRef.current;
+    if (!canvas) return;
+
+    const updateDotCount = () => {
+      const objects = canvas.getObjects();
+      const dots = objects.filter(obj => obj.type === 'circle');
+      setDotCount(dots.length);
+    };
+
+    updateDotCount();
+
+    canvas.on('object:added', updateDotCount);
+    canvas.on('object:removed', updateDotCount);
+    canvas.on('load:completed', updateDotCount);
+
+    return () => {
+      if (canvas) {
+        canvas.off('object:added', updateDotCount);
+        canvas.off('object:removed', updateDotCount);
+        canvas.off('load:completed', updateDotCount);
+      }
+    };
+  }, [canvasReady, setDotCount]);
 
   // 프로젝트가 없으면 생성하는 헬퍼
   const ensureProjectId = async () => {

@@ -2,12 +2,14 @@ import React from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { useUnity } from "../contexts/UnityContext.jsx";
+import { useEditor } from "../contexts/EditorContext.jsx";
 import client from "../api/client";
 
 export default function Navbar({ transparent: propTransparent = false }) {
   const location = useLocation();
   const { isAuthenticated, logout } = useAuth();
   const { isUnityVisible, showUnity, hideUnity } = useUnity();
+  const { dotCount } = useEditor();
 
   // ===== ① 에디터(프로젝트) 전용 Navbar =====
   if (location.pathname.startsWith("/projects")) {
@@ -85,6 +87,9 @@ export default function Navbar({ transparent: propTransparent = false }) {
               title={editorState.projectName || "Untitled Project"}
             >
               {editorState.projectName || "Untitled Project"}
+            </div>
+            <div className="text-sm text-gray-500">
+              (드론 수: {dotCount})
             </div>
           </div>
 
