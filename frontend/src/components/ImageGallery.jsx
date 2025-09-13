@@ -147,7 +147,7 @@ export default function ImageGallery({ onImageDragStart }) {
       padding: '10px', 
       backgroundColor: '#f8f9fa',
       borderRight: '1px solid #dee2e6',
-      height: '100vh',
+      height: '100%',
       overflowY: 'auto'
     }}>
       <h3 style={{ marginBottom: '15px', fontSize: '16px' }}>이미지 갤러리</h3>

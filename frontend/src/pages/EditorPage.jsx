@@ -1340,7 +1340,7 @@ export default function EditorPage({projectId = DUMMY}) {
 
         {/* 갤러리 패널 */}
         {galleryOpen && (
-            <div style={{flex: "0 1 360px", minWidth: 0, boxSizing: "border-box"}}>
+            <div style={{flex: "0 1 360px", minWidth: 0, boxSizing: "border-box", height: "100%"}}>
               <ImageGallery onImageDragStart={(u) => console.log("drag:", u)}/>
             </div>
         )}
