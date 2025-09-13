@@ -384,7 +384,7 @@ export default function Canvas({
         
         if (activeLayer) {
           fabricLayerUtils.assignObjectToLayer(obj, activeLayer.id, activeLayer.name);
-          console.log('Object assigned to layer:', activeLayer.name);
+          // console.log('Object assigned to layer:', activeLayer.name);
         }
       }
     };
@@ -596,157 +596,91 @@ export default function Canvas({
 
   // Effect for loading the background image
   useEffect(() => {
-    console.log("imageUrl 변경됨:", imageUrl);
-    if (!imageUrl || !fabricCanvas.current) return;
-    const canvas = fabricCanvas.current;
+  // 씬 정보나 캔버스가 준비되지 않았으면 아무것도 하지 않음
+  if (!imageUrl || !fabricCanvas.current || !scene?.id) {
+    return;
+  }
 
-    const postLoadActions = () => {
-      applyDrawingMode(drawingModeRef.current, currentColorRef.current);
-      canvas.renderAll();
-    };
+  // 1. 작업 취소(Cleanup)를 위한 플래그
+  let isCancelled = false;
+  const canvas = fabricCanvas.current;
 
-    if (imageUrl.endsWith(".json")) {
-      console.log("JSON 파일 로드 시작:", imageUrl);
-
-      // IndexedDB에서 먼저 확인
-      (async () => {
-        try {
-          // selectedId를 사용해서 IndexedDB에서 캐시된 데이터 확인
-          const cachedData = await loadCanvasFromIndexedDB(scene.id);
-
-          if (cachedData) {
-            console.log("IndexedDB에서 캐시된 JSON 데이터 사용:", scene.id);
-            loadFabricCanvasFromData(cachedData);
-            return;
-          }
-
-          console.log("캐시된 데이터 없음, 서버에서 가져오기:", imageUrl);
-
-          // 캐시가 없으면 기존처럼 fetch로 가져오기
-          const response = await fetch(imageUrl);
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-
-          const fabricJsonData = await response.json();
-          console.log("서버에서 JSON 데이터 로드됨:", fabricJsonData);
-
-          // 서버에서 가져온 데이터를 IndexedDB에 저장
-          if (scene.id) {
-            try {
-              await saveCanvasToIndexedDB(scene.id, fabricJsonData);
-              console.log("JSON 데이터가 IndexedDB에 저장됨:", scene.id);
-            } catch (saveError) {
-              console.warn("IndexedDB 저장 실패:", saveError);
-            }
-          }
-
-          loadFabricCanvasFromData(fabricJsonData);
-
-        } catch (err) {
-          console.error("JSON 로드 실패:", err);
-          // // JSON 로드 실패 시 기본 이미지 방식으로 폴백
-          // loadAsImage();
-        }
-      })();
-    }
-    // Fabric Canvas 로드 함수 (공통 로직 분리)
-    // Replace the loadFabricCanvasFromData function with this advanced debugger.
-
-const loadFabricCanvasFromData = async (fabricJsonData) => { // 'async' 키워드 추가
-    const canvas = fabricCanvas.current;
-
-    if (!canvas) {return;}
-
-    if (!fabricJsonData || !fabricJsonData.objects || fabricJsonData.objects.length === 0) {
-        console.warn("렌더링할 객체가 없습니다.");
-        return;
-    }
-
-    // 1. 기존 객체들을 모두 지웁니다.
-    const existingObjects = canvas.getObjects()
-        .filter(obj => obj.customType === "svgDot" || obj.customType === "jsonDot" || obj.type === "image");
-      existingObjects.forEach(obj => canvas.remove(obj));
-
-    const objectsToRender = fabricJsonData.objects;
-    const successfullyCreated = [];
-
-    // for...of 루프를 사용하여 비동기 작업을 순차적으로 처리합니다.
-    for (const [i, objData] of objectsToRender.entries()) {
-    try {
-        // type이 없는 경우를 대비하고, 앞뒤 공백을 제거합니다.
-        const type = objData.type ? objData.type.trim().toLowerCase() : '';
-        
-
-        if (type === 'circle') {
-            // --- Circle 타입 처리 ---
-            const newCircle = new fabric.Circle({
-                ...objData,
-                customType: 'svgDot', // 지우개로 지울 수 있도록 customType 설정
-                selectable: true, // 선택 가능하도록 변경
-                evented: true, // 이벤트 활성화
-                hasControls: false, // 변형 컨트롤 비활성화 (크기 조절 등)
-                hasBorders: true, // 선택 테두리는 표시
-                hoverCursor: 'crosshair',
-                moveCursor: 'crosshair'
-            });
-            successfullyCreated.push(newCircle);
-
-        } else if (type === 'path') {
-            // --- Path 타입 처리 ---
-            const newPath = new fabric.Path(objData.path, objData);
-            successfullyCreated.push(newPath);
-
-        } else if (type === 'image') {
-           const image = await new Promise((resolve, reject) => {
-                const imgSrc = objData.src;
-
-                if (!imgSrc) {
-                    return reject(new Error(`#${i} Image 객체에 'src' 속성이 없습니다.`));
-                }
-
-                // 1. 브라우저의 기본 Image 객체 생성
-                const imgEl = new Image();
-                imgEl.crossOrigin = 'anonymous'; // CORS 설정
-
-                // 2. 이미지 로드 성공 시
-                imgEl.onload = () => {
-                    // 3. 로드된 이미지(imgEl)를 사용하여 Fabric 이미지 객체 생성
-                    const fabricImage = new fabric.Image(imgEl, objData);
-                    resolve(fabricImage);
-                };
-
-                // 4. 이미지 로드 실패 시
-                imgEl.onerror = () => {
-                    console.error(`[DEBUG] #${i} 이미지 로드 실패.`);
-                    reject(new Error(`#${i} 이미지 로드 실패: ${imgSrc}`));
-                };
-
-                // 5. 이미지 소스(src)를 설정하여 로드 시작
-                imgEl.src = imgSrc;
-            });
-            successfullyCreated.push(image);
-
-        } else {
-             console.warn(`#${i} 객체는 정의되지 않은 '${type}' 타입 입니다. 건너뜁니다.`);
-        }
-
-    } catch (error) {
-        console.error(`객체 생성 실패: #${i} 객체에서 문제가 발생했습니다.`, {
-            problematicObjectData: objData,
-            errorDetails: error
-        });
-        return;
-    }
-}
-
-    canvas.renderOnAddRemove = false;
-    canvas.add(...successfullyCreated);
-    canvas.renderOnAddRemove = true;
+  // 로드가 끝난 후 공통으로 실행될 액션들
+  const postLoadActions = () => {
+    applyDrawingMode(drawingModeRef.current, currentColorRef.current);
+    // onLoadComplete는 loadFromJSON 콜백에서 직접 호출하므로 여기서는 renderAll만 담당
     canvas.renderAll();
-    postLoadActions();
-};
-  }, [imageUrl,scene?.id]); // selectedId도 dependency에 추가
+  };
+
+  // 비동기 로딩 작업을 시작하는 메인 함수
+  const startLoading = async () => {
+    try {
+      // IndexedDB 또는 서버에서 로드할 데이터를 가져옴
+      const cachedData = await loadCanvasFromIndexedDB(scene.id);
+
+      // 데이터를 기다리는 동안 씬이 바뀌었다면, 즉시 중단
+      if (isCancelled) return;
+
+      const dataToLoad = cachedData || await (await fetch(imageUrl)).json();
+
+      // 데이터를 가져온 후에도 취소되었는지 다시 확인
+      if (isCancelled) return;
+
+      // 새 데이터를 IndexedDB에 저장 (캐시가 없었을 경우)
+      if (!cachedData && dataToLoad) {
+        await saveCanvasToIndexedDB(scene.id, dataToLoad);
+        if (isCancelled) return;
+      }
+
+      // 데이터가 없을 경우 로딩 종료
+      if (!dataToLoad || !dataToLoad.objects) {
+        canvas.clear();
+        canvas.renderAll();
+        return;
+      }
+
+      // --- Fabric.js 네이티브 함수를 사용한 안전한 로딩 ---
+      canvas.clear(); // 렌더링 전에 캔버스를 확실하게 비움
+      canvas.loadFromJSON(dataToLoad, () => {
+        // loadFromJSON의 콜백은 이미지 등 모든 비동기 로딩이 끝난 후 실행됨
+        if (isCancelled) return; // 로드가 끝났지만 그 사이 씬이 바뀌었다면, 캔버스에 적용하지 않고 중단
+
+        // 로드된 객체들에 필요한 커스텀 속성 부여
+        canvas.getObjects().forEach(obj => {
+          if (obj.type === "circle") {
+            obj.set({
+              customType: 'svgDot',
+              selectable: true,
+              evented: true,
+              hasControls: false,
+              hasBorders: true,
+              hoverCursor: 'crosshair',
+              moveCursor: 'crosshair'
+            });
+            // 필요하다면 여기서 레이어 할당 로직도 추가할 수 있습니다.
+          }
+        });
+
+        postLoadActions(); // 브러쉬 모드 적용 등 후처리
+      });
+
+    } catch (err) {
+      if (!isCancelled) {
+        console.error(`씬 ${scene.id} 로드 실패:`, err);
+      }
+    }
+  };
+
+  startLoading();
+
+  // 2. 클린업(Cleanup) 함수
+  // 이 useEffect가 다시 실행되기 직전(즉, 씬 전환 시)에 호출됩니다.
+  // isCancelled를 true로 바꿔서, 진행 중이던 이전 씬의 모든 비동기 작업을 중단시킵니다.
+  return () => {
+    isCancelled = true;
+  };
+
+}, [imageUrl, scene?.id]); // 의존성 배열
 
 
   //   function loadAsImage() {
@@ -856,7 +790,7 @@ const loadFabricCanvasFromData = async (fabricJsonData) => { // 'async' 키워�
 
     // 픽셀 지우개 모드일 때는 항상 배경색 사용
     const currentColor = mode === "pixelErase" ? "#fafafa" : (colorOverride || drawingColor);
-    console.log('applyDrawingMode 호출:', mode, '사용할 색상:', currentColor);
+    // console.log('applyDrawingMode 호출:', mode, '사용할 색상:', currentColor);
     
     // 이전 이벤트 리스너 정리
     if (eraseHandlers.current.wheelHandler) {
@@ -1433,18 +1367,8 @@ const loadFabricCanvasFromData = async (fabricJsonData) => { // 'async' 키워�
           evented: true,
           hasControls: true,
           hasBorders: true,
-          cornerStyle: "circle",
-          cornerColor: "#007bff",
-          cornerSize: 12,
-          transparentCorners: false,
-          borderColor: "#007bff",
           customType: "droppedImage", // 구분을 위한 커스텀 타입
-          // 회전 컨트롤 활성화
-          hasRotatingPoint: true,
-          rotatingPointOffset: 30,
-          // 균등 스케일링 옵션
           lockUniScaling: false,
-          // 컨트롤 포인트 설정
           centeredScaling: false,
           centeredRotation: true,
         });
@@ -1671,14 +1595,18 @@ const loadFabricCanvasFromData = async (fabricJsonData) => { // 'async' 키워�
     const canvas = fabricCanvas.current;
     
     // 현재 캔버스 초기화
-    canvas.clear();
-    canvas.backgroundColor = '#fafafa';
-    
+    const existingObjects = canvas.getObjects()
+      .filter(obj => obj.customType === "path" || obj.customType === "circle" || obj.type === "image");
+    existingObjects.forEach(obj => canvas.remove(obj));
+    // canvas.backgroundColor = '#fafafa';
+
+    console.time('Manual Method'); // 타이머 시작
     // 저장된 상태에서 복원
     canvas.loadFromJSON(state.objects, () => {
       canvas.renderAll();
       console.log("원본 캔버스 상태 복원 완료");
     });
+    console.timeEnd('Manual Method')
     
     return true;
   };
@@ -1778,7 +1706,7 @@ const loadFabricCanvasFromData = async (fabricJsonData) => { // 'async' 키워�
       externalStageRef.current.applyDrawingMode = (mode, color) => {
         // 색상 정보를 명시적으로 전달받아 사용
         const currentColor = color || externalDrawingColor;
-        console.log('applyDrawingMode with color:', mode, currentColor);
+        // console.log('applyDrawingMode with color:', mode, currentColor);
         applyDrawingMode(mode, currentColor);
       };
       externalStageRef.current.setDrawingMode = (mode) => {
