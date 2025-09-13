@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useMemo, useRef, useState} from "react";
+﻿import React, {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import EditorToolbar from "../components/EditorToolbar.jsx";
 import MainCanvasSection from "../components/MainCanvasSection.jsx";
 import SceneCarousel from "../components/SceneCarousel.jsx";
@@ -23,7 +23,7 @@ const VISIBLE = 4;
 const DUMMY = "11111111-1111-1111-1111-111111111111";
 
 const LEFT_TOOL_WIDTH = 100;
-const RIGHT_PANEL_WIDTH = 260; // 미리보기 패널을 위해 40px 증가
+const RIGHT_PANEL_WIDTH = 280; // 미리보기 패널을 위해 40px 증가
 
 export default function EditorPage({projectId = DUMMY}) {
   const {project_id} = useParams();
