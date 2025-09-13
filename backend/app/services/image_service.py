@@ -5,12 +5,33 @@ import numpy as np
 import json
 
 
+def apply_sobel_edge_detection(gray_img, low_threshold, high_threshold):
+    """
+    미리보기와 동일한 Sobel 엣지 검출 알고리즘
+    OpenCV 최적화 버전으로 성능 개선 (결과는 동일)
+    """
+    # OpenCV Sobel 연산자 사용 (C++ 최적화)
+    grad_x = cv2.Sobel(gray_img, cv2.CV_64F, 1, 0, ksize=3)  # X 방향 기울기
+    grad_y = cv2.Sobel(gray_img, cv2.CV_64F, 0, 1, ksize=3)  # Y 방향 기울기
+    
+    # 기울기 크기 계산 (미리보기와 동일한 공식)
+    magnitude = np.sqrt(grad_x**2 + grad_y**2)
+    
+    # 임계값에 따른 분류 (미리보기와 동일)
+    result = np.zeros_like(gray_img, dtype=np.uint8)
+    result[magnitude > high_threshold] = 255
+    result[(magnitude > low_threshold) & (magnitude <= high_threshold)] = 128
+    # magnitude <= low_threshold인 경우는 이미 0으로 초기화됨
+    
+    return result
+
+
 def process_image(
     input_path: str,
     step: int = 3,
     target_dots: int | None = None,
-    canny_threshold1: int = 80,  # 강한 엣지만 검출
-    canny_threshold2: int = 200,  # 더 높은 임계값으로 선명한 윤곽선만
+    canny_threshold1: int = 80,  # Sobel 낮은 임계값 (미리보기 lowThreshold와 동일)
+    canny_threshold2: int = 200,  # Sobel 높은 임계값 (미리보기 highThreshold와 동일)
     blur_ksize: int = 5,  # 더 강한 블러로 노이즈 제거
     blur_sigma: float = 1.2,
     color_rgb: tuple[int, int, int] | None = None,
@@ -18,7 +39,7 @@ def process_image(
     """
     입력 이미지 경로를 받아 엣지 픽셀을 일정 간격으로 점 샘플링한 결과를 Fabric.js JSON으로 생성합니다.
 
-    - 파이프라인: Gray → GaussianBlur → Canny → Grid Sampling
+    - 파이프라인: Gray → GaussianBlur → Sobel → Grid Sampling (미리보기와 동일)
     - target_dots가 주어지면 엣지 픽셀 수로부터 step을 자동 계산합니다.
       대략적으로 기대 도트 수 ≈ edge_pixels / (step^2)로 가정하여 step ≈ sqrt(edge_pixels / target_dots)
     - 결과는 backend/uploads/processed_<uuid>_<dot_count>.json 로 저장됩니다.
@@ -38,10 +59,15 @@ def process_image(
     # 간단하고 빠른 엣지 검출
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-    # 기본 블러 + Canny 엣지
+    # 기본 블러 
     k = max(3, blur_ksize | 1)
     blur = cv2.GaussianBlur(gray, (k, k), blur_sigma)
-    edges = cv2.Canny(blur, canny_threshold1, canny_threshold2)
+    
+    # Sobel 엣지 검출 (미리보기와 동일한 알고리즘)
+    edges = apply_sobel_edge_detection(blur, canny_threshold1, canny_threshold2)
+    
+    # 기존 Canny 엣지 검출 (주석 처리)
+    # edges = cv2.Canny(blur, canny_threshold1, canny_threshold2)
 
     # 최소한의 모폴로지 연산
     kernel = np.ones((2, 2), np.uint8)

@@ -757,11 +757,12 @@ export default function EditorPage({projectId = DUMMY}) {
           canvas.width = img.width;
           canvas.height = img.height;
           canvas.getContext('2d').drawImage(img, 0, 0);
-          canvas.toBlob(resolve, 'image/png');
+          // PNG 대신 고품질 JPEG 사용으로 파일 크기 대폭 감소 (품질 90%)
+          canvas.toBlob(resolve, 'image/jpeg', 0.9);
         };
         img.src = canvasImage;
       });
-      const file = new File([blob], "canvas_drawing.png", { type: "image/png" });
+      const file = new File([blob], "canvas_drawing.jpg", { type: "image/jpeg" });
       const fd = new FormData();
       fd.append("image", file);
 
