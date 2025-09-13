@@ -30,6 +30,7 @@ export default function Canvas({
   projectId,
   changeSaveMode,
   triggerAutoSave,
+  isSceneTransformed = false, // 씬 변환 상태
 }) {
   const canvasRef = useRef(null);
   const fabricCanvas = useRef(null);
@@ -1346,6 +1347,12 @@ const loadFabricCanvasFromData = async (fabricJsonData) => { // 'async' 키워�
   const handleDrop = (e) => {
     e.preventDefault();
     setIsDragOver(false);
+
+    // 변환된 씬에서는 이미지 드롭 금지
+    if (isSceneTransformed) {
+      alert('변환이 완료된 씬에서는 이미지를 추가할 수 없습니다.');
+      return;
+    }
 
     const imageUrl = e.dataTransfer.getData("text/plain");
     if (imageUrl && fabricCanvas.current) {
