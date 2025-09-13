@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useMemo, useRef, useState} from "react";
+﻿import React, {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import EditorToolbar from "../components/EditorToolbar.jsx";
 import MainCanvasSection from "../components/MainCanvasSection.jsx";
 import SceneCarousel from "../components/SceneCarousel.jsx";
@@ -23,7 +23,7 @@ const VISIBLE = 4;
 const DUMMY = "11111111-1111-1111-1111-111111111111";
 
 const LEFT_TOOL_WIDTH = 100;
-const RIGHT_PANEL_WIDTH = 300; // 미리보기 패널을 위해 40px 증가
+const RIGHT_PANEL_WIDTH = 280; // 미리보기 패널을 위해 40px 증가
 
 export default function EditorPage({projectId = DUMMY}) {
   const {project_id} = useParams();
@@ -1177,7 +1177,7 @@ export default function EditorPage({projectId = DUMMY}) {
           className="editor-shell font-nanumhuman"
           style={{
             width: "100%",
-            minHeight: "100vh",
+            height: "100%",
             background: "#fff",
             display: "flex",
             alignItems: "flex-start",
@@ -1194,7 +1194,7 @@ export default function EditorPage({projectId = DUMMY}) {
               borderRight: "1px solid #eee",
               position: "sticky",
               top: 0,
-              height: "100vh",
+              height: "100%",
               background: "#fff",
               flex: "0 0 auto",
               boxSizing: "border-box",
@@ -1340,7 +1340,7 @@ export default function EditorPage({projectId = DUMMY}) {
 
         {/* 갤러리 패널 */}
         {galleryOpen && (
-            <div style={{flex: "0 1 360px", minWidth: 0, boxSizing: "border-box"}}>
+            <div style={{flex: "0 1 250px", minWidth: 0, boxSizing: "border-box"}}>
               <ImageGallery onImageDragStart={(u) => console.log("drag:", u)}/>
             </div>
         )}
@@ -1396,7 +1396,7 @@ export default function EditorPage({projectId = DUMMY}) {
               borderLeft: "1px solid #eee",
               position: "sticky",
               top: 0,
-              height: "100vh",
+              height: "100%",
               background: "#fff",
               flex: "0 0 auto",
               boxSizing: "border-box",
@@ -1404,7 +1404,7 @@ export default function EditorPage({projectId = DUMMY}) {
               zIndex: 50,
             }}
         >
-          <div style={{height: "100%", overflowY: "auto", padding: 16}}>
+          <div style={{height: "100%", overflowY: "scroll", padding: 16}}>
             {/* 레이어 패널 */}
             {canvasReady ? (
                 <LayerPanel
@@ -1473,7 +1473,7 @@ export default function EditorPage({projectId = DUMMY}) {
                   <div style={{ fontSize: "16px", fontWeight: "600", marginBottom: "8px" }}>
                     ✅ 변환 완료
                   </div>
-                  <div style={{ fontSize: "14px" }}>
+                  <div style={{ fontSize: "14px", wordBreak: 'keep-all' }}>
                     브러쉬 도구로 추가 편집이 가능합니다
                   </div>
                 </div>

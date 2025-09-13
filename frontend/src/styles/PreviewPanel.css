@@ -187,8 +187,9 @@
 
 .preview-empty p {
   margin: 0;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.5;
+  word-break: keep-all;
 }
 
 .preview-panel-footer {

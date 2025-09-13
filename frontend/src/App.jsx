@@ -89,32 +89,35 @@ const showGlobalNav = location.pathname !== "/" && location.pathname !== "/login
   }
 
 return (
-  <div style={{ padding: 0 }}>
+  <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
     {/* 메인에서는 전역 Navbar를 숨기고, 다른 페이지에서만 보이게 */}
     {showGlobalNav && <Navbar />}  
       
-      <Routes location={background || location}>
-        <Route path="/" element={<MainPage />} />
-        <Route path="/dashboard" element={<PrivateRoute> <DashboardPage /> </PrivateRoute> }/>
-        <Route path="/projects" element={<Navigate to="/dashboard" replace />}/>
-        <Route path="/projects/:project_id" element={<ProjectOwnerRoute> <EditorPage /> </ProjectOwnerRoute>}/>
-         {!background && (
-          <Route
-            path="/login"
-            element={
-              <PublicRoute>
-                <MainPage />
-                <LoginModal />
-              </PublicRoute>
-            }
-          />
-        )}
-      </Routes>
-      {background && (
-        <Routes>
-          <Route path="/login" element={<LoginModal />} />
+      <div style={{ flex: '1 1 auto', overflowY: 'hidden', position: 'relative' }}>
+        <Routes location={background || location}>
+          <Route path="/" element={<MainPage />} />
+          <Route path="/dashboard" element={<PrivateRoute> <DashboardPage /> </PrivateRoute> }/>
+          <Route path="/projects" element={<Navigate to="/dashboard" replace />}/>
+          <Route path="/projects/:project_id" element={<ProjectOwnerRoute> <EditorPage /> </ProjectOwnerRoute>}/>
+           {!background && (
+            <Route
+              path="/login"
+              element={
+                <PublicRoute>
+                  <MainPage />
+                  <LoginModal />
+                </PublicRoute>
+              }
+            />
+          )}
         </Routes>
-      )}
+        {background && (
+          <Routes>
+            <Route path="/login" element={<LoginModal />} />
+          </Routes>
+        )}
+      </div>
+
       <div style={unityOverlayStyle}>
         <div style={unityContainerStyle}>
           <button
