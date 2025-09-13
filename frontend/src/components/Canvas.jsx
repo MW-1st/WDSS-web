@@ -972,13 +972,40 @@ const loadFabricCanvasFromData = async (fabricJsonData) => { // 'async' 키워�
         }
 
         const pointer = canvas.getPointer(e.e);
+        const dotRadius = 2;
+        
+        // 캔버스 경계 체크: 점선 경계 밖에는 도트 생성 금지
+        if (pointer.x < 0 || pointer.x > width || pointer.y < 0 || pointer.y > height) {
+          return; // 경계 밖이면 도트를 생성하지 않음
+        }
+        
+        // 중복 체크: 동일한 위치에 이미 도트가 있는지 확인
+        const overlapping = currentDots.some(existingDot => {
+          const existingX = existingDot.left + existingDot.radius;
+          const existingY = existingDot.top + existingDot.radius;
+          const newX = pointer.x;
+          const newY = pointer.y;
+          
+          // 두 원의 중심 사이의 거리 계산
+          const distance = Math.sqrt(
+            Math.pow(newX - existingX, 2) + Math.pow(newY - existingY, 2)
+          );
+          
+          // 두 도트가 겹치는지 확인 (반지름의 합보다 작으면 겹침)
+          return distance < (dotRadius + existingDot.radius);
+        });
+        
+        // 겹치는 위치면 새 도트를 생성하지 않음
+        if (overlapping) {
+          return;
+        }
+
         // 클로저 문제를 피하기 위해 ref에서 최신 값을 가져옴
         const currentActiveLayerId = activeLayerIdRef.current;
         const currentLayers = layersRef.current;
         const activeLayer = currentLayers.find(layer => layer.id === currentActiveLayerId);
 
         // 변환된 도트와 같은 크기로 브러쉬 도트 생성 (고정 2px)
-        const dotRadius = 2;
         const newDot = new fabric.Circle({
           left: pointer.x - dotRadius,
           top: pointer.y - dotRadius,
