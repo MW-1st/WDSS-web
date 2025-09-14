@@ -234,6 +234,7 @@ async def process_uploaded_image(
 @router.post("/svg-to-json")
 async def svg_to_json_endpoint(
     file: UploadFile = File(...),
+    project_id: str | None = None,  # 프로젝트 ID 추가
     show_name: str = "svg-import",
     scene_number: int = 1,
     scene_holder: int = 0,
@@ -301,7 +302,11 @@ async def svg_to_json_endpoint(
             json.dump(data, f, ensure_ascii=False, indent=2)
 
         # Unity로 JSON 데이터 전송
-        await manager.broadcast(json.dumps(data))
+        if project_id:
+            await manager.broadcast_to_project(project_id, json.dumps(data))
+        else:
+            # project_id가 없으면 전역 브로드캐스트 (기존 호환성)
+            await manager.broadcast(json.dumps(data))
 
         return {"json_url": f"/svg-json/{out_name}", "unity_sent": True}
     finally:

@@ -3,7 +3,8 @@ import React from "react";
 export default function UnitySimulatorControls({
   isUnityVisible,
   showUnity,
-  hideUnity
+  hideUnity,
+  projectId  // 프로젝트 ID 추가
 }) {
   const buttonStyle = {
     padding: "10px 20px",
@@ -30,7 +31,7 @@ export default function UnitySimulatorControls({
     >
       <div style={{ marginBottom: "15px" }}>
         {!isUnityVisible ? (
-          <button style={buttonStyle} onClick={showUnity}>
+          <button style={buttonStyle} onClick={() => showUnity(projectId)}>
             🎮 Unity 시뮬레이터 열기
           </button>
         ) : (
