@@ -598,6 +598,9 @@ export default function Canvas({
   useEffect(() => {
     console.log("imageUrl 변경됨:", imageUrl);
     if (!imageUrl || !fabricCanvas.current) return;
+
+    let isCancelled = false;
+
     const canvas = fabricCanvas.current;
 
     const postLoadActions = () => {
@@ -605,176 +608,154 @@ export default function Canvas({
       canvas.renderAll();
     };
 
-    if (imageUrl.endsWith(".json")) {
-      console.log("JSON 파일 로드 시작:", imageUrl);
+    // Fabric Canvas 로드 함수 (공통 로직 분리)
+    // Replace the loadFabricCanvasFromData function with this advanced debugger.
 
-      // IndexedDB에서 먼저 확인
-      (async () => {
+    const loadFabricCanvasFromData = async (fabricJsonData) => { // 'async' 키워드 추가
+      const canvas = fabricCanvas.current;
+      if (!canvas) {
+        return;
+      }
+
+      if (!fabricJsonData || !fabricJsonData.objects || fabricJsonData.objects.length === 0) {
+        console.warn("렌더링할 객체가 없습니다.");
+        return;
+      }
+
+      // 1. 기존 객체들을 모두 지웁니다.
+      canvas.clear();
+
+      const objectsToRender = fabricJsonData.objects;
+      const successfullyCreated = [];
+
+      // for...of 루프를 사용하여 비동기 작업을 순차적으로 처리합니다.
+      for (const [i, objData] of objectsToRender.entries()) {
+        if (isCancelled) return;
         try {
-          // selectedId를 사용해서 IndexedDB에서 캐시된 데이터 확인
-          const cachedData = await loadCanvasFromIndexedDB(scene.id);
+          // type이 없는 경우를 대비하고, 앞뒤 공백을 제거합니다.
+          const type = objData.type ? objData.type.trim().toLowerCase() : '';
 
-          if (cachedData) {
-            console.log("IndexedDB에서 캐시된 JSON 데이터 사용:", scene.id);
-            loadFabricCanvasFromData(cachedData);
-            return;
+
+          if (type === 'circle') {
+            // --- Circle 타입 처리 ---
+            const newCircle = new fabric.Circle({
+              ...objData,
+              customType: 'svgDot', // 지우개로 지울 수 있도록 customType 설정
+              selectable: true, // 선택 가능하도록 변경
+              evented: true, // 이벤트 활성화
+              hasControls: false, // 변형 컨트롤 비활성화 (크기 조절 등)
+              hasBorders: true, // 선택 테두리는 표시
+              hoverCursor: 'crosshair',
+              moveCursor: 'crosshair'
+            });
+            successfullyCreated.push(newCircle);
+
+          } else if (type === 'path') {
+            // --- Path 타입 처리 ---
+            const newPath = new fabric.Path(objData.path, objData);
+            successfullyCreated.push(newPath);
+
+          } else if (type === 'image') {
+            const image = await new Promise((resolve, reject) => {
+              const imgSrc = objData.src;
+
+              if (!imgSrc) {
+                return reject(new Error(`#${i} Image 객체에 'src' 속성이 없습니다.`));
+              }
+
+              // 1. 브라우저의 기본 Image 객체 생성
+              const imgEl = new Image();
+              imgEl.crossOrigin = 'anonymous'; // CORS 설정
+
+              // 2. 이미지 로드 성공 시
+              imgEl.onload = () => {
+                // 3. 로드된 이미지(imgEl)를 사용하여 Fabric 이미지 객체 생성
+                const fabricImage = new fabric.Image(imgEl, objData);
+                resolve(fabricImage);
+              };
+
+              // 4. 이미지 로드 실패 시
+              imgEl.onerror = () => {
+                console.error(`[DEBUG] #${i} 이미지 로드 실패.`);
+                reject(new Error(`#${i} 이미지 로드 실패: ${imgSrc}`));
+              };
+
+              // 5. 이미지 소스(src)를 설정하여 로드 시작
+              imgEl.src = imgSrc;
+            });
+            successfullyCreated.push(image);
+
+          } else {
+            console.warn(`#${i} 객체는 정의되지 않은 '${type}' 타입 입니다. 건너뜁니다.`);
           }
 
-          console.log("캐시된 데이터 없음, 서버에서 가져오기:", imageUrl);
+        } catch (error) {
+          console.error(`객체 생성 실패: #${i} 객체에서 문제가 발생했습니다.`, {
+            problematicObjectData: objData,
+            errorDetails: error
+          });
+          return;
+        }
+      }
+      successfullyCreated.forEach(obj => obj.set('dirty', true));
+      canvas.renderOnAddRemove = false;
+      canvas.add(...successfullyCreated);
+      canvas.renderOnAddRemove = true;
+      canvas.renderAll();
+
+      setTimeout(() => {
+    // 그 사이 씬이 다시 전환되었을 수 있으니 한번 더 확인
+      if (isCancelled) return;
+      console.log("🎨 강제 렌더링 재실행 (색상 적용)");
+      canvas.renderAll();
+    }, 16);
+
+      postLoadActions();
+    };
+
+    // IndexedDB에서 먼저 확인
+    const startLoading = async () => {
+      try {
+        // selectedId를 사용해서 IndexedDB에서 캐시된 데이터 확인
+        const cachedData = await loadCanvasFromIndexedDB(scene.id);
+
+        if (cachedData) {
+          await loadFabricCanvasFromData(cachedData);
+        } else {
 
           // 캐시가 없으면 기존처럼 fetch로 가져오기
           const response = await fetch(imageUrl);
+          if (isCancelled) return;
           if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
           }
 
           const fabricJsonData = await response.json();
-          console.log("서버에서 JSON 데이터 로드됨:", fabricJsonData);
-
+          if (isCancelled) return;
           // 서버에서 가져온 데이터를 IndexedDB에 저장
           if (scene.id) {
-            try {
-              await saveCanvasToIndexedDB(scene.id, fabricJsonData);
-              console.log("JSON 데이터가 IndexedDB에 저장됨:", scene.id);
-            } catch (saveError) {
-              console.warn("IndexedDB 저장 실패:", saveError);
-            }
+            await saveCanvasToIndexedDB(scene.id, fabricJsonData);
           }
+          if (isCancelled) return;
 
-          loadFabricCanvasFromData(fabricJsonData);
-
-        } catch (err) {
+          await loadFabricCanvasFromData(fabricJsonData);
+        }
+      } catch (err) {
+        if (!isCancelled) {
           console.error("JSON 로드 실패:", err);
-          // // JSON 로드 실패 시 기본 이미지 방식으로 폴백
-          // loadAsImage();
         }
-      })();
-    }
-    // Fabric Canvas 로드 함수 (공통 로직 분리)
-    // Replace the loadFabricCanvasFromData function with this advanced debugger.
+      }
+    };
 
-const loadFabricCanvasFromData = async (fabricJsonData) => { // 'async' 키워드 추가
-    const canvas = fabricCanvas.current;
+    startLoading();
 
-    if (!canvas) {return;}
+    return () => {
+      console.log(`🧹 로딩 작업 취소: ${scene?.id}`);
+      isCancelled = true;
+    };
 
-    if (!fabricJsonData || !fabricJsonData.objects || fabricJsonData.objects.length === 0) {
-        console.warn("렌더링할 객체가 없습니다.");
-        return;
-    }
+  }, [imageUrl, scene?.id]);
 
-    // 1. 기존 객체들을 모두 지웁니다.
-    const existingObjects = canvas.getObjects()
-        .filter(obj => obj.customType === "svgDot" || obj.customType === "jsonDot" || obj.type === "image");
-      existingObjects.forEach(obj => canvas.remove(obj));
-
-    const objectsToRender = fabricJsonData.objects;
-    const successfullyCreated = [];
-
-    // for...of 루프를 사용하여 비동기 작업을 순차적으로 처리합니다.
-    for (const [i, objData] of objectsToRender.entries()) {
-    try {
-        // type이 없는 경우를 대비하고, 앞뒤 공백을 제거합니다.
-        const type = objData.type ? objData.type.trim().toLowerCase() : '';
-        
-
-        if (type === 'circle') {
-            // --- Circle 타입 처리 ---
-            const newCircle = new fabric.Circle({
-                ...objData,
-                customType: 'svgDot', // 지우개로 지울 수 있도록 customType 설정
-                selectable: true, // 선택 가능하도록 변경
-                evented: true, // 이벤트 활성화
-                hasControls: false, // 변형 컨트롤 비활성화 (크기 조절 등)
-                hasBorders: true, // 선택 테두리는 표시
-                hoverCursor: 'crosshair',
-                moveCursor: 'crosshair'
-            });
-            successfullyCreated.push(newCircle);
-
-        } else if (type === 'path') {
-            // --- Path 타입 처리 ---
-            const newPath = new fabric.Path(objData.path, objData);
-            successfullyCreated.push(newPath);
-
-        } else if (type === 'image') {
-           const image = await new Promise((resolve, reject) => {
-                const imgSrc = objData.src;
-
-                if (!imgSrc) {
-                    return reject(new Error(`#${i} Image 객체에 'src' 속성이 없습니다.`));
-                }
-
-                // 1. 브라우저의 기본 Image 객체 생성
-                const imgEl = new Image();
-                imgEl.crossOrigin = 'anonymous'; // CORS 설정
-
-                // 2. 이미지 로드 성공 시
-                imgEl.onload = () => {
-                    // 3. 로드된 이미지(imgEl)를 사용하여 Fabric 이미지 객체 생성
-                    const fabricImage = new fabric.Image(imgEl, objData);
-                    resolve(fabricImage);
-                };
-
-                // 4. 이미지 로드 실패 시
-                imgEl.onerror = () => {
-                    console.error(`[DEBUG] #${i} 이미지 로드 실패.`);
-                    reject(new Error(`#${i} 이미지 로드 실패: ${imgSrc}`));
-                };
-
-                // 5. 이미지 소스(src)를 설정하여 로드 시작
-                imgEl.src = imgSrc;
-            });
-            successfullyCreated.push(image);
-
-        } else {
-             console.warn(`#${i} 객체는 정의되지 않은 '${type}' 타입 입니다. 건너뜁니다.`);
-        }
-
-    } catch (error) {
-        console.error(`객체 생성 실패: #${i} 객체에서 문제가 발생했습니다.`, {
-            problematicObjectData: objData,
-            errorDetails: error
-        });
-        return;
-    }
-}
-
-    canvas.renderOnAddRemove = false;
-    canvas.add(...successfullyCreated);
-    canvas.renderOnAddRemove = true;
-    canvas.renderAll();
-    postLoadActions();
-};
-  }, [imageUrl,scene?.id]); // selectedId도 dependency에 추가
-
-
-  //   function loadAsImage() {
-  //     FabricImage.fromURL(imageUrl, {
-  //       crossOrigin: "anonymous",
-  //     }).then((img) => {
-  //       // Clear previous image
-  //       const existingImage = canvas.getObjects("image")[0];
-  //       if (existingImage) {
-  //         canvas.remove(existingImage);
-  //       }
-  //
-  //       const scale = Math.min(width / img.width, height / img.height, 1);
-  //       img.set({
-  //         left: (width - img.width * scale) / 2,
-  //         top: (height - img.height * scale) / 2,
-  //         scaleX: scale,
-  //         scaleY: scale,
-  //         selectable: false,
-  //         evented: false,
-  //       });
-  //
-  //       canvas.add(img);
-  //       canvas.sendToBack(img);
-  //       canvas.renderAll();
-  //     });
-  //   }
-  // }, [imageUrl]);
 
   // 외부에서 drawingMode가 변경될 때 반응
   useEffect(() => {
