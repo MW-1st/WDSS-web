@@ -23,15 +23,14 @@ from app.db.database import get_conn
 from app.db.user import get_user_by_username
 from app.dependencies import get_current_user
 from app.utils.mailer import send_email
+from app.utils.redis_client import VerificationStore, RateLimitStore
 
 router = APIRouter()
 
-# SSE를 위한 인메모리 스토어 (이메일별 인증 상태 관리)
-verification_store = {}
-verification_events = {}
-
-# 이메일 재발송 제한을 위한 스토어 (이메일별 마지막 발송 시간)
-email_send_timestamps = {}
+# Redis로 교체됨! 이제 모든 서버가 데이터를 공유합니다
+# verification_store = {}         → VerificationStore 클래스 사용
+# verification_events = {}        → Redis Pub/Sub 사용 (추후 구현)
+# email_send_timestamps = {}      → RateLimitStore 클래스 사용
 
 
 async def authenticate_user(username: str, password: str) -> Optional[UserInDB]:
@@ -102,36 +101,23 @@ async def read_users_me(current_user: UserResponse = Depends(get_current_user)):
 
 @router.get("/verification-stream/{email}")
 async def verification_stream(email: str):
-    """SSE 엔드포인트: 이메일 인증 상태를 실시간으로 스트리밍"""
+    """Redis 기반 SSE 엔드포인트"""
 
     async def event_publisher():
-        # 연결 초기화
-        verification_events[email] = asyncio.Event()
-
         try:
             yield f"data: {json.dumps({'status': 'connected', 'email': email})}\n\n"
 
+            # Redis에서 주기적으로 인증 상태 확인
             while True:
-                # 인증 이벤트 대기
-                await verification_events[email].wait()
+                await asyncio.sleep(1)  # 1초마다 확인
 
-                # 인증 상태 확인
-                if email in verification_store and verification_store[email].get('verified'):
-                    token = verification_store[email].get('token')
+                if VerificationStore.is_verified(email):
+                    token = VerificationStore.get_token(email)
                     yield f"data: {json.dumps({'status': 'verified', 'email': email, 'token': token})}\n\n"
                     break
 
-                # 이벤트 리셋
-                verification_events[email].clear()
-
         except asyncio.CancelledError:
             pass
-        finally:
-            # 정리
-            if email in verification_events:
-                del verification_events[email]
-            if email in verification_store:
-                del verification_store[email]
 
     return StreamingResponse(
         event_publisher(),
@@ -147,16 +133,17 @@ async def verification_stream(email: str):
 
 async def _send_verification_email_internal(email: str, is_resend: bool = False):
     """내부 이메일 발송 함수 (재발송 제한 로직 포함)"""
+    print(f"[FUNCTION_CALLED] _send_verification_email_internal: {email}, is_resend: {is_resend}")
+
     import time
 
     current_time = time.time()
     email_str = str(email)
 
-    # 재발송 제한 확인 (재발송인 경우에만)
-    if is_resend and email_str in email_send_timestamps:
-        time_since_last_send = current_time - email_send_timestamps[email_str]
-        if time_since_last_send < 60:  # 60초 제한
-            remaining_time = int(60 - time_since_last_send)
+    # Redis 기반 재발송 제한 확인 (재발송인 경우에만)
+    if is_resend:
+        remaining_time = RateLimitStore.get_remaining_cooldown(email_str)
+        if remaining_time > 0:
             raise HTTPException(
                 status_code=429,
                 detail=f"Please wait {remaining_time} seconds before resending"
@@ -189,12 +176,15 @@ async def _send_verification_email_internal(email: str, is_resend: bool = False)
         f"\n\n{'This is a resent verification email.' if is_resend else ''}"
     )
 
+    print(f"[DEBUG] About to send email to: {email_str}")
+    print(f"[DEBUG] Subject: {subject}")
+
     try:
         send_email(email_str, subject, body)
 
-        # 발송 시간 기록 (재발송인 경우에만)
+        # Redis에 발송 시간 기록 (재발송인 경우에만)
         if is_resend:
-            email_send_timestamps[email_str] = current_time
+            RateLimitStore.set_send_timestamp(email_str)
 
         action = "resent" if is_resend else "sent"
         return MessageResponse(
@@ -202,9 +192,12 @@ async def _send_verification_email_internal(email: str, is_resend: bool = False)
             message=f"Verification email {action} to {email_str}. Please check your inbox."
         )
     except Exception as e:
-        # 발송 시간 기록 (개발환경에서도, 재발송인 경우에만)
+        print(f"[EMAIL_ERROR] Failed to send email: {e}")
+        print(f"[EMAIL_ERROR] Email: {email_str}")
+
+        # Redis에 발송 시간 기록 (개발환경에서도, 재발송인 경우에만)
         if is_resend:
-            email_send_timestamps[email_str] = current_time
+            RateLimitStore.set_send_timestamp(email_str)
 
         action = "resent" if is_resend else "sent"
         return MessageResponse(
@@ -216,6 +209,7 @@ async def _send_verification_email_internal(email: str, is_resend: bool = False)
 @router.post("/send-verification", response_model=MessageResponse)
 async def send_verification_email(payload: SendVerificationRequest):
     """이메일 인증 코드를 발송합니다."""
+    print(f"[ENDPOINT] send_verification_email called with: {payload.email}")
     return await _send_verification_email_internal(payload.email, is_resend=False)
 
 
@@ -230,8 +224,8 @@ async def resend_verification_email(payload: SendVerificationRequest):
     "/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED
 )
 async def register(payload: RegisterRequest):
-    # 이메일 인증 여부 확인 (SSE 방식)
-    if payload.email not in verification_store or not verification_store[payload.email].get('verified'):
+    # Redis에서 이메일 인증 여부 확인
+    if not VerificationStore.is_verified(str(payload.email)):
         raise HTTPException(
             status_code=400, detail="Email verification required. Please verify your email first."
         )
@@ -298,16 +292,11 @@ async def verify_email(token: str):
     try:
         email = security.decode_email_verification_token(token)
 
-        # 인증 상태 저장
-        verification_store[email] = {
-            'verified': True,
-            'token': token,
-            'timestamp': timedelta()
-        }
+        # Redis에 인증 상태 저장
+        VerificationStore.set_verified(email, token)
 
-        # SSE 이벤트 트리거
-        if email in verification_events:
-            verification_events[email].set()
+        # SSE 이벤트 트리거 (추후 Redis Pub/Sub로 개선 예정)
+        # 현재는 SSE가 주기적으로 Redis를 확인하는 방식으로 작동
 
         return f"""
         <!DOCTYPE html>
