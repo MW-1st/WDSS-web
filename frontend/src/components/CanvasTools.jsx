@@ -108,6 +108,20 @@ const CanvasTools = React.memo(function CanvasTools({
           </button>
         </div>
 
+        <div className="color-picker-group">
+            <div className="color-picker-wrapper">
+            <input
+                ref={anchorRefs.color}
+                type="color"
+                value={drawingColor}
+                onChange={handleNativeColorChange}
+                className="square-color-picker"
+                aria-label="색상 선택"
+                title={drawingColor}
+            />
+            </div>
+        </div>
+
         <div
           ref={anchorRefs.erase}
           className="tool-anchor"
@@ -136,20 +150,6 @@ const CanvasTools = React.memo(function CanvasTools({
           >
             <FaEraser />
           </button>
-        </div>
-      </div>
-
-      <div className="color-picker-group">
-        <div className="color-picker-wrapper">
-          <input
-            ref={anchorRefs.color}
-            type="color"
-            value={drawingColor}
-            onChange={handleNativeColorChange}
-            className="square-color-picker"
-            aria-label="색상 선택"
-            title={drawingColor}
-          />
         </div>
       </div>
 
