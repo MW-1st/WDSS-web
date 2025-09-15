@@ -43,7 +43,6 @@ export default function useCanvasImageLoader({
     };
 
     const loadFabricCanvasFromData = async (fabricJsonData) => {
-      const canvas = fabricCanvasRef.current;
       if (!canvas) return;
 
       if (
@@ -119,11 +118,9 @@ export default function useCanvasImageLoader({
           return;
         }
       }
-      successfullyCreated.forEach((obj) => obj.set("dirty", true));
       canvas.renderOnAddRemove = false;
       canvas.add(...successfullyCreated);
       canvas.renderOnAddRemove = true;
-      canvas.renderAll();
 
       setTimeout(() => {
         if (isCancelled) return;
