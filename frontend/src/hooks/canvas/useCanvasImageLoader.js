@@ -27,6 +27,7 @@ export default function useCanvasImageLoader({
   triggerAutoSave,
   onCanvasChangeRef,
   setCanvasRevision,
+  loadSceneLayerState,
 }) {
   // 이미지/JSON 로드 effect
   useEffect(() => {
@@ -43,7 +44,6 @@ export default function useCanvasImageLoader({
     };
 
     const loadFabricCanvasFromData = async (fabricJsonData) => {
-      const canvas = fabricCanvasRef.current;
       if (!canvas) return;
 
       if (
@@ -119,11 +119,41 @@ export default function useCanvasImageLoader({
           return;
         }
       }
-      successfullyCreated.forEach((obj) => obj.set("dirty", true));
       canvas.renderOnAddRemove = false;
       canvas.add(...successfullyCreated);
       canvas.renderOnAddRemove = true;
-      canvas.renderAll();
+
+      if (fabricJsonData.layerMetadata && loadSceneLayerState && scene?.id) {
+        loadSceneLayerState(scene.id, fabricJsonData.layerMetadata);
+
+        setTimeout(() => {
+          const canvas = fabricCanvasRef.current;
+          if (canvas && fabricJsonData.layerMetadata) {
+            const layers = fabricJsonData.layerMetadata.layers || [];
+            const objects = canvas.getObjects();
+
+            objects.forEach(obj => {
+              // 캔버스 경계선은 제외
+              if (obj.name === 'canvasBoundary') return;
+
+              if (obj.layerId) {
+                const layer = layers.find(l => l.id === obj.layerId);
+                if (layer) {
+                  obj.set({
+                    visible: layer.visible,
+                    selectable: !layer.locked,
+                    evented: !layer.locked
+                  });
+                }
+              } else if (fabricJsonData.layerMetadata.activeLayerId) {
+                obj.set('layerId', fabricJsonData.layerMetadata.activeLayerId);
+              }
+            });
+
+            canvas.renderAll();
+          }
+        }, 50);
+      }
 
       setTimeout(() => {
         if (isCancelled) return;

@@ -1,4 +1,4 @@
-export function createCanvasActions({ fabricCanvasRef, drawingColorRef, layersRef, activeLayerIdRef, triggerAutoSave, onCanvasChangeRef, setCanvasRevision, width = 800, height = 500 }) {
+export function createCanvasActions({ fabricCanvasRef, drawingColorRef, layersRef, activeLayerIdRef, triggerAutoSave, onCanvasChangeRef, setCanvasRevision, width = 800, height = 500, getSceneLayerState, sceneId }) {
   const handleClearAll = () => {
     if (!fabricCanvasRef.current) return;
 
@@ -169,16 +169,26 @@ export function createCanvasActions({ fabricCanvasRef, drawingColorRef, layersRe
     if (!fabricCanvasRef.current) return null;
 
     const canvas = fabricCanvasRef.current;
+    const canvasData = canvas.toJSON([
+      'layerId', 'layerName', 'customType', 'originalFill',
+      'originalCx', 'originalCy'
+    ]);
+
+    const layerState = sceneId ? getSceneLayerState(sceneId) : null;
+
     const state = {
-      objects: canvas.toJSON(),
+      ...canvasData,
+      layerMetadata: layerState ? {
+        layers: layerState.layers,
+        activeLayerId: layerState.activeLayerId
+      } : null,
       timestamp: Date.now(),
     };
 
-    console.log("원본 캔버스 상태 저장:", state);
     return state;
   };
 
-  const restoreOriginalCanvasState = (state) => {
+  const restoreOriginalCanvasState = (state, loadSceneLayerState) => {
     if (!fabricCanvasRef.current || !state) return false;
 
     const canvas = fabricCanvasRef.current;
@@ -193,9 +203,14 @@ export function createCanvasActions({ fabricCanvasRef, drawingColorRef, layersRe
       );
     existingObjects.forEach((obj) => canvas.remove(obj));
 
-    canvas.loadFromJSON(state.objects, () => {
+    const canvasData = state.objects ? { objects: state.objects, version: state.version } : state;
+
+    canvas.loadFromJSON(canvasData, () => {
       canvas.renderAll();
-      console.log("원본 캔버스 상태 복원 완료");
+
+      if (state.layerMetadata && loadSceneLayerState && sceneId) {
+        loadSceneLayerState(sceneId, state.layerMetadata);
+      }
     });
 
     return true;

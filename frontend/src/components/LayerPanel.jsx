@@ -94,8 +94,7 @@ const LayerPanel = ({
       </div>
       
       <div className="layer-list">
-        {console.log('=== LayerPanel DEBUG ===', layers.map(l => ({ id: l.id, name: l.name, zIndex: l.zIndex })))}
-        {layers.map((layer) => {
+        {[...layers].sort((a, b) => b.zIndex - a.zIndex).map((layer) => {
           const handleLayerItemClick = () => {
             console.log('Layer item clicked:', layer.id, layer.name);
             onLayerSelect(layer.id);

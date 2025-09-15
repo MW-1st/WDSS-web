@@ -93,6 +93,7 @@ export default function EditorPage({projectId = DUMMY}) {
   const [activeLayerIdState, setActiveLayerIdState] = useState(null);
   const [selectedObjectLayerId, setSelectedObjectLayerId] = useState(null);
 
+
   // 프로젝트 설정 모달 상태
   const [editingProject, setEditingProject] = useState(null);
   const openProjectSettings = () => {
@@ -122,37 +123,54 @@ export default function EditorPage({projectId = DUMMY}) {
 
   // 레이어 상태를 업데이트하는 함수
   const updateLayerState = React.useCallback(() => {
-    if (stageRef.current && stageRef.current.layers) {
+    if (stageRef.current && selectedId) {
       try {
-        const layers = stageRef.current.layers.getLayers() || [];
-        const activeId = stageRef.current.layers.getActiveLayerId();
+        // 씬별 레이어 상태 가져오기
+        const canvas = stageRef.current;
+        if (canvas.getSceneLayerState) {
+          const layerState = canvas.getSceneLayerState(selectedId);
+          if (layerState && layerState.layers) {
+            const layers = layerState.layers || [];
+            const activeId = layerState.activeLayerId || 'layer-1';
 
-        setLayersState(prevLayers => {
-          const layersChanged = JSON.stringify(prevLayers.map(l => ({id: l.id, zIndex: l.zIndex, name: l.name, visible: l.visible, locked: l.locked}))) !== 
-                               JSON.stringify(layers.map(l => ({id: l.id, zIndex: l.zIndex, name: l.name, visible: l.visible, locked: l.locked})));
-          
-          if (layersChanged) {
-            console.log('Layers changed, updating state');
-            return [...layers];
-          } else {
-            return prevLayers;
+            setLayersState(prevLayers => {
+              const layersChanged = JSON.stringify(prevLayers.map(l => ({id: l.id, zIndex: l.zIndex, name: l.name, visible: l.visible, locked: l.locked}))) !==
+                                   JSON.stringify(layers.map(l => ({id: l.id, zIndex: l.zIndex, name: l.name, visible: l.visible, locked: l.locked})));
+
+              if (layersChanged) {
+                return [...layers];
+              } else {
+                return prevLayers;
+              }
+            });
+
+            setActiveLayerIdState(prevActiveId => {
+              if (prevActiveId !== activeId) {
+                return activeId;
+              } else {
+                return prevActiveId;
+              }
+            });
+            return;
           }
-        });
+        }
 
-        setActiveLayerIdState(prevActiveId => {
-          if (prevActiveId !== activeId) {
-            console.log('Active layer changed:', prevActiveId, '->', activeId);
-            return activeId;
-          } else {
-            return prevActiveId;
-          }
-        });
-
+        // 폴백: 기존 방식 사용
+        if (stageRef.current.layers) {
+          const layers = stageRef.current.layers.getLayers() || [];
+          const activeId = stageRef.current.layers.getActiveLayerId() || 'layer-1';
+          setLayersState([...layers]);
+          setActiveLayerIdState(activeId);
+        } else {
+          // 캔버스 레이어 시스템이 아직 준비되지 않은 경우 기본값 사용
+          console.log('Canvas layers not ready, using default values');
+          setActiveLayerIdState('layer-1');
+        }
       } catch (error) {
         console.warn('Error updating layer state:', error);
       }
     }
-  }, []);
+  }, [selectedId]);
 
   // unity 관련 상태
   const {isUnityVisible, showUnity, hideUnity, sendTestData} = useUnity();
@@ -207,10 +225,15 @@ export default function EditorPage({projectId = DUMMY}) {
   });
   const {syncToServer, uploadThumbnail} = useServerSync(pid, selectedId, stageRef);
 
-  const handleSaveThumbnail = useCallback(async (pregeneratedDataUrl = null) => {
-    // 캔버스나 업로드 함수가 준비되지 않았으면 실행하지 않음
-    if (!stageRef.current || !uploadThumbnail) {
-      console.warn("썸네일 저장 실패: 캔버스나 업로드 함수가 준비되지 않았습니다.");
+   const saveCurrentScene = useCallback(async (sceneIdToSave, saveModeToUse, options = {}) => {
+    const {
+      shouldSaveThumbnail = false,
+      capturedCanvasData = null,    // 캡처된 캔버스 데이터 옵션
+      capturedThumbnailDataUrl = null // 캡처된 썸네일 데이터 옵션
+    } = options;
+
+    if (!sceneIdToSave || !stageRef.current) {
+      console.warn('저장할 씬 ID 또는 캔버스가 없어 저장 작업을 건너뜁니다.');
       return;
     }
 
@@ -242,7 +265,7 @@ export default function EditorPage({projectId = DUMMY}) {
       const canvas = stageRef.current;
       const canvasData = canvas.toJSON([
         'layerId', 'layerName', 'customType', 'originalFill',
-        'originalCx', 'originalCy', 'brightness'
+        'originalCx', 'originalCy'
       ]);
 
       // 현재 saveMode에 맞게 서버에 저장
@@ -259,9 +282,14 @@ export default function EditorPage({projectId = DUMMY}) {
         alert('저장에 실패했습니다. 다시 시도해주세요.');
       }
     } catch (error) {
-      console.error('Manual save error:', error);
-      alert('저장 중 오류가 발생했습니다.');
+      console.error(`❌ ${sceneIdToSave} 씬 저장 중 오류 발생:`, error);
     }
+  }, [saveImmediately, syncToServer, uploadThumbnail]);
+
+
+  // 수동 저장 함수
+  const handleManualSave = async () => {
+     await saveCurrentScene(selectedId, saveMode, { shouldSaveThumbnail: true });
   };
 
   // 씬 변경 시 서버 동기화
@@ -273,42 +301,52 @@ export default function EditorPage({projectId = DUMMY}) {
     previousSceneId.current = selectedId;
   }, [selectedId]);
 
-  // 브라우저 이벤트 리스너
+  // 씬 변경 추적 및 페이지 이탈 시 저장을 위한 useEffect
   useEffect(() => {
-    const handleBeforeUnload = async (event) => {
-      if (selectedId && stageRef.current) {
-        console.log('Page unloading, syncing to server...');
-        await Promise.all([
-          syncToServerNow(),
-          handleSaveThumbnail() // 썸네일 저장 함수 호출
-        ]);
+    // --- 페이지를 떠날 때 실행될 통합 저장 함수 ---
+    const handleSaveOnExit = () => {
+      // 현재 선택된 씬 ID와 저장 모드를 ref에서 가져와 저장
+      // 페이지를 떠나는 것은 중요한 이벤트이므로 썸네일을 함께 저장합니다.
+      saveCurrentScene(selectedIdRef.current, previousSaveModeRef.current, {
+        shouldSaveThumbnail: true
+      });
+    };
+
+    // --- 이벤트 핸들러 정의 ---
+    const handleBeforeUnload = (event) => {
+      // 내용이 있을 때만 저장 로직 실행
+      if (selectedIdRef.current && stageRef.current) {
+        console.log('페이지를 닫기 전 저장합니다...');
+        handleSaveOnExit();
       }
     };
 
     const handleVisibilityChange = () => {
+      // 탭을 벗어나거나 브라우저가 비활성화될 때
       if (document.visibilityState === 'hidden') {
-        console.log('Page hidden, syncing to server...');
-        syncToServerNow();
+        console.log('페이지가 비활성화되어 저장합니다...');
+        handleSaveOnExit();
       }
     };
 
     const handlePopState = () => {
-      console.log('Navigation detected, syncing to server...');
-      syncToServerNow();
+      // 브라우저 뒤로가기/앞으로가기 버튼 사용 시
+      console.log('브라우저 네비게이션으로 인해 저장합니다...');
+      handleSaveOnExit();
     };
 
-    // 이벤트 리스너 등록
+    // --- 이벤트 리스너 등록 ---
     window.addEventListener('beforeunload', handleBeforeUnload);
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('popstate', handlePopState);
 
+    // --- 컴포넌트 언마운트 시 리스너 정리 ---
     return () => {
-      // 정리
       window.removeEventListener('beforeunload', handleBeforeUnload);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('popstate', handlePopState);
     };
-  }, [selectedId, syncToServerNow, handleSaveThumbnail]);
+  }, [saveCurrentScene]); // 의존성은 통합 저장 함수 하나로 충분합니다.
 
   // 색상이 변경될 때 즉시 캔버스에 반영
   useEffect(() => {
@@ -336,28 +374,7 @@ export default function EditorPage({projectId = DUMMY}) {
         }
         updateLayerState();
 
-        // 캔버스 선택 이벤트 리스너 추가
-        const canvas = stageRef.current;
-        const handleSelectionChanged = () => {
-          const activeObject = canvas.getActiveObject();
-          if (activeObject && activeObject.layerId) {
-            setSelectedObjectLayerId(activeObject.layerId);
-          } else {
-            setSelectedObjectLayerId(null);
-          }
-        };
-
-        canvas.on('selection:created', handleSelectionChanged);
-        canvas.on('selection:updated', handleSelectionChanged);
-        canvas.on('selection:cleared', () => setSelectedObjectLayerId(null));
-
-        return () => {
-          if (canvas) {
-            canvas.off('selection:created', handleSelectionChanged);
-            canvas.off('selection:updated', handleSelectionChanged);
-            canvas.off('selection:cleared');
-          }
-        };
+        // 캔버스 선택 이벤트는 Canvas 컴포넌트의 onSelectionChange prop으로 처리됨
       } else {
         timeoutId = setTimeout(checkCanvasReady, 100);
       }
@@ -371,31 +388,6 @@ export default function EditorPage({projectId = DUMMY}) {
       if (cleanup) cleanup();
     };
   }, []);
-
-  useEffect(() => {
-    const canvas = stageRef.current;
-    if (!canvas) return;
-
-    const updateDotCount = () => {
-      const objects = canvas.getObjects();
-      const dots = objects.filter(obj => obj.type === 'circle');
-      setDotCount(dots.length);
-    };
-
-    updateDotCount();
-
-    canvas.on('object:added', updateDotCount);
-    canvas.on('object:removed', updateDotCount);
-    canvas.on('load:completed', updateDotCount);
-
-    return () => {
-      if (canvas) {
-        canvas.off('object:added', updateDotCount);
-        canvas.off('object:removed', updateDotCount);
-        canvas.off('load:completed', updateDotCount);
-      }
-    };
-  }, [canvasReady, setDotCount]);
 
   // 프로젝트가 없으면 생성하는 헬퍼
   const ensureProjectId = async () => {
@@ -581,6 +573,11 @@ export default function EditorPage({projectId = DUMMY}) {
       };
       const nextScenes = [...scenes, createdNorm];
       setScenes(nextScenes);
+
+      // 선택 상태 초기화
+      setSelectedObject(null);
+      setSelectedObjectLayerId(null);
+
       if (createdId) {
         await handleSelect(createdId);
       } else {
@@ -609,60 +606,91 @@ export default function EditorPage({projectId = DUMMY}) {
 
   // 선택
   const handleSelect = (id) => {
-  if (id === "__ADD__" || id === selectedId) return;
+    if (id === "__ADD__" || id === selectedId) return;
 
   // --- 1. 데이터 캡쳐 ---
   // 씬이 바뀌기 직전, 현재 캔버스의 데이터를 미리 변수에 저장합니다.
   let dataToSave = null;
+  let layerStateToSave = null;
   let thumbnailToSave = null;
   const sceneIdToSave = selectedId; // 떠나는 씬의 ID
   const saveModeToUse = previousSaveModeRef.current; // 떠나는 씬의 저장 모드
 
   if (sceneIdToSave && stageRef.current) {
     const canvas = stageRef.current;
-    dataToSave = canvas.toJSON([
+    const canvasData = canvas.toJSON([
       'layerId', 'layerName', 'customType', 'originalFill',
       'originalCx', 'originalCy'
     ]);
+
+    if (canvas.saveCurrentSceneLayerState) {
+      layerStateToSave = canvas.saveCurrentSceneLayerState();
+    }
+
+    dataToSave = {
+      ...canvasData,
+      layerMetadata: layerStateToSave
+    };
+
     thumbnailToSave = canvas.toDataURL({ format: 'png', quality: 0.5 });
   }
-  console.log(`🚀 데이터 저장`, dataToSave, thumbnailToSave);
 
   // --- 2. UI 즉시 업데이트 ---
   // 캡쳐한 스냅샷으로 전환 효과를 주고, 씬 ID를 변경하여 UI를 즉시 전환합니다.
   setSelectedId(id);
+  setSelectedObject(null);
+  setSelectedObjectLayerId(null);
 
-  // --- 3. 백그라운드에서 저장 실행 ---
-  // 캡쳐해 둔 데이터가 있을 경우, 'await' 없이 저장 함수들을 호출하여
-  // 백그라운드에서 작업을 실행시킵니다.
-  if (dataToSave) {
-    // IndexedDB에 저장
-    saveImmediately(dataToSave)
-      .catch(e => console.error('백그라운드 IndexedDB 저장 실패:', e));
-
-    // 서버에 저장
-    syncToServerNow(dataToSave, saveModeToUse)
-      .catch(e => console.error('백그라운드 서버 저장 실패:', e));
-
-    // 썸네일 저장 (미리 생성한 썸네일 데이터를 전달)
-    handleSaveThumbnail(thumbnailToSave)
-      .catch(e => console.error('백그라운드 썸네일 저장 실패:', e));
+  // 캔버스 선택 해제
+  if (stageRef.current) {
+    const canvas = stageRef.current;
+    canvas.discardActiveObject();
+    canvas.renderAll();
   }
 
-  // --- 캐러셀 스크롤 등 나머지 UI 로직 ---
-  const nextScene = scenes.find(s => s.id === id);
-  const nextSceneTransformed = nextScene?.saveMode === 'processed' || nextScene?.isTransformed === true;
-
-  if (nextSceneTransformed) {
-    handleModeChange('select');
-  } else {
-    handleModeChange('select');
+    // --- 3. 백그라운드에서 저장 실행 ---
+     // --- 3. 캡처해 둔 데이터로 백그라운드 저장 실행 ---
+  if (sceneIdToSave && dataToSave) {
+    saveCurrentScene(sceneIdToSave, saveModeToUse, {
+      shouldSaveThumbnail: true,
+      capturedCanvasData: dataToSave,
+      capturedThumbnailDataUrl: thumbnailToSave,
+    });
   }
+
+    // --- 캐러셀 스크롤 등 나머지 UI 로직 ---
+    const nextScene = scenes.find(s => s.id === id);
+    const nextSceneTransformed = nextScene?.saveMode === 'processed' || nextScene?.isTransformed === true;
+
+    if (nextSceneTransformed) {
+      handleModeChange('select');
+    } else {
+      handleModeChange('select');
+    }
 
   const items = [...scenes, {id: "__ADD__", isAdd: true}];
   const idx = items.findIndex(it => it.id === id);
   if (idx < start) setStart(idx);
   if (idx >= start + VISIBLE) setStart(idx - VISIBLE + 1);
+
+  setTimeout(() => {
+    updateLayerState();
+    setSelectedObject(null);
+    setSelectedObjectLayerId(null);
+
+    // 새 씬인 경우 레이어 시스템이 올바르게 초기화되었는지 확인
+    setTimeout(() => {
+      updateLayerState();
+
+      // 여전히 활성 레이어가 없으면 강제로 기본값 설정
+      setTimeout(() => {
+        if (!activeLayerIdState || activeLayerIdState === null) {
+          console.log('Force setting default active layer');
+          setActiveLayerIdState('layer-1');
+        }
+      }, 100);
+    }, 200);
+  }, 100);
 };
 
   // scenes/selectedId 변경 시 선택 유효성 보정
@@ -756,6 +784,9 @@ export default function EditorPage({projectId = DUMMY}) {
   }
 
   setProcessing(true);
+  stageRef.current.off('mouse:down');
+  stageRef.current.off('mouse:move');
+  stageRef.current.off('mouse:up');
 
   try {
     let finalUrl = '';
@@ -860,11 +891,18 @@ export default function EditorPage({projectId = DUMMY}) {
         stageRef.current.loadFromJSON(transformedJsonData, () => {
           stageRef.current.renderAll();
           console.log("변환된 데이터가 현재 캔버스에 로드되었습니다.", selectedId, sceneIdToTransform);
-          handleModeChange('select');
+          handleModeChange('brush');
         });
     } else {
         console.log(`변환은 완료되었지만 사용자가 다른 씬(${selectedId})으로 이동하여 캔버스는 업데이트하지 않습니다.`);
     }
+
+    // React 상태 설정
+    stageRef.current.isDrawingMode = false;
+    stageRef.current.selection = true;
+
+    setDrawingMode('select');
+    setIsPanMode(false);
 
   } catch (e) {
     console.error("Transform error", e);
@@ -914,53 +952,66 @@ export default function EditorPage({projectId = DUMMY}) {
   }, [handleModeChange]);
 
   const handleClearAll = React.useCallback(async () => {
-    if (stageRef.current && stageRef.current.clear) {
+    const canvas = stageRef.current;
+
+    if (canvas && canvas.clear) {
       if (
           confirm(
               "캔버스의 모든 내용을 지우시겠습니까? 이 작업은 되돌릴 수 없습니다."
           )
       ) {
         try {
-          // 1. 캔버스 초기화
-          stageRef.current.clear();
-          console.log("캔버스가 초기화되었습니다");
+          // 1. 모든 이벤트 리스너 임시 제거 (필요시)
+          canvas.off('mouse:down');
+          canvas.off('mouse:move');
+          canvas.off('mouse:up');
 
-          // 2. 서버에 씬 초기화 요청
+          // 2. 캔버스 완전 초기화
+          canvas.clear();
+          canvas.isDrawingMode = false;
+          canvas.selection = true; // 선택 가능하게 설정
+
+          // 3. 서버 데이터 업데이트
           const response = await client.patch(`/projects/${pid}/scenes/${selectedId}`, {
             status: 'reset'
           });
 
-          // 씬 상태를 초기화된 상태로 업데이트
+          await deleteCanvasFromIndexedDB(selectedId)
+
+          // 4. React 상태 초기화
           setScenes(prevScenes =>
             prevScenes.map(scene => {
               if (scene.id === selectedId) {
                 return {
                   ...scene,
-                  saveMode: 'originals', // 변환 상태를 원본으로 리셋
-                  isTransformed: false, // 백업 필드
+                  saveMode: 'originals',
+                  isTransformed: false,
                 };
               }
               return scene;
             })
           );
-          if (stageRef.current?.changeSaveMode) {
-              stageRef.current.changeSaveMode('originals');
-              console.log(stageRef.current.changeSaveMode);
-          }
-          console.log("서버 씬 초기화 완료:", response.data);
-          window.location.reload();
 
-          // 3. 성공 메시지 (선택사항)
-          // alert("씬이 완전히 초기화되었습니다.");
+          // 5. 캔버스 내부 저장 모드 변경
+          if (canvas?.changeSaveMode) {
+              canvas.changeSaveMode('originals');
+          }
+
+          // React 상태 설정
+          setDrawingMode('select');
+          setIsPanMode(false);
+
+          //
+          // // 8. 즉시 렌더링
+          // canvas.renderAll();
 
         } catch (error) {
           console.error("씬 초기화 중 오류 발생:", error);
-          // 에러 처리 - 사용자에게 알림
           alert("씬 초기화 중 오류가 발생했습니다. 다시 시도해주세요.");
         }
       }
     }
-  }, [client, pid, selectedId]); // client, projectId, sceneId를 dependency에 추가
+  }, [client, pid, selectedId, drawingMode, isPanMode]);
 
   const handleColorChange = React.useCallback((color) => {
     setDrawingColor(color);
@@ -1446,7 +1497,10 @@ export default function EditorPage({projectId = DUMMY}) {
               drawingColor={drawingColor}
               activeLayerId={activeLayerIdState}
               onModeChange={handleModeChange}
-              onSelectionChange={setSelectedObject}
+              onSelectionChange={(selection) => {
+                setSelectedObject(selection);
+                setSelectedObjectLayerId(selection?.layerId || null);
+              }}
               onPanChange={setIsPanMode}
               changeSaveMode={changeSaveMode}
               triggerAutoSave={triggerAutoSave}
