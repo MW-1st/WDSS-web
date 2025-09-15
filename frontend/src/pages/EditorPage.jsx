@@ -783,9 +783,6 @@ export default function EditorPage({projectId = DUMMY}) {
   }
 
   setProcessing(true);
-  stageRef.current.off('mouse:down');
-  stageRef.current.off('mouse:move');
-  stageRef.current.off('mouse:up');
 
   try {
     let finalUrl = '';
@@ -950,33 +947,24 @@ export default function EditorPage({projectId = DUMMY}) {
   }, [handleModeChange]);
 
   const handleClearAll = React.useCallback(async () => {
-    const canvas = stageRef.current;
-
+    const canvas = stageRef?.current;
     if (canvas && canvas.clear) {
       if (
-          confirm(
-              "캔버스의 모든 내용을 지우시겠습니까? 이 작업은 되돌릴 수 없습니다."
-          )
+        confirm(
+          "캔버스의 모든 내용을 지우시겠습니까? 이 작업은 되돌릴 수 없습니다. - editor page"
+        )
       ) {
         try {
-          // 1. 모든 이벤트 리스너 임시 제거 (필요시)
-          canvas.off('mouse:down');
-          canvas.off('mouse:move');
-          canvas.off('mouse:up');
-
-          // 2. 캔버스 완전 초기화
+          // 1. 캔버스 완전 초기화
           canvas.clear();
-          canvas.isDrawingMode = false;
-          canvas.selection = true; // 선택 가능하게 설정
 
-          // 3. 서버 데이터 업데이트
-          const response = await client.patch(`/projects/${pid}/scenes/${selectedId}`, {
+          // 2. 서버 및 indexedDB 데이터 업데이트
+          await client.patch(`/projects/${pid}/scenes/${selectedId}`, {
             status: 'reset'
           });
+          triggerAutoSave({action: "clearAll"});
 
-          await deleteCanvasFromIndexedDB(selectedId)
-
-          // 4. React 상태 초기화
+          // 3. 씬 상태 초기화
           setScenes(prevScenes =>
             prevScenes.map(scene => {
               if (scene.id === selectedId) {
@@ -992,16 +980,9 @@ export default function EditorPage({projectId = DUMMY}) {
 
           // 5. 캔버스 내부 저장 모드 변경
           if (canvas?.changeSaveMode) {
-              canvas.changeSaveMode('originals');
+            canvas.changeSaveMode('originals');
           }
-
-          // React 상태 설정
-          setDrawingMode('select');
-          setIsPanMode(false);
-
-          //
-          // // 8. 즉시 렌더링
-          // canvas.renderAll();
+          handleModeChange('select')
 
         } catch (error) {
           console.error("씬 초기화 중 오류 발생:", error);
