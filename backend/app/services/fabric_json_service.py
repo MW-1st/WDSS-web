@@ -50,7 +50,7 @@ def fabric_json_to_coords(json_path: str) -> List[Tuple[float, float]]:
     objects = fabric_data.get("objects", [])
 
     for obj in objects:
-        if obj.get("type") == "circle":
+        if obj.get("type").lower() == "circle":
             # Fabric.js uses 'left' and 'top' for position
             x = _parse_float(str(obj.get("left", 0)))
             y = _parse_float(str(obj.get("top", 0)))
