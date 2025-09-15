@@ -14,6 +14,7 @@ import DashboardPage from "./pages/DashboardPage.jsx";
 import Navbar from "./components/Navbar";
 import { UnityProvider, useUnity } from "./contexts/UnityContext.jsx";
 import { AuthProvider, useAuth } from "./contexts/AuthContext.jsx";
+import { EditorProvider } from "./contexts/EditorContext.jsx";
 
 import PrivateRoute from "./routes/PrivateRoute.jsx";
 import PublicRoute from "./routes/PublicRoute.jsx";
@@ -93,7 +94,7 @@ return (
     {/* 메인에서는 전역 Navbar를 숨기고, 다른 페이지에서만 보이게 */}
     {showGlobalNav && <Navbar />}  
       
-      <div style={{ flex: '1 1 auto', overflowY: 'hidden', position: 'relative' }}>
+      <div style={{ flex: '1 1 auto', overflowY: 'auto', position: 'relative' }}>
         <Routes location={background || location}>
           <Route path="/" element={<MainPage />} />
           <Route path="/dashboard" element={<PrivateRoute> <DashboardPage /> </PrivateRoute> }/>
@@ -143,7 +144,9 @@ export default function App() {
   return (
     <AuthProvider>
       <UnityProvider>
-        <AppContent />
+        <EditorProvider>
+          <AppContent />
+        </EditorProvider>
       </UnityProvider>
     </AuthProvider>
   );

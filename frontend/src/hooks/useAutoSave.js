@@ -66,7 +66,7 @@ export const useAutoSave = (projectId, sceneId, fabricCanvas, options = {}, scen
         const canvas = fabricCanvas.current;
         const canvasData = canvas.toJSON([
           'layerId', 'layerName', 'customType', 'originalFill',
-          'originalCx', 'originalCy'
+          'originalCx', 'originalCy', 'brightness'
         ]);
 
 
@@ -342,7 +342,7 @@ export const useAutoSave = (projectId, sceneId, fabricCanvas, options = {}, scen
       if (canvas) {
         const canvasData = canvas.toJSON([
           'layerId', 'layerName', 'customType', 'originalFill',
-          'originalCx', 'originalCy'
+          'originalCx', 'originalCy', 'brightness'
         ]);
         return syncToServer(canvasData, saveMode);
       }

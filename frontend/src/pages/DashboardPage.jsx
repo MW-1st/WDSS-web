@@ -42,6 +42,32 @@ const ProjectIcon = () => (
   </svg>
 );
 
+const Thumbnail = ({ src, alt }) => {
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    setHasError(false);
+  }, [src]);
+
+  const handleError = () => {
+    setHasError(true);
+  };
+
+  if (hasError || !src) {
+    return <ProjectIcon />;
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+      loading="lazy"
+      onError={handleError}
+    />
+  );
+};
+
 export default function DashboardPage() {
   const { isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
@@ -220,16 +246,7 @@ export default function DashboardPage() {
                       <TiDelete size={22} />
                     </button>
                     <div className="card-thumbnail">
-                      {thumbs[project.id] ? (
-                        <img
-                          src={thumbs[project.id]}
-                          alt={`${project.project_name} 썸네일`}
-                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                          loading="lazy"
-                        />
-                      ) : (
-                        <ProjectIcon />
-                      )}
+                      <Thumbnail src={thumbs[project.id]} alt={`${project.project_name} 썸네일`} />
                     </div>
                     <div className="card-body">
                       <div className="flex items-start justify-between gap-2">

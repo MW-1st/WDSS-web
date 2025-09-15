@@ -6,7 +6,7 @@ function normalizeColorToHex(color) {
   if (!color) return "#000000";
   if (typeof color === "string") {
     const hexMatch = color.match(/^#([0-9a-fA-F]{6})$/);
-    if (hexMatch) return `#${hexMatch[21]}`.toUpperCase();
+    if (hexMatch) return `#${hexMatch[1]}`.toUpperCase();
     const rgbMatch = color.match(
       /^rgb\s*\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$/
     );
@@ -123,6 +123,7 @@ const BrightnessControl = ({
 
 export default function ObjectPropertiesPanel({ 
   selection, 
+  selectionVersion, // Add this prop
   onChangeFill, 
   onChangeBrightness 
 }) {
@@ -155,7 +156,7 @@ export default function ObjectPropertiesPanel({
       setLocalBrightness(currentBrightness);
       setHasChanges(false);
     }
-  }, [selection]);
+  }, [selection, selectionVersion]); // Add selectionVersion to dependency array
 
   // 색상 변경 핸들러
   const handleColorChange = useCallback((hex) => {

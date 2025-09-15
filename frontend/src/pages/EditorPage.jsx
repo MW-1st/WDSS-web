@@ -1,4 +1,4 @@
-﻿import React, {useCallback, useEffect, useMemo, useRef, useState} from "react";
+import React, {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import EditorToolbar from "../components/EditorToolbar.jsx";
 import MainCanvasSection from "../components/MainCanvasSection.jsx";
 import SceneCarousel from "../components/SceneCarousel.jsx";
@@ -18,6 +18,7 @@ import { IoHandRightOutline } from "react-icons/io5";
 import ProjectSettingsModal from "../components/ProjectSettingsModal";
 import PortalPopover from "../components/PortalPopover.jsx";
 import { saveCanvasToIndexedDB } from "../utils/indexedDBUtils.js";
+import { useEditor } from "../contexts/EditorContext.jsx";
 
 const VISIBLE = 4;
 const DUMMY = "11111111-1111-1111-1111-111111111111";
@@ -33,6 +34,7 @@ export default function EditorPage({projectId = DUMMY}) {
   const [projectMeta, setProjectMeta] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
   const [start, setStart] = useState(0);
+  const { setDotCount } = useEditor();
 
   // 갤러리 열림 상태
   const [galleryOpen, setGalleryOpen] = useState(() => {
@@ -66,6 +68,7 @@ export default function EditorPage({projectId = DUMMY}) {
   const [eraserSize, setEraserSize] = useState(20);
   const [drawingColor, setDrawingColor] = useState('#222222');
   const [selectedObject, setSelectedObject] = useState(null);
+  const [selectionVersion, setSelectionVersion] = useState(0);
   const [isPanMode, setIsPanMode] = useState(false);
   const [isToolSelectionOpen, setToolSelectionOpen] = useState(false);
   const previousSceneId = useRef(selectedId);
@@ -239,7 +242,7 @@ export default function EditorPage({projectId = DUMMY}) {
       const canvas = stageRef.current;
       const canvasData = canvas.toJSON([
         'layerId', 'layerName', 'customType', 'originalFill',
-        'originalCx', 'originalCy'
+        'originalCx', 'originalCy', 'brightness'
       ]);
 
       // 현재 saveMode에 맞게 서버에 저장
@@ -368,6 +371,31 @@ export default function EditorPage({projectId = DUMMY}) {
       if (cleanup) cleanup();
     };
   }, []);
+
+  useEffect(() => {
+    const canvas = stageRef.current;
+    if (!canvas) return;
+
+    const updateDotCount = () => {
+      const objects = canvas.getObjects();
+      const dots = objects.filter(obj => obj.type === 'circle');
+      setDotCount(dots.length);
+    };
+
+    updateDotCount();
+
+    canvas.on('object:added', updateDotCount);
+    canvas.on('object:removed', updateDotCount);
+    canvas.on('load:completed', updateDotCount);
+
+    return () => {
+      if (canvas) {
+        canvas.off('object:added', updateDotCount);
+        canvas.off('object:removed', updateDotCount);
+        canvas.off('load:completed', updateDotCount);
+      }
+    };
+  }, [canvasReady, setDotCount]);
 
   // 프로젝트가 없으면 생성하는 헬퍼
   const ensureProjectId = async () => {
@@ -832,7 +860,7 @@ export default function EditorPage({projectId = DUMMY}) {
         stageRef.current.loadFromJSON(transformedJsonData, () => {
           stageRef.current.renderAll();
           console.log("변환된 데이터가 현재 캔버스에 로드되었습니다.", selectedId, sceneIdToTransform);
-          handleModeChange('brush');
+          handleModeChange('select');
         });
     } else {
         console.log(`변환은 완료되었지만 사용자가 다른 씬(${selectedId})으로 이동하여 캔버스는 업데이트하지 않습니다.`);
@@ -976,7 +1004,56 @@ export default function EditorPage({projectId = DUMMY}) {
 
     canvas.renderAll && canvas.renderAll();
     setSelectedObject((prev) => (prev ? {...prev, fill: hex, stroke: hex} : prev));
-  }, []);
+    triggerAutoSave();
+  }, [triggerAutoSave]);
+
+  const handleBrightnessChange = useCallback((brightness) => {
+    const canvas = stageRef.current;
+    if (!canvas) return;
+    const active = canvas.getActiveObject && canvas.getActiveObject();
+    if (!active) return;
+
+    // UI: 0.0 (dark) to 1.0 (normal).
+    // Fabric Filter: -1 (dark) to 1 (bright), 0 is normal.
+    // Map UI [0.0, 1.0] to Fabric [-1.0, 0.0].
+    const fabricBrightnessValue = brightness - 1.0;
+
+    const applyBrightness = (obj) => {
+      if (!obj) return;
+      
+      // Ensure filters array exists. It might not on all object types.
+      obj.filters = obj.filters || [];
+
+      // Remove existing brightness filter to prevent stacking.
+      obj.filters = obj.filters.filter(f => f.type !== 'Brightness');
+
+      // Add new brightness filter if the value is not default (1.0).
+      if (brightness < 1.0) {
+        // fabric is assumed to be available globally in this project setup
+        obj.filters.push(new fabric.Image.filters.Brightness({
+          brightness: fabricBrightnessValue,
+        }));
+      }
+
+      // Store the UI-facing value (0-1) on the object for persistence and retrieval.
+      obj.set({ brightness: brightness });
+
+      // Apply the filters to the object.
+      if (obj.applyFilters) {
+        obj.applyFilters();
+      }
+    };
+
+    if (active.type === 'activeSelection') {
+      active.getObjects().forEach(applyBrightness);
+    } else {
+      applyBrightness(active);
+    }
+
+    canvas.renderAll();
+    setSelectedObject((prev) => (prev ? { ...prev, brightness } : null));
+    triggerAutoSave();
+  }, [triggerAutoSave]);
 
   // 레이어 관련 핸들러들
   const handleLayerSelect = React.useCallback((layerId) => {
@@ -1432,7 +1509,9 @@ export default function EditorPage({projectId = DUMMY}) {
             {/* 객체 속성 패널 */}
             <ObjectPropertiesPanel
                 selection={selectedObject}
+                selectionVersion={selectionVersion}
                 onChangeFill={handleSelectedFillChange}
+                onChangeBrightness={handleBrightnessChange}
             />
 
             {/* 미리보기 패널 - 변환 전에만 표시 */}
