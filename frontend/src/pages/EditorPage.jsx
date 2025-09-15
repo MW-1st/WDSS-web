@@ -1,4 +1,4 @@
-﻿import React, {useCallback, useEffect, useMemo, useRef, useState} from "react";
+import React, {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import EditorToolbar from "../components/EditorToolbar.jsx";
 import MainCanvasSection from "../components/MainCanvasSection.jsx";
 import SceneCarousel from "../components/SceneCarousel.jsx";
@@ -18,6 +18,7 @@ import { IoHandRightOutline } from "react-icons/io5";
 import ProjectSettingsModal from "../components/ProjectSettingsModal";
 import PortalPopover from "../components/PortalPopover.jsx";
 import { saveCanvasToIndexedDB } from "../utils/indexedDBUtils.js";
+import "../styles/EditorPage.css";
 
 const VISIBLE = 4;
 const DUMMY = "11111111-1111-1111-1111-111111111111";
@@ -1176,51 +1177,25 @@ export default function EditorPage({projectId = DUMMY}) {
   return (
       <div
           className="editor-shell font-nanumhuman"
-          style={{
-            width: "100%",
-            height: "100%",
-            background: "#fff",
-            display: "flex",
-            alignItems: "flex-start",
-            gap: 16,
-            boxSizing: "border-box",
-            overflowX: "hidden",
-          }}
       >
         {/* 왼쪽 툴바 */}
         <aside
             id="left-rail"
-            style={{
-              width: LEFT_TOOL_WIDTH,
-              borderRight: "1px solid #eee",
-              position: "sticky",
-              top: 0,
-              height: "100%",
-              background: "#fff",
-              flex: "0 0 auto",
-              boxSizing: "border-box",
-              overflow: "visible",
-              zIndex: 50,
-            }}
+            className="left-rail"
         >
-          <div style={{height: "100%", overflowY: "auto", padding: 16}}>
+          <div className="left-rail-inner">
 
-            <div style={{position: "relative", display: "inline-block", marginBottom: 12}}>
+            <div className="tool-select-container">
               <button
                   ref={toolButtonRef}
                   onClick={() => setToolSelectionOpen(prev => !prev)}
                   title="도구 선택"
                   aria-label="도구 선택"
+                  className="tool-select-button"
                   style={{
                     border: `2px solid ${isSelectOrPan ? '#007bff' : '#e0e0e0'}`,
-                    padding: "8px 16px",
-                    borderRadius: 8,
-                    cursor: "pointer",
-                    fontSize: 16,
-                    transition: "all 0.2s ease",
                     backgroundColor: isSelectOrPan ? '#007bff' : '#ffffff',
                     color: isSelectOrPan ? 'white' : '#333333',
-                    boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
                   }}
               >
                 {isPanMode ? <IoHandRightOutline/> : <LuMousePointer/>}
@@ -1242,17 +1217,10 @@ export default function EditorPage({projectId = DUMMY}) {
                     }}
                     title="선택 도구 (V)"
                     aria-label="선택 도구"
+                    className="popover-button"
                     style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      padding: "8px 12px",
-                      border: "none",
                       backgroundColor: drawingMode === 'select' && !isPanMode ? '#007bff' : 'transparent',
                       color: drawingMode === 'select' && !isPanMode ? 'white' : '#333333',
-                      width: "100%",
-                      textAlign: "left",
-                      cursor: "pointer"
                     }}
                 >
                   <LuMousePointer/>
@@ -1265,17 +1233,10 @@ export default function EditorPage({projectId = DUMMY}) {
                     }}
                     title="이동 도구 (H)"
                     aria-label="이동 도구"
+                    className="popover-button"
                     style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      padding: "8px 12px",
-                      border: "none",
                       backgroundColor: isPanMode ? '#007bff' : 'transparent',
                       color: isPanMode ? 'white' : '#333333',
-                      width: "100%",
-                      textAlign: "left",
-                      cursor: "pointer"
                     }}
                 >
                   <IoHandRightOutline/>
@@ -1312,24 +1273,15 @@ export default function EditorPage({projectId = DUMMY}) {
                 isSceneTransformed={isSceneTransformed}
                 isToolAllowed={isToolAllowed}
             />
-            <div style={{marginTop: "auto"}}>
+            <div className="settings-container">
               <button
                   type="button"
                   title="프로젝트 설정"
                   aria-label="프로젝트 설정"
                   onClick={openProjectSettings}
                   disabled={!projectMeta}
+                  className="settings-button"
                   style={{
-                    width: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 6,
-                    padding: 8,
-                    border: "1px solid #e5e7eb",
-                    borderRadius: 8,
-                    background: "#f9fafb",
-                    color: "#374151",
                     cursor: projectMeta ? "pointer" : "not-allowed",
                   }}
               >
@@ -1341,17 +1293,14 @@ export default function EditorPage({projectId = DUMMY}) {
 
         {/* 갤러리 패널 */}
         {galleryOpen && (
-            <div style={{flex: "0 1 250px", minWidth: 0, boxSizing: "border-box"}}>
+            <div className="gallery-panel">
               <ImageGallery onImageDragStart={(u) => console.log("drag:", u)}/>
             </div>
         )}
 
         {/* 메인 */}
         <div
-            style={{
-              flex: "1 1 0%",
-              minWidth: 0,
-            }}
+            className="main-content"
         >
           <MainCanvasSection
               selectedScene={selectedScene}
@@ -1392,20 +1341,9 @@ export default function EditorPage({projectId = DUMMY}) {
 
         {/* 오른쪽 패널 - 레이어와 객체 속성을 함께 표시 */}
         <aside
-            style={{
-              width: RIGHT_PANEL_WIDTH,
-              borderLeft: "1px solid #eee",
-              position: "sticky",
-              top: 0,
-              height: "100%",
-              background: "#fff",
-              flex: "0 0 auto",
-              boxSizing: "border-box",
-              overflow: "visible",
-              zIndex: 50,
-            }}
+            className="right-panel"
         >
-          <div style={{height: "100%", overflowY: "scroll", padding: 16}}>
+          <div className="right-panel-inner">
             {/* 레이어 패널 */}
             {canvasReady ? (
                 <LayerPanel
@@ -1421,13 +1359,13 @@ export default function EditorPage({projectId = DUMMY}) {
                     onLayerReorder={handleLayerReorder}
                 />
             ) : (
-                <div style={{padding: '20px', textAlign: 'center', color: '#666'}}>
+                <div className="canvas-loading">
                   캔버스 준비 중...
                 </div>
             )}
 
             {/* 구분선 */}
-            <div style={{margin: '16px 0', borderTop: '1px solid #eee'}}/>
+            <div className="separator"/>
 
             {/* 객체 속성 패널 */}
             <ObjectPropertiesPanel
@@ -1439,7 +1377,7 @@ export default function EditorPage({projectId = DUMMY}) {
             {!isSceneTransformed && (
               <>
                 {/* 구분선 */}
-                <div style={{ margin: '16px 0', borderTop: '1px solid #eee' }} />
+                <div className="separator" />
 
                 {/* 미리보기 패널 */}
                 <PreviewPanel
@@ -1461,20 +1399,13 @@ export default function EditorPage({projectId = DUMMY}) {
             {isSceneTransformed && (
               <>
                 {/* 구분선 */}
-                <div style={{ margin: '16px 0', borderTop: '1px solid #eee' }} />
+                <div className="separator" />
                 
-                <div style={{
-                  padding: "20px",
-                  textAlign: "center",
-                  border: "1px solid #e9ecef",
-                  borderRadius: "8px",
-                  backgroundColor: "#f8f9fa",
-                  color: "#6c757d"
-                }}>
-                  <div style={{ fontSize: "16px", fontWeight: "600", marginBottom: "8px" }}>
+                <div className="transform-complete-box">
+                  <div className="transform-complete-title">
                     ✅ 변환 완료
                   </div>
-                  <div style={{ fontSize: "14px", wordBreak: 'keep-all' }}>
+                  <div className="transform-complete-text">
                     브러쉬 도구로 추가 편집이 가능합니다
                   </div>
                 </div>
