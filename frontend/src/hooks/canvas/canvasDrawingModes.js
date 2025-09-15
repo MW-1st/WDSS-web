@@ -66,6 +66,30 @@ export function createDrawingModes({
       brush.limitedToCanvasSize = true;
       canvas.freeDrawingBrush = brush;
 
+      const pathCreatedHandler = (e) => {
+        if (e.path) {
+          const currentActiveLayerId = activeLayerIdRef.current;
+          const currentLayers = layersRef.current;
+          const activeLayer = currentLayers.find((layer) => layer.id === currentActiveLayerId);
+
+          e.path.set({
+            selectable: true,
+            evented: true,
+          });
+
+          if (activeLayer) {
+            fabricLayerUtils.assignObjectToLayer(e.path, activeLayer.id, activeLayer.name);
+          }
+
+          if (setCanvasRevision) setCanvasRevision((c) => c + 1);
+          if (triggerAutoSave) triggerAutoSave({ drawingMode: "draw" });
+          if (onCanvasChangeRef && onCanvasChangeRef.current) onCanvasChangeRef.current();
+        }
+      };
+
+      eraseHandlers.current = { pathCreatedHandler };
+      canvas.on("path:created", pathCreatedHandler);
+
       canvas.setCursor("crosshair");
     } else if (mode === "brush") {
       canvas.isDrawingMode = false;
@@ -402,12 +426,20 @@ export function createDrawingModes({
 
       const pathCreatedHandler = (e) => {
         if (e.path) {
+          const currentActiveLayerId = activeLayerIdRef.current;
+          const currentLayers = layersRef.current;
+          const activeLayer = currentLayers.find((layer) => layer.id === currentActiveLayerId);
+
           e.path.set({
             selectable: false,
             evented: false,
             excludeFromExport: false,
             isEraserPath: true,
           });
+
+          if (activeLayer) {
+            fabricLayerUtils.assignObjectToLayer(e.path, activeLayer.id, activeLayer.name);
+          }
         }
       };
 

@@ -10,6 +10,7 @@ export default function ImageTransformControls({
   sceneId = 1,
   layout = "full",
   stageRef, // stageRef prop 추가
+  projectId, // 프로젝트 ID prop 추가
 }) {
   // Local state for smooth slider drag
   const [localDots, setLocalDots] = React.useState(Number(targetDots) || 2000);
@@ -53,6 +54,11 @@ export default function ImageTransformControls({
         "file",
         new File([svgBlob], "modified_canvas.svg", { type: "image/svg+xml" })
       );
+
+      // 프로젝트 ID 추가 (있는 경우)
+      if (projectId) {
+        fd.append("project_id", projectId);
+      }
 
       const jsonResp = await client.post("/image/svg-to-json", fd);
       const jsonUrl = jsonResp.data?.json_url;
