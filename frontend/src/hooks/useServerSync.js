@@ -216,6 +216,11 @@ export const useServerSync = (projectId, sceneId, fabricCanvas, options = {}) =>
 
     const actualObjectCount = drawnObjects.length;
 
+    let layerMetadata = null;
+    if (canvas.saveCurrentSceneLayerState) {
+      layerMetadata = canvas.saveCurrentSceneLayerState();
+    }
+
     const saveMetadata = {
       objectCount: actualObjectCount,
       canvasSize: {
@@ -224,7 +229,7 @@ export const useServerSync = (projectId, sceneId, fabricCanvas, options = {}) =>
       }
     }
 
-    return {...canvasData, ...saveMetadata,}
+    return {...canvasData, layerMetadata, ...saveMetadata}
   }, [fabricCanvas]);
 
   // 주기적 동기화 시작
