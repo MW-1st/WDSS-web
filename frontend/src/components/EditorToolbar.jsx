@@ -127,15 +127,17 @@ const Inner = ({
             onMouseEnter={() => setGalleryHovered(true)}
             onMouseLeave={() => setGalleryHovered(false)}
             style={{
-              border: "1px solid #ccc",
-              padding: "8px 16px",
-              borderRadius: 4,
+              border: "1px solid #e5e7eb",
+              width: 40,
+              height: 40,
+              padding: 0,
+              borderRadius: 8,
               cursor: "pointer",
               fontSize: 16,
               display: "inline-flex",
               alignItems: "center",
-              gap: 6,
-              background: "#f8f9fa",
+              justifyContent: "center",
+              background: "#fff",
             }}
           >
             <FaImage />

@@ -1,28 +1,20 @@
-
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { FaPen, FaPaintBrush, FaEraser, FaRegTrashAlt } from "react-icons/fa";
-import { PiSelectionPlusBold } from "react-icons/pi";
-import ColorPicker from "./ColorPicker.jsx";
-import "../styles/CanvasTools.css"; // 이렇게 수정
-
+import "../styles/CanvasTools.css";
 
 const CanvasTools = React.memo(function CanvasTools({
   drawingMode = "draw",
-  eraserSize = 20,
   drawingColor = "#222222",
   onModeChange,
   onClearAll,
   onColorChange,
-  onColorPreview,
-  isSceneTransformed = false, // 씬 변환 상태
-  isToolAllowed, // 도구 허용 여부 확인 함수
+  isSceneTransformed = false,
 }) {
   const [hovered, setHovered] = useState(null);
 
   const anchorRefs = {
     drawTool: useRef(null),
-    select: useRef(null),
     erase: useRef(null),
     pixelErase: useRef(null),
     clear: useRef(null),
@@ -32,32 +24,23 @@ const CanvasTools = React.memo(function CanvasTools({
   const [tooltipPos, setTooltipPos] = useState({ top: 0, left: 0 });
 
   const getTooltipText = (mode) => {
-    const baseText = (() => {
-      switch (mode) {
-        case "drawTool":
-          return isSceneTransformed ? 
-            "브러시(P): 점을 찍습니다." : 
-            "그리기(P): 자유곡선을 그립니다.";
-        case "erase":
-          return "지우개(E): 선과 점을 지웁니다.";
-        case "pixelErase":
-          return "픽셀 지우개: 배경을 칠합니다.";
-        default:
-          return "";
-      }
-    })();
-    
-    return baseText;
+    switch (mode) {
+      case "drawTool":
+        return isSceneTransformed
+          ? "브러시(P): 점을 찍습니다."
+          : "그리기(P): 자유곡선을 그립니다.";
+      case "erase":
+        return "지우개(E): 선과 점을 지웁니다.";
+      case "pixelErase":
+        return "픽셀 지우개: 배경을 칠합니다.";
+      default:
+        return "";
+    }
   };
 
   const handleDrawToolClick = () => {
-    // 씬의 변환 상태에 따라 자동으로 펜 또는 브러쉬 모드로 전환
     const targetMode = isSceneTransformed ? 'brush' : 'draw';
     onModeChange(targetMode);
-  };
-
-  const handleToolClick = (mode) => {
-    onModeChange(mode);
   };
 
   useEffect(() => {
@@ -80,68 +63,20 @@ const CanvasTools = React.memo(function CanvasTools({
     };
   }, [hovered]);
 
-  const buttonStyle = {
-    border: "1px solid #ccc",
-    padding: "8px 16px",
-    borderRadius: "4px",
-    cursor: "pointer",
-    marginBottom: "8px",
-    fontSize: "16px",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "6px",
-  };
-
-  const getButtonStyle = (mode) => {
+  const getButtonClasses = (mode) => {
     let isActive = false;
-    
     if (mode === "drawTool") {
-      // 통합된 그리기 도구: draw 또는 brush 모드가 활성화되어 있으면 활성 상태
       isActive = drawingMode === 'draw' || drawingMode === 'brush';
     } else {
       isActive = drawingMode === mode;
     }
-    
-    return {
-      ...buttonStyle,
-      backgroundColor: isActive ? "#007bff" : "#f8f9fa",
-      color: isActive ? "white" : "black",
-      cursor: "pointer",
-      opacity: 1,
-      border: isActive ? "1px solid #007bff" : "1px solid #ccc",
-    };
-  };
-
-  const clearButtonStyle = {
-    ...buttonStyle,
-    backgroundColor: "#dc3545",
-    color: "white",
-    border: "1px solid #dc3545",
-    fontWeight: "bold",
-    marginRight: 0,
+    return `tool-button ${isActive ? 'active' : ''}`;
   };
 
   const TooltipPortal = () =>
     hovered
       ? createPortal(
-          <div
-            style={{
-              position: "fixed",
-              top: tooltipPos.top,
-              left: tooltipPos.left,
-              transform: "translateY(-50%)",
-              background: "#000",
-              color: "#fff",
-              padding: "6px 8px",
-              borderRadius: 6,
-              fontSize: 12,
-              whiteSpace: "nowrap",
-              zIndex: 9999,
-              boxShadow: "0 2px 6px rgba(0,0,0,.2)",
-              pointerEvents: "none",
-            }}
-          >
+          <div className="tooltip" style={{ top: tooltipPos.top, left: tooltipPos.left }}>
             {hovered === "clear"
               ? "전체 지우기: 캔버스의 모든 내용 삭제."
               : getTooltipText(hovered)}
@@ -156,24 +91,17 @@ const CanvasTools = React.memo(function CanvasTools({
   };
 
   return (
-    <div style={{ padding: "12px 0" }}>
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "8px",
-          marginBottom: "12px",
-        }}
-      >
+    <div className="canvas-tools-container">
+      <div className="tools-group">
         <div
           ref={anchorRefs.drawTool}
-          style={{ position: "relative", display: "inline-flex", zIndex: 1000 }}
+          className="tool-anchor"
           onMouseEnter={() => setHovered("drawTool")}
           onMouseLeave={() => setHovered(null)}
         >
           <button
             onClick={handleDrawToolClick}
-            style={getButtonStyle("drawTool")}
+            className={getButtonClasses("drawTool")}
             aria-label={isSceneTransformed ? "브러시" : "그리기"}
           >
             {isSceneTransformed ? <FaPaintBrush /> : <FaPen />}
@@ -182,13 +110,13 @@ const CanvasTools = React.memo(function CanvasTools({
 
         <div
           ref={anchorRefs.erase}
-          style={{ position: "relative", display: "inline-flex", zIndex: 1000 }}
+          className="tool-anchor"
           onMouseEnter={() => setHovered("erase")}
           onMouseLeave={() => setHovered(null)}
         >
           <button
-            onClick={() => handleToolClick("erase")}
-            style={getButtonStyle("erase")}
+            onClick={() => onModeChange("erase")}
+            className={getButtonClasses("erase")}
             aria-label="지우개"
           >
             <FaEraser />
@@ -197,13 +125,13 @@ const CanvasTools = React.memo(function CanvasTools({
 
         <div
           ref={anchorRefs.pixelErase}
-          style={{ position: "relative", display: "inline-flex", zIndex: 1000 }}
+          className="tool-anchor"
           onMouseEnter={() => setHovered("pixelErase")}
           onMouseLeave={() => setHovered(null)}
         >
           <button
-            onClick={() => handleToolClick("pixelErase")}
-            style={getButtonStyle("pixelErase")}
+            onClick={() => onModeChange("pixelErase")}
+            className={getButtonClasses("pixelErase")}
             aria-label="픽셀 지우개"
           >
             <FaEraser />
@@ -211,13 +139,8 @@ const CanvasTools = React.memo(function CanvasTools({
         </div>
       </div>
 
-      {/* 색상 선택 - 완전한 정사각형 (내부도 정사각형) */}
-      <div style={{ marginBottom: "12px" }}>
-        <h5 style={{ margin: "0 0 8px 0", fontSize: "14px", fontWeight: 600 }}>
-          색상 선택
-        </h5>
-
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 6 }}>
+      <div className="color-picker-group">
+        <div className="color-picker-wrapper">
           <input
             ref={anchorRefs.color}
             type="color"
@@ -226,39 +149,15 @@ const CanvasTools = React.memo(function CanvasTools({
             className="square-color-picker"
             aria-label="색상 선택"
             title={drawingColor}
-            style={{
-              width: 32,
-              height: 32,
-              cursor: "pointer",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-              transition: "all 0.2s ease",
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.transform = "scale(1.1)";
-              e.target.style.boxShadow = "0 2px 6px rgba(0,0,0,0.15)";
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.transform = "scale(1)";
-              e.target.style.boxShadow = "0 1px 3px rgba(0,0,0,0.1)";
-            }}
           />
-          <span style={{ 
-            fontFamily: "monospace", 
-            fontSize: 13,
-            color: "#666",
-            marginLeft: 2
-          }}>
-            {drawingColor}
-          </span>
         </div>
       </div>
 
-      {/* 전체 지우기 버튼 */}
-      <div style={{ marginBottom: "12px" }}>
+      <div className="clear-tool-group">
         <button
           ref={anchorRefs.clear}
           onClick={onClearAll}
-          style={clearButtonStyle}
+          className="tool-button clear-button"
           aria-label="전체 지우기"
           onMouseEnter={() => setHovered("clear")}
           onMouseLeave={() => setHovered(null)}

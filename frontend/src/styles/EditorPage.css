@@ -12,7 +12,7 @@
 }
 
 .left-rail {
-  width: 100px; /* LEFT_TOOL_WIDTH */
+  width: 64px; /* compact left tool rail */
   border-right: 1px solid #eee;
   position: sticky;
   top: 0;
@@ -27,7 +27,7 @@
 .left-rail-inner {
   height: 100%;
   overflow-y: auto;
-  padding: 16px;
+  padding: 8px; /* tighter padding for compact rail */
   display: flex;
   flex-direction: column;
 }
@@ -39,10 +39,16 @@
 }
 
 .tool-select-button {
-  padding: 8px 16px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
   border-radius: 8px;
   cursor: pointer;
   font-size: 16px;
+  line-height: 0; /* remove baseline gap for SVG */
+  display: inline-flex; /* center icon */
+  align-items: center;
+  justify-content: center;
   transition: all 0.2s ease;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
@@ -63,12 +69,13 @@
 }
 
 .settings-button {
-  width: 100%;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 8px;
+  padding: 0;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   background: #f9fafb;
@@ -84,6 +91,7 @@
 .main-content {
   flex: 1 1 0%;
   min-width: 0;
+  padding-top: 1rem;
 }
 
 .right-panel {

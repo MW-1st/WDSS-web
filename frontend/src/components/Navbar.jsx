@@ -73,7 +73,7 @@ export default function Navbar({ transparent: propTransparent = false }) {
 
 
     return (
-      <nav className="px-4 py-2 mb-4 flex justify-center font-nanumhuman">
+      <nav className="px-4 py-2 flex justify-center font-nanumhuman border-b border-gray-200">
         <div className="w-full flex justify-between items-center gap-40">
           {/* Logo + Project name */}
           <div className="flex items-center gap-3">
