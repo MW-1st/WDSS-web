@@ -17,7 +17,7 @@ import { LuMousePointer } from "react-icons/lu";
 import { IoHandRightOutline } from "react-icons/io5";
 import ProjectSettingsModal from "../components/ProjectSettingsModal";
 import PortalPopover from "../components/PortalPopover.jsx";
-import { saveCanvasToIndexedDB } from "../utils/indexedDBUtils.js";
+import {deleteCanvasFromIndexedDB, saveCanvasToIndexedDB} from "../utils/indexedDBUtils.js";
 
 const VISIBLE = 4;
 const DUMMY = "11111111-1111-1111-1111-111111111111";
@@ -222,61 +222,57 @@ export default function EditorPage({projectId = DUMMY}) {
   });
   const {syncToServer, uploadThumbnail} = useServerSync(pid, selectedId, stageRef);
 
-  const handleSaveThumbnail = useCallback(async (pregeneratedDataUrl = null) => {
-    // 캔버스나 업로드 함수가 준비되지 않았으면 실행하지 않음
-    if (!stageRef.current || !uploadThumbnail) {
-      console.warn("썸네일 저장 실패: 캔버스나 업로드 함수가 준비되지 않았습니다.");
+   const saveCurrentScene = useCallback(async (sceneIdToSave, saveModeToUse, options = {}) => {
+    const {
+      shouldSaveThumbnail = false,
+      capturedCanvasData = null,    // 캡처된 캔버스 데이터 옵션
+      capturedThumbnailDataUrl = null // 캡처된 썸네일 데이터 옵션
+    } = options;
+
+    if (!sceneIdToSave || !stageRef.current) {
+      console.warn('저장할 씬 ID 또는 캔버스가 없어 저장 작업을 건너뜁니다.');
       return;
     }
 
-    const thumbnailDataUrl = pregeneratedDataUrl || stageRef.current.toDataURL({
-      format: 'png',
-      quality: 0.8
-    });
+    const canvas = stageRef.current;
+    const logAction = shouldSaveThumbnail ? "전체 저장 (썸네일 포함)" : "데이터 저장";
+    console.log(`🚀 ${sceneIdToSave} 씬 ${logAction} 시작 (모드: ${saveModeToUse})`);
 
     try {
-      // 결정된 데이터를 사용해 업로드
-      await uploadThumbnail(thumbnailDataUrl);
-      console.log("✅ 썸네일이 백그라운드에서 성공적으로 저장되었습니다.");
+      // 1. 데이터 결정: 캡처된 데이터가 있으면 사용, 없으면 현재 캔버스에서 생성
+      const canvasData = capturedCanvasData || {
+        ...canvas.toJSON([
+          'layerId', 'layerName', 'customType', 'originalFill', 'originalCx', 'originalCy'
+        ]),
+        width: canvas.getWidth(),
+        height: canvas.getHeight()
+      };
+
+      // 2. 실행할 저장 작업 목록 구성
+      const savePromises = [
+        saveImmediately(canvasData),
+        syncToServer(canvasData, saveModeToUse)
+      ];
+
+      // 3. 썸네일 저장 작업 구성
+      if (shouldSaveThumbnail) {
+        // 캡처된 썸네일이 있으면 사용, 없으면 현재 캔버스에서 생성
+        const thumbnailDataUrl = capturedThumbnailDataUrl || canvas.toDataURL({ format: 'png', quality: 0.5 });
+        savePromises.push(uploadThumbnail(thumbnailDataUrl));
+      }
+
+      await Promise.all(savePromises);
+      console.log(`✅ ${sceneIdToSave} 씬 ${logAction} 완료`);
+
     } catch (error) {
-      console.error("❌ 썸네일 저장에 실패했습니다:", error);
+      console.error(`❌ ${sceneIdToSave} 씬 저장 중 오류 발생:`, error);
     }
-  }, [uploadThumbnail]);
+  }, [saveImmediately, syncToServer, uploadThumbnail]);
 
 
   // 수동 저장 함수
   const handleManualSave = async () => {
-    if (!selectedId || !stageRef.current || !pid) {
-      console.warn('Cannot save: missing selectedId, stageRef, or projectId');
-      return;
-    }
-
-    try {
-      console.log('Manual save started with mode:', saveMode);
-
-      const canvas = stageRef.current;
-      const canvasData = canvas.toJSON([
-        'layerId', 'layerName', 'customType', 'originalFill',
-        'originalCx', 'originalCy'
-      ]);
-
-      // 현재 saveMode에 맞게 서버에 저장
-      const success = await syncToServer(canvasData, saveMode);
-
-      if (success) {
-        await handleSaveThumbnail();
-        console.log(`수동 저장 시 썸네일 저장 완료: Scene ${selectedId}`);
-        console.log(`Scene ${selectedId} manually saved with mode: ${saveMode}`);
-        // 성공 알림 (선택사항)
-        // alert('저장되었습니다.');
-      } else {
-        console.error('Manual save failed');
-        alert('저장에 실패했습니다. 다시 시도해주세요.');
-      }
-    } catch (error) {
-      console.error('Manual save error:', error);
-      alert('저장 중 오류가 발생했습니다.');
-    }
+     await saveCurrentScene(selectedId, saveMode, { shouldSaveThumbnail: true });
   };
 
   // 씬 변경 시 서버 동기화
@@ -288,42 +284,52 @@ export default function EditorPage({projectId = DUMMY}) {
     previousSceneId.current = selectedId;
   }, [selectedId]);
 
-  // 브라우저 이벤트 리스너
+  // 씬 변경 추적 및 페이지 이탈 시 저장을 위한 useEffect
   useEffect(() => {
-    const handleBeforeUnload = async (event) => {
-      if (selectedId && stageRef.current) {
-        console.log('Page unloading, syncing to server...');
-        await Promise.all([
-          syncToServerNow(),
-          handleSaveThumbnail() // 썸네일 저장 함수 호출
-        ]);
+    // --- 페이지를 떠날 때 실행될 통합 저장 함수 ---
+    const handleSaveOnExit = () => {
+      // 현재 선택된 씬 ID와 저장 모드를 ref에서 가져와 저장
+      // 페이지를 떠나는 것은 중요한 이벤트이므로 썸네일을 함께 저장합니다.
+      saveCurrentScene(selectedIdRef.current, previousSaveModeRef.current, {
+        shouldSaveThumbnail: true
+      });
+    };
+
+    // --- 이벤트 핸들러 정의 ---
+    const handleBeforeUnload = (event) => {
+      // 내용이 있을 때만 저장 로직 실행
+      if (selectedIdRef.current && stageRef.current) {
+        console.log('페이지를 닫기 전 저장합니다...');
+        handleSaveOnExit();
       }
     };
 
     const handleVisibilityChange = () => {
+      // 탭을 벗어나거나 브라우저가 비활성화될 때
       if (document.visibilityState === 'hidden') {
-        console.log('Page hidden, syncing to server...');
-        syncToServerNow();
+        console.log('페이지가 비활성화되어 저장합니다...');
+        handleSaveOnExit();
       }
     };
 
     const handlePopState = () => {
-      console.log('Navigation detected, syncing to server...');
-      syncToServerNow();
+      // 브라우저 뒤로가기/앞으로가기 버튼 사용 시
+      console.log('브라우저 네비게이션으로 인해 저장합니다...');
+      handleSaveOnExit();
     };
 
-    // 이벤트 리스너 등록
+    // --- 이벤트 리스너 등록 ---
     window.addEventListener('beforeunload', handleBeforeUnload);
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('popstate', handlePopState);
 
+    // --- 컴포넌트 언마운트 시 리스너 정리 ---
     return () => {
-      // 정리
       window.removeEventListener('beforeunload', handleBeforeUnload);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('popstate', handlePopState);
     };
-  }, [selectedId, syncToServerNow, handleSaveThumbnail]);
+  }, [saveCurrentScene]); // 의존성은 통합 저장 함수 하나로 충분합니다.
 
   // 색상이 변경될 때 즉시 캔버스에 반영
   useEffect(() => {
@@ -619,7 +625,7 @@ export default function EditorPage({projectId = DUMMY}) {
 
   // 선택
   const handleSelect = (id) => {
-  if (id === "__ADD__" || id === selectedId) return;
+    if (id === "__ADD__" || id === selectedId) return;
 
   // --- 1. 데이터 캡쳐 ---
   // 씬이 바뀌기 직전, 현재 캔버스의 데이터를 미리 변수에 저장합니다.
@@ -661,32 +667,25 @@ export default function EditorPage({projectId = DUMMY}) {
     canvas.renderAll();
   }
 
-  // --- 3. 백그라운드에서 저장 실행 ---
-  // 캡쳐해 둔 데이터가 있을 경우, 'await' 없이 저장 함수들을 호출하여
-  // 백그라운드에서 작업을 실행시킵니다.
-  if (dataToSave) {
-    // IndexedDB에 저장
-    saveImmediately(dataToSave)
-      .catch(e => console.error('백그라운드 IndexedDB 저장 실패:', e));
-
-    // 서버에 저장
-    syncToServerNow(dataToSave, saveModeToUse)
-      .catch(e => console.error('백그라운드 서버 저장 실패:', e));
-
-    // 썸네일 저장 (미리 생성한 썸네일 데이터를 전달)
-    handleSaveThumbnail(thumbnailToSave)
-      .catch(e => console.error('백그라운드 썸네일 저장 실패:', e));
+    // --- 3. 백그라운드에서 저장 실행 ---
+     // --- 3. 캡처해 둔 데이터로 백그라운드 저장 실행 ---
+  if (sceneIdToSave && dataToSave) {
+    saveCurrentScene(sceneIdToSave, saveModeToUse, {
+      shouldSaveThumbnail: true,
+      capturedCanvasData: dataToSave,
+      capturedThumbnailDataUrl: thumbnailToSave,
+    });
   }
 
-  // --- 캐러셀 스크롤 등 나머지 UI 로직 ---
-  const nextScene = scenes.find(s => s.id === id);
-  const nextSceneTransformed = nextScene?.saveMode === 'processed' || nextScene?.isTransformed === true;
+    // --- 캐러셀 스크롤 등 나머지 UI 로직 ---
+    const nextScene = scenes.find(s => s.id === id);
+    const nextSceneTransformed = nextScene?.saveMode === 'processed' || nextScene?.isTransformed === true;
 
-  if (nextSceneTransformed) {
-    handleModeChange('select');
-  } else {
-    handleModeChange('select');
-  }
+    if (nextSceneTransformed) {
+      handleModeChange('select');
+    } else {
+      handleModeChange('select');
+    }
 
   const items = [...scenes, {id: "__ADD__", isAdd: true}];
   const idx = items.findIndex(it => it.id === id);
@@ -804,6 +803,9 @@ export default function EditorPage({projectId = DUMMY}) {
   }
 
   setProcessing(true);
+  stageRef.current.off('mouse:down');
+  stageRef.current.off('mouse:move');
+  stageRef.current.off('mouse:up');
 
   try {
     let finalUrl = '';
@@ -908,11 +910,17 @@ export default function EditorPage({projectId = DUMMY}) {
         stageRef.current.loadFromJSON(transformedJsonData, () => {
           stageRef.current.renderAll();
           console.log("변환된 데이터가 현재 캔버스에 로드되었습니다.", selectedId, sceneIdToTransform);
-          handleModeChange('brush');
         });
     } else {
         console.log(`변환은 완료되었지만 사용자가 다른 씬(${selectedId})으로 이동하여 캔버스는 업데이트하지 않습니다.`);
     }
+
+    // React 상태 설정
+    stageRef.current.isDrawingMode = false;
+    stageRef.current.selection = true;
+
+    setDrawingMode('select');
+    setIsPanMode(false);
 
   } catch (e) {
     console.error("Transform error", e);
@@ -962,53 +970,66 @@ export default function EditorPage({projectId = DUMMY}) {
   }, [handleModeChange]);
 
   const handleClearAll = React.useCallback(async () => {
-    if (stageRef.current && stageRef.current.clear) {
+    const canvas = stageRef.current;
+
+    if (canvas && canvas.clear) {
       if (
           confirm(
               "캔버스의 모든 내용을 지우시겠습니까? 이 작업은 되돌릴 수 없습니다."
           )
       ) {
         try {
-          // 1. 캔버스 초기화
-          stageRef.current.clear();
-          console.log("캔버스가 초기화되었습니다");
+          // 1. 모든 이벤트 리스너 임시 제거 (필요시)
+          canvas.off('mouse:down');
+          canvas.off('mouse:move');
+          canvas.off('mouse:up');
 
-          // 2. 서버에 씬 초기화 요청
+          // 2. 캔버스 완전 초기화
+          canvas.clear();
+          canvas.isDrawingMode = false;
+          canvas.selection = true; // 선택 가능하게 설정
+
+          // 3. 서버 데이터 업데이트
           const response = await client.patch(`/projects/${pid}/scenes/${selectedId}`, {
             status: 'reset'
           });
 
-          // 씬 상태를 초기화된 상태로 업데이트
+          await deleteCanvasFromIndexedDB(selectedId)
+
+          // 4. React 상태 초기화
           setScenes(prevScenes =>
             prevScenes.map(scene => {
               if (scene.id === selectedId) {
                 return {
                   ...scene,
-                  saveMode: 'originals', // 변환 상태를 원본으로 리셋
-                  isTransformed: false, // 백업 필드
+                  saveMode: 'originals',
+                  isTransformed: false,
                 };
               }
               return scene;
             })
           );
-          if (stageRef.current?.changeSaveMode) {
-              stageRef.current.changeSaveMode('originals');
-              console.log(stageRef.current.changeSaveMode);
-          }
-          console.log("서버 씬 초기화 완료:", response.data);
-          window.location.reload();
 
-          // 3. 성공 메시지 (선택사항)
-          // alert("씬이 완전히 초기화되었습니다.");
+          // 5. 캔버스 내부 저장 모드 변경
+          if (canvas?.changeSaveMode) {
+              canvas.changeSaveMode('originals');
+          }
+
+          // React 상태 설정
+          setDrawingMode('select');
+          setIsPanMode(false);
+
+          //
+          // // 8. 즉시 렌더링
+          // canvas.renderAll();
 
         } catch (error) {
           console.error("씬 초기화 중 오류 발생:", error);
-          // 에러 처리 - 사용자에게 알림
           alert("씬 초기화 중 오류가 발생했습니다. 다시 시도해주세요.");
         }
       }
     }
-  }, [client, pid, selectedId]); // client, projectId, sceneId를 dependency에 추가
+  }, [client, pid, selectedId, drawingMode, isPanMode]);
 
   const handleColorChange = React.useCallback((color) => {
     setDrawingColor(color);
