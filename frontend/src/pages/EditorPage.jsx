@@ -90,7 +90,6 @@ export default function EditorPage({projectId = DUMMY}) {
   const [activeLayerIdState, setActiveLayerIdState] = useState(null);
   const [selectedObjectLayerId, setSelectedObjectLayerId] = useState(null);
 
-
   // 프로젝트 설정 모달 상태
   const [editingProject, setEditingProject] = useState(null);
   const openProjectSettings = () => {
@@ -220,7 +219,7 @@ export default function EditorPage({projectId = DUMMY}) {
     },
     selectedScene
   });
-  const {syncToServer, uploadThumbnail} = useServerSync(pid, selectedId, stageRef);
+  const {syncToServer, uploadThumbnail, getCurrentCanvasData} = useServerSync(pid, selectedId, stageRef);
 
    const saveCurrentScene = useCallback(async (sceneIdToSave, saveModeToUse, options = {}) => {
     const {
@@ -240,13 +239,7 @@ export default function EditorPage({projectId = DUMMY}) {
 
     try {
       // 1. 데이터 결정: 캡처된 데이터가 있으면 사용, 없으면 현재 캔버스에서 생성
-      const canvasData = capturedCanvasData || {
-        ...canvas.toJSON([
-          'layerId', 'layerName', 'customType', 'originalFill', 'originalCx', 'originalCy'
-        ]),
-        width: canvas.getWidth(),
-        height: canvas.getHeight()
-      };
+      const canvasData = capturedCanvasData || getCurrentCanvasData();
 
       // 2. 실행할 저장 작업 목록 구성
       const savePromises = [
@@ -635,24 +628,11 @@ export default function EditorPage({projectId = DUMMY}) {
   const sceneIdToSave = selectedId; // 떠나는 씬의 ID
   const saveModeToUse = previousSaveModeRef.current; // 떠나는 씬의 저장 모드
 
-  if (sceneIdToSave && stageRef.current) {
-    const canvas = stageRef.current;
-    const canvasData = canvas.toJSON([
-      'layerId', 'layerName', 'customType', 'originalFill',
-      'originalCx', 'originalCy'
-    ]);
-
-    if (canvas.saveCurrentSceneLayerState) {
-      layerStateToSave = canvas.saveCurrentSceneLayerState();
+    if (sceneIdToSave && stageRef.current) {
+      const canvas = stageRef.current;
+      dataToSave = getCurrentCanvasData();
+      thumbnailToSave = canvas.toDataURL({ format: 'png', quality: 0.5 });
     }
-
-    dataToSave = {
-      ...canvasData,
-      layerMetadata: layerStateToSave
-    };
-
-    thumbnailToSave = canvas.toDataURL({ format: 'png', quality: 0.5 });
-  }
 
   // --- 2. UI 즉시 업데이트 ---
   // 캡쳐한 스냅샷으로 전환 효과를 주고, 씬 ID를 변경하여 UI를 즉시 전환합니다.
