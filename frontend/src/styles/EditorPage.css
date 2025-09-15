@@ -158,51 +158,72 @@
 /* Right panel accordion */
 .accordion-section {
   margin-top: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); /* match layer panel shadow */
+  border-radius: 8px;
+  transition: transform 120ms ease, box-shadow 120ms ease;
 }
 .accordion-header {
   width: 100%;
   text-align: left;
-  padding: 8px 10px;
-  border: 1px solid #e5e7eb;
+  padding: 10px 16px; /* match layer-panel-header */
+  border: 1px solid #dee2e6; /* match layer-panel border */
   border-radius: 8px;
-  background: #f9fafb;
-  color: #111827;
+  background: #fff; /* match layer-panel-header */
+  color: #343a40; /* match layer-panel-header text */
   font-weight: 600;
+  font-size: 16px; /* match layer-panel-header h3 size */
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  transition: transform 120ms ease, background-color 120ms ease,
+    box-shadow 120ms ease;
 }
 .accordion-header:hover {
-  background: #eef2ff;
-  border-color: #c5ddf8;
+  transform: scale(1.01);
 }
-.accordion-header[aria-expanded="true"] {
-  background: #eef2ff;
-}
-.accordion-body {
-  margin-top: 8px;
+.accordion-header:active {
+  transform: scale(0.985);
 }
 
-/* Selection summary above properties header */
-.selection-summary {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  margin-bottom: 6px;
-  border: 1px solid #e5e7eb;
-  background: #f9fafb;
-  color: #374151;
-  border-radius: 8px;
+/* When open, visually merge header with body */
+.accordion-header[aria-expanded="true"] {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+/* Accordion body as a unified card with the header */
+.accordion-body {
+  border: 1px solid #dee2e6; /* match layer-panel */
+  border-top: none; /* merge with header */
+  border-bottom-left-radius: 8px;
+  border-bottom-right-radius: 8px;
+  background: #ffffff;
+  padding: 12px;
+}
+
+/* Make inner properties panel seamless when placed inside accordion */
+.accordion-body .properties-panel {
+  border: none;
+  box-shadow: none;
+  background: transparent;
+  padding: 0;
+}
+
+.accordion-body .properties-panel-body {
+  padding: 0;
+}
+
+/* Small selection/type badge inside the accordion header */
+.accordion-badge {
+  padding: 2px 8px;
   font-size: 12px;
-}
-.selection-summary .summary-type {
-  font-weight: 600;
-  color: #1f2937;
-}
-.selection-summary .summary-sep {
-  color: #9ca3af;
-}
-.selection-summary .summary-size,
-.selection-summary .summary-pos {
-  color: #4b5563;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  background: #eef4ff;
+  color: #2952cc;
+  border: 1px solid #cfe0ff;
+  border-radius: 999px;
+  line-height: 1.4;
+  white-space: nowrap;
+  text-transform: lowercase;
 }

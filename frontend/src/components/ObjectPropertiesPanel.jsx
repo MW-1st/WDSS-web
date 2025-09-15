@@ -207,21 +207,16 @@ export default function ObjectPropertiesPanel({
 
   return (
     <div className="properties-panel">
-      <div>
-
         {selection && (
           <div className="header-info">
-            <span className="type-badge">{selection.customType || selection.type || "-"}</span>
             {hasChanges && (
               <span className="changes-indicator">
-                <span className="changes-dot">●</span>
+              <span className="changes-dot">●</span>
                 변경됨
               </span>
             )}
           </div>
         )}
-      </div>
-
       <div className="properties-panel-body">
         {!selection && (
           <div className="properties-empty">개체를 선택하세요</div>

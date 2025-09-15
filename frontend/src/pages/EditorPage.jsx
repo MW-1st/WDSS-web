@@ -1440,30 +1440,19 @@ export default function EditorPage({projectId = DUMMY}) {
 
             {/* 객체 속성 패널 (예전 헤더 버튼 방식 복원) */}
             <div className="accordion-section">
-              {selectedObject && (
-                <div className="selection-summary" aria-label="현재 선택 요약">
-                  <span className="summary-type">{selectedObject.customType || selectedObject.type || '-'}</span>
-                  {(selectedObject.width && selectedObject.height) ? (
-                    <>
-                      <span className="summary-sep">·</span>
-                      <span className="summary-size">{Math.round(selectedObject.width)}×{Math.round(selectedObject.height)}px</span>
-                    </>
-                  ) : null}
-                  {(selectedObject.left !== undefined && selectedObject.top !== undefined) ? (
-                    <>
-                      <span className="summary-sep">·</span>
-                      <span className="summary-pos">({Math.round(selectedObject.left)}, {Math.round(selectedObject.top)})</span>
-                    </>
-                  ) : null}
-                </div>
-              )}
+
               <button
                 type="button"
                 className="accordion-header"
                 aria-expanded={rightPropsOpen}
                 onClick={() => setRightPropsOpen(v => !v)}
               >
-                개체 속성
+                <span>개체 속성</span>
+                {selectedObject && (
+                  <span className="accordion-badge">
+                    {(selectedObject?.customType || selectedObject?.type || "").toString()}
+                  </span>
+                )}
               </button>
               {rightPropsOpen && (
                 <div className="accordion-body">
