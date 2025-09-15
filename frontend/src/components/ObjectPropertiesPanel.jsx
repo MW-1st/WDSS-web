@@ -1,12 +1,13 @@
 import React, { useMemo, useState, useCallback, useEffect } from "react";
 import ColorPicker from "./ColorPicker.jsx";
 import "../styles/ObjectPropertiesPanel.css";
+import useAutoSave from "../hooks/useAutoSave.js";
 
 function normalizeColorToHex(color) {
   if (!color) return "#000000";
   if (typeof color === "string") {
     const hexMatch = color.match(/^#([0-9a-fA-F]{6})$/);
-    if (hexMatch) return `#${hexMatch[21]}`.toUpperCase();
+    if (hexMatch) return `#${hexMatch[1]}`.toUpperCase();
     const rgbMatch = color.match(
       /^rgb\s*\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$/
     );
@@ -45,6 +46,7 @@ const BrightnessControl = ({
     if (numValue < min || numValue > max) {
       setError(`값은 ${min}~${max} 범위 내여야 합니다`);
       return false;
+
     }
     
     setError("");
@@ -71,6 +73,17 @@ const BrightnessControl = ({
     setInputValue(value.toString());
     setSliderValue(value);
     setError("");
+    // const canvas = stageRef.current;
+    // dataToSave = canvas.toJSON([
+    //   'layerId', 'layerName', 'customType', 'originalFill',
+    //   'originalCx', 'originalCy'
+    // ]);
+    // saveImmediately(dataToSave)
+    //   .catch(e => console.error('백그라운드 IndexedDB 저장 실패:', e));
+    //
+    // // 서버에 저장
+    // syncToServerNow(dataToSave, saveModeToUse)
+    //   .catch(e => console.error('백그라운드 서버 저장 실패:', e));
   }, [value]);
 
   return (
