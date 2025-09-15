@@ -93,7 +93,7 @@ export default function useCanvasExternalStageApi({
       };
 
       externalStageRef.current.setDrawingColor = (color) => {
-        setDrawingColor(color);
+        updateBrushColor(color);
         setDrawingMode((currentMode) => {
           if (currentMode !== "pixelErase") {
             updateBrushColor(color);
