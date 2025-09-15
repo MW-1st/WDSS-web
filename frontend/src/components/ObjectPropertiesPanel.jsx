@@ -163,7 +163,7 @@ export default function ObjectPropertiesPanel({
   useEffect(() => {
     if (selection) {
       const currentColor = normalizeColorToHex(selection?.fill || selection?.stroke);
-      const currentBrightness = selection?.brightness || 1.0;
+      const currentBrightness = (selection?.brightness ?? 1.0);
       
       setLocalColor(currentColor);
       setLocalBrightness(currentBrightness);
@@ -198,7 +198,7 @@ export default function ObjectPropertiesPanel({
   const handleResetChanges = useCallback(() => {
     if (selection) {
       const originalColor = normalizeColorToHex(selection?.fill || selection?.stroke);
-      const originalBrightness = selection?.brightness || 1.0;
+      const originalBrightness = (selection?.brightness ?? 1.0);
       
       setLocalColor(originalColor);
       setLocalBrightness(originalBrightness);

@@ -292,6 +292,29 @@ export default function useCanvasInit({
         cb(null);
         return;
       }
+
+      // Include brightness information if available.
+      // For activeSelection, derive a representative value if all children share it.
+      let brightness;
+      try {
+        if (typeof active.brightness === 'number') {
+          brightness = active.brightness;
+        } else if (active.type === 'activeSelection' && typeof active.getObjects === 'function') {
+          const children = active.getObjects();
+          if (children && children.length > 0) {
+            const values = children
+              .map(o => (typeof o.brightness === 'number' ? o.brightness : undefined))
+              .filter(v => v !== undefined);
+            if (values.length === children.length) {
+              const allSame = values.every(v => v === values[0]);
+              if (allSame) brightness = values[0];
+            }
+          }
+        }
+      } catch (e) {
+        // ignore and leave brightness undefined
+      }
+
       cb({
         type: active.type || null,
         customType: active.customType || null,
@@ -301,6 +324,7 @@ export default function useCanvasInit({
         left: active.left ?? null,
         top: active.top ?? null,
         layerId: active.layerId || null,
+        brightness: typeof brightness === 'number' ? brightness : undefined,
       });
     };
 
@@ -362,7 +386,12 @@ export default function useCanvasInit({
     canvas.on("selection:cleared", handleCleared);
 
     const handleTransforming = () => updateDeleteIconPosition();
-    const handleModified = () => updateDeleteIconPosition();
+    const handleModified = () => {
+      updateDeleteIconPosition();
+      // When an object is modified (e.g., properties like brightness change),
+      // refresh selection payload so right panel reflects latest values.
+      try { notifySelection(); } catch (e) {}
+    };
     const handleWheel = () => updateDeleteIconPosition();
     const handleAfterRender = () => updateDeleteIconPosition();
     canvas.on("object:moving", handleTransforming);

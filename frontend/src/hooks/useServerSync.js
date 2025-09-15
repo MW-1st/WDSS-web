@@ -206,7 +206,7 @@ export const useServerSync = (projectId, sceneId, fabricCanvas, options = {}) =>
     const canvas = fabricCanvas.current;
     return canvas.toJSON([
       'layerId', 'layerName', 'customType', 'originalFill',
-      'originalCx', 'originalCy'
+      'originalCx', 'originalCy', 'brightness'
     ]);
   }, [fabricCanvas]);
 
