@@ -171,7 +171,7 @@ export function createCanvasActions({ fabricCanvasRef, drawingColorRef, layersRe
     const canvas = fabricCanvasRef.current;
     const canvasData = canvas.toJSON([
       'layerId', 'layerName', 'customType', 'originalFill',
-      'originalCx', 'originalCy'
+      'originalCx', 'originalCy', 'brightness'
     ]);
 
     const layerState = sceneId ? getSceneLayerState(sceneId) : null;

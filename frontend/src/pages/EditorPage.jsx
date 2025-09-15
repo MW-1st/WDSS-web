@@ -1,5 +1,6 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import EditorToolbar from "../components/EditorToolbar.jsx";
+import * as fabric from "fabric";
 import MainCanvasSection from "../components/MainCanvasSection.jsx";
 import SceneCarousel from "../components/SceneCarousel.jsx";
 import ImageGallery from "../components/ImageGallery.jsx";
@@ -237,50 +238,36 @@ export default function EditorPage({projectId = DUMMY}) {
       return;
     }
 
-    const thumbnailDataUrl = pregeneratedDataUrl || stageRef.current.toDataURL({
-      format: 'png',
-      quality: 0.8
-    });
+    const canvas = stageRef.current;
+    const logAction = shouldSaveThumbnail ? "전체 저장 (썸네일 포함)" : "데이터 저장";
+    console.log(`🚀 ${sceneIdToSave} 씬 ${logAction} 시작 (모드: ${saveModeToUse})`);
 
     try {
-      // 결정된 데이터를 사용해 업로드
-      await uploadThumbnail(thumbnailDataUrl);
-      console.log("✅ 썸네일이 백그라운드에서 성공적으로 저장되었습니다.");
-    } catch (error) {
-      console.error("❌ 썸네일 저장에 실패했습니다:", error);
-    }
-  }, [uploadThumbnail]);
+      // 1. 데이터 결정: 캡처된 데이터가 있으면 사용, 없으면 현재 캔버스에서 생성
+      const canvasData = capturedCanvasData || {
+        ...canvas.toJSON([
+          'layerId', 'layerName', 'customType', 'originalFill', 'originalCx', 'originalCy', 'brightness'
+        ]),
+        width: canvas.getWidth(),
+        height: canvas.getHeight()
+      };
 
+      // 2. 실행할 저장 작업 목록 구성
+      const savePromises = [
+        saveImmediately(canvasData),
+        syncToServer(canvasData, saveModeToUse)
+      ];
 
-  // 수동 저장 함수
-  const handleManualSave = async () => {
-    if (!selectedId || !stageRef.current || !pid) {
-      console.warn('Cannot save: missing selectedId, stageRef, or projectId');
-      return;
-    }
-
-    try {
-      console.log('Manual save started with mode:', saveMode);
-
-      const canvas = stageRef.current;
-      const canvasData = canvas.toJSON([
-        'layerId', 'layerName', 'customType', 'originalFill',
-        'originalCx', 'originalCy'
-      ]);
-
-      // 현재 saveMode에 맞게 서버에 저장
-      const success = await syncToServer(canvasData, saveMode);
-
-      if (success) {
-        await handleSaveThumbnail();
-        console.log(`수동 저장 시 썸네일 저장 완료: Scene ${selectedId}`);
-        console.log(`Scene ${selectedId} manually saved with mode: ${saveMode}`);
-        // 성공 알림 (선택사항)
-        // alert('저장되었습니다.');
-      } else {
-        console.error('Manual save failed');
-        alert('저장에 실패했습니다. 다시 시도해주세요.');
+      // 3. 썸네일 저장 작업 구성
+      if (shouldSaveThumbnail) {
+        // 캡처된 썸네일이 있으면 사용, 없으면 현재 캔버스에서 생성
+        const thumbnailDataUrl = capturedThumbnailDataUrl || canvas.toDataURL({ format: 'png', quality: 0.5 });
+        savePromises.push(uploadThumbnail(thumbnailDataUrl));
       }
+
+      await Promise.all(savePromises);
+      console.log(`✅ ${sceneIdToSave} 씬 ${logAction} 완료`);
+
     } catch (error) {
       console.error(`❌ ${sceneIdToSave} 씬 저장 중 오류 발생:`, error);
     }
@@ -388,6 +375,67 @@ export default function EditorPage({projectId = DUMMY}) {
       if (cleanup) cleanup();
     };
   }, []);
+
+  useEffect(() => {
+    if (canvasReady && selectedId) {
+      // 첫 번째 시도: 즉시 업데이트
+      updateLayerState();
+
+      // 두 번째 시도: 200ms 후 다시 업데이트 (캔버스가 씬 데이터를 로드할 시간을 줌)
+      setTimeout(() => {
+        updateLayerState();
+      }, 200);
+
+      // 세 번째 시도: 500ms 후 최종 확인 (새 씬의 경우 레이어 시스템이 완전히 초기화될 시간)
+      setTimeout(() => {
+        updateLayerState();
+      }, 500);
+    }
+  }, [selectedId, canvasReady, updateLayerState]);
+
+
+  useEffect(() => {
+    if (canvasReady && selectedId && stageRef.current) {
+      const canvas = stageRef.current;
+      setTimeout(() => {
+        updateLayerState();
+
+        if (canvas.getSceneLayerState) {
+          const layerState = canvas.getSceneLayerState(selectedId);
+          if (layerState && layerState.layers && layerState.layers.length > 0) {
+            if (canvas.restoreSceneLayerState) {
+              canvas.restoreSceneLayerState(selectedId, layerState);
+            }
+          }
+        }
+      }, 200);
+    }
+  }, [selectedId, canvasReady, updateLayerState]);
+
+  useEffect(() => {
+    const canvas = stageRef.current;
+    if (!canvas) return;
+
+    const updateDotCount = () => {
+      const objects = canvas.getObjects();
+      const dots = objects.filter(obj => obj.type === 'circle');
+      setDotCount(dots.length);
+    };
+
+    updateDotCount();
+
+    canvas.on('object:added', updateDotCount);
+    canvas.on('object:removed', updateDotCount);
+    canvas.on('load:completed', updateDotCount);
+
+    return () => {
+      if (canvas) {
+        canvas.off('object:added', updateDotCount);
+        canvas.off('object:removed', updateDotCount);
+        canvas.off('load:completed', updateDotCount);
+      }
+    };
+  }, [canvasReady, setDotCount]);
 
   // 프로젝트가 없으면 생성하는 헬퍼
   const ensureProjectId = async () => {
@@ -620,7 +668,7 @@ export default function EditorPage({projectId = DUMMY}) {
     const canvas = stageRef.current;
     const canvasData = canvas.toJSON([
       'layerId', 'layerName', 'customType', 'originalFill',
-      'originalCx', 'originalCy'
+      'originalCx', 'originalCy', 'brightness'
     ]);
 
     if (canvas.saveCurrentSceneLayerState) {
@@ -891,7 +939,7 @@ export default function EditorPage({projectId = DUMMY}) {
         stageRef.current.loadFromJSON(transformedJsonData, () => {
           stageRef.current.renderAll();
           console.log("변환된 데이터가 현재 캔버스에 로드되었습니다.", selectedId, sceneIdToTransform);
-          handleModeChange('brush');
+          handleModeChange('select');
         });
     } else {
         console.log(`변환은 완료되었지만 사용자가 다른 씬(${selectedId})으로 이동하여 캔버스는 업데이트하지 않습니다.`);
@@ -1072,18 +1120,16 @@ export default function EditorPage({projectId = DUMMY}) {
     const applyBrightness = (obj) => {
       if (!obj) return;
       
-      // Ensure filters array exists. It might not on all object types.
-      obj.filters = obj.filters || [];
-
-      // Remove existing brightness filter to prevent stacking.
-      obj.filters = obj.filters.filter(f => f.type !== 'Brightness');
-
-      // Add new brightness filter if the value is not default (1.0).
-      if (brightness < 1.0) {
-        // fabric is assumed to be available globally in this project setup
-        obj.filters.push(new fabric.Image.filters.Brightness({
-          brightness: fabricBrightnessValue,
-        }));
+      // Only images support bitmap filters. Guard to avoid runtime errors.
+      try {
+        obj.filters = obj.filters || [];
+        obj.filters = obj.filters.filter(f => f.type !== 'Brightness');
+        const BrightnessFilter = (fabric?.filters && fabric.filters.Brightness) || (fabric?.Image?.filters && fabric.Image.filters.Brightness);
+        if (obj.type === 'image' && BrightnessFilter && brightness < 1.0) {
+          obj.filters.push(new BrightnessFilter({ brightness: fabricBrightnessValue }));
+        }
+      } catch (e) {
+        // ignore filter application errors for non-image objects
       }
 
       // Store the UI-facing value (0-1) on the object for persistence and retrieval.
@@ -1096,13 +1142,21 @@ export default function EditorPage({projectId = DUMMY}) {
     };
 
     if (active.type === 'activeSelection') {
+      // Apply to children of the selection
       active.getObjects().forEach(applyBrightness);
+      // Also store a representative brightness value on the activeSelection itself
+      // so that UI reflecting the current selection can read it reliably.
+      try {
+        active.set({ brightness });
+      } catch (e) {}
     } else {
       applyBrightness(active);
     }
 
     canvas.renderAll();
     setSelectedObject((prev) => (prev ? { ...prev, brightness } : null));
+    // Bump selectionVersion so the properties panel re-syncs from selection
+    setSelectionVersion((v) => v + 1);
     triggerAutoSave();
   }, [triggerAutoSave]);
 
@@ -1500,6 +1554,7 @@ export default function EditorPage({projectId = DUMMY}) {
               onSelectionChange={(selection) => {
                 setSelectedObject(selection);
                 setSelectedObjectLayerId(selection?.layerId || null);
+                setSelectionVersion((v) => v + 1);
               }}
               onPanChange={setIsPanMode}
               changeSaveMode={changeSaveMode}
