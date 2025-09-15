@@ -8,8 +8,8 @@
   padding: 0;
   overflow: hidden;
   /* From inline styles */
-  width: 38px;
-  height: 38px;
+  width: 37px;
+  height: 37px;
   cursor: pointer;
 
   transition: all 0.2s ease;
@@ -39,7 +39,6 @@
 
 /* New Styles */
 .canvas-tools-container {
-  padding: 8px 0;
   display: flex;
   flex-direction: column;
   align-items: center; /* center all tool rows */
@@ -49,7 +48,7 @@
   display: flex;
   flex-direction: column;
   align-items: center; /* horizontal center of each item */
-  gap: 4px;
+  gap: 8px;
   margin-bottom: 8px;
 }
 
@@ -156,7 +155,6 @@
   border-color: #bd2130;
 }
 
-.color-picker-group,
 .clear-tool-group {
   margin-bottom: 8px;
   display: flex;

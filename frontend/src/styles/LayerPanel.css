@@ -37,10 +37,6 @@
   transform: scale(1.01);
 }
 
-.layer-panel-header:active {
-  transform: scale(0.985);
-}
-
 .layer-panel-header h3 {
   margin: 0;
   font-size: 16px;

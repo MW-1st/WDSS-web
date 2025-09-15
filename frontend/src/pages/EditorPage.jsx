@@ -1254,7 +1254,7 @@ export default function EditorPage({projectId = DUMMY}) {
                   onMouseEnter={() => setSelectHovered(true)}
                   onMouseLeave={() => setSelectHovered(false)}
               >
-                {isPanMode ? <IoHandRightOutline/> : <LuMousePointer/>}
+                {isPanMode ? <IoHandRightOutline size={20}/> : <LuMousePointer size={20}/>}
               </button>
               {selectHovered && createPortal(
                 <div

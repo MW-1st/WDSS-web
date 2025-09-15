@@ -129,25 +129,23 @@ const Inner = ({
             className="tool-button"
             title="Image gallery"
           >
-            <FaImage />
+            <FaImage size={20} />
           </button>
           <Tooltip />
         </div>
       )}
 
-      <div style={{ marginBottom: 16 }}>
-        <CanvasTools
-          drawingMode={drawingMode}
-          eraserSize={eraserSize}
-          drawingColor={drawingColor}
-          onModeChange={onModeChange}
-          onColorChange={onColorChange}
-          onColorPreview={onColorPreview}
-          onClearAll={onClearAll}
-          isSceneTransformed={isSceneTransformed}
-          isToolAllowed={isToolAllowed}
-        />
-      </div>
+      <CanvasTools
+        drawingMode={drawingMode}
+        eraserSize={eraserSize}
+        drawingColor={drawingColor}
+        onModeChange={onModeChange}
+        onColorChange={onColorChange}
+        onColorPreview={onColorPreview}
+        onClearAll={onClearAll}
+        isSceneTransformed={isSceneTransformed}
+        isToolAllowed={isToolAllowed}
+      />
 
       {layout !== "sidebar" && (
         <>
@@ -181,7 +179,7 @@ const EditorToolbar = React.memo(function EditorToolbar(props) {
     return (
       <div
         className="editor-sidebar"
-        style={{ display: "flex", flexDirection: "column", gap: 12 }}
+        style={{ display: "flex", flexDirection: "column", gap: 8 }}
       >
         <Inner {...props} />
       </div>

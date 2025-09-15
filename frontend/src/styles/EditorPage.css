@@ -183,10 +183,6 @@
 .accordion-header:hover {
   transform: scale(1.01);
 }
-.accordion-header:active {
-  transform: scale(0.985);
-}
-
 /* When open, visually merge header with body */
 .accordion-header[aria-expanded="true"] {
   border-bottom-left-radius: 0;
