@@ -207,8 +207,8 @@ export default function ObjectPropertiesPanel({
 
   return (
     <div className="properties-panel">
-      <div className="properties-panel-header">
-        <h3>개체 속성</h3>
+      <div>
+
         {selection && (
           <div className="header-info">
             <span className="type-badge">{selection.customType || selection.type || "-"}</span>

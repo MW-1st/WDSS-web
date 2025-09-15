@@ -119,26 +119,15 @@ const Inner = ({
   return (
     <>
       {layout === "sidebar" && (
-        <div style={{ marginBottom: 8 }}>
+        <div className="tool-anchor">
           <button
             ref={btnRef}
             onClick={toggleGallery}
             aria-label="Image gallery"
             onMouseEnter={() => setGalleryHovered(true)}
             onMouseLeave={() => setGalleryHovered(false)}
-            style={{
-              border: "1px solid #e5e7eb",
-              width: 40,
-              height: 40,
-              padding: 0,
-              borderRadius: 8,
-              cursor: "pointer",
-              fontSize: 16,
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              background: "#fff",
-            }}
+            className="tool-button"
+            title="Image gallery"
           >
             <FaImage />
           </button>

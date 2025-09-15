@@ -1337,7 +1337,7 @@ export default function EditorPage({projectId = DUMMY}) {
                   aria-label="프로젝트 설정"
                   onClick={openProjectSettings}
                   disabled={!projectMeta}
-                  className="settings-button"
+                  className="tool-button"
                   style={{
                     cursor: projectMeta ? "pointer" : "not-allowed",
                   }}

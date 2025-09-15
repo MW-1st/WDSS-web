@@ -71,6 +71,9 @@
 
 .settings-container {
   margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center; /* center settings button like other tools */
 }
 
 .settings-button {
@@ -169,11 +172,10 @@
 }
 .accordion-header:hover {
   background: #eef2ff;
-  border-color: #93c5fd;
+  border-color: #c5ddf8;
 }
 .accordion-header[aria-expanded="true"] {
   background: #eef2ff;
-  border-color: #93c5fd;
 }
 .accordion-body {
   margin-top: 8px;

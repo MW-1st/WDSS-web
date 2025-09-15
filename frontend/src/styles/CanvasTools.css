@@ -70,6 +70,7 @@
   border-radius: 8px;
   cursor: pointer;
   font-size: 18px; /* slightly larger icons */
+  line-height: 0; /* avoid baseline gaps for SVG icons */
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -200,25 +201,6 @@
   color: #666;
   margin-left: 2px;
 }
-
-/* Special behavior for the select/pan toggle button on the editor page */
-.tool-select-toggle:hover {
-  background-color: #eef2ff; /* hover tint */
-  border-color: #93c5fd;
-}
-.tool-select-toggle.active {
-  background-color: #007bff; /* filled when active */
-  color: #fff;
-  border-color: #007bff;
-}
-.tool-select-toggle.active:hover {
-  background-color: #1a7cff; /* subtle hover change when active */
-}
-.tool-select-toggle[data-open="true"] {
-  outline: 2px solid #60a5fa; /* when the popover is open */
-  outline-offset: 0;
-}
-.tool-select-toggle:hover svg { transform: scale(1.05); }
 
 .tooltip {
   position: fixed;
