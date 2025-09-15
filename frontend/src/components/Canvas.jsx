@@ -103,7 +103,9 @@ export default function Canvas({
     getActiveLayer,
     getLayer,
     getSortedLayers,
-  } = useLayers();
+    loadSceneLayerState,
+    getSceneLayerState,
+  } = useLayers(scene?.id);
 
   /* 레이어 참조(derived) */
   const { activeLayerIdRef, layersRef, getSortedLayersRef } =
@@ -115,6 +117,45 @@ export default function Canvas({
       setCanvasRevision,
       canvasRevision,
     });
+
+  /* 레이어 상태와 Fabric.js 동기화 */
+  useEffect(() => {
+    if (!fabricCanvas.current || !layers || layers.length === 0) return;
+
+    const canvas = fabricCanvas.current;
+    const objects = canvas.getObjects();
+    const sortedLayers = getSortedLayers();
+
+    // zIndex가 높은 레이어부터 순회하며 객체를 캔버스 맨 뒤로 보냅니다.
+    // 최종적으로 zIndex가 가장 낮은 레이어의 객체가 맨 뒤에 남게 됩니다.
+    [...sortedLayers].reverse().forEach(layer => {
+      const objectsInLayer = objects.filter(obj => obj.layerId === layer.id);
+      // 한 레이어 내 객체들의 순서를 유지하기 위해 역순으로 처리합니다.
+      objectsInLayer.reverse().forEach(obj => {
+        canvas.sendObjectToBack(obj);
+      });
+    });
+
+    // 레이어 속성(visible, locked) 동기화
+    objects.forEach(obj => {
+      if (obj.name === 'canvasBoundary') return;
+
+      if (!obj.layerId) {
+        obj.set('layerId', activeLayerId);
+      }
+
+      const layer = getLayer(obj.layerId);
+      if (layer) {
+        obj.set({
+          visible: layer.visible,
+          selectable: !layer.locked,
+          evented: !layer.locked
+        });
+      }
+    });
+
+    canvas.renderAll();
+  }, [layers, activeLayerId, getLayer, getSortedLayers, canvasRevision]);
 
   /* 리사이즈 및 뷰포트 처리 */
   useCanvasViewport(fabricCanvas, width, height);
@@ -174,6 +215,7 @@ export default function Canvas({
     triggerAutoSave,
     onCanvasChangeRef,
     setCanvasRevision,
+    loadSceneLayerState,
   });
 
   /* Fabric 캔버스 초기화 */
@@ -282,10 +324,11 @@ export default function Canvas({
             !layer.visible
           );
           toggleLayerVisibility(layerId);
+          setCanvasRevision((c) => c + 1);
         }
       }
     },
-    [getLayer, toggleLayerVisibility]
+    [getLayer, toggleLayerVisibility, setCanvasRevision]
   );
 
   const handleLayerLockChange = useCallback(
@@ -299,10 +342,11 @@ export default function Canvas({
             !layer.locked
           );
           toggleLayerLock(layerId);
+          setCanvasRevision((c) => c + 1);
         }
       }
     },
-    [getLayer, toggleLayerLock]
+    [getLayer, toggleLayerLock, setCanvasRevision]
   );
 
   const handleDeleteLayer = useCallback(
@@ -326,7 +370,7 @@ export default function Canvas({
     hasDrawnContent,
     clearCanvas,
     saveOriginalCanvasState,
-    restoreOriginalCanvasState,
+    restoreOriginalCanvasState: (state) => restoreOriginalCanvasState(state, loadSceneLayerState),
     applyDrawingMode,
     externalDrawingColor,
     setDrawingMode,
@@ -342,6 +386,42 @@ export default function Canvas({
     handleLayerLockChange,
     reorderLayers,
     changeSaveMode,
+    loadSceneLayerState,
+    getSceneLayerState,
+    saveCurrentSceneLayerState: () => scene?.id ? getSceneLayerState(scene.id) : null,
+    restoreSceneLayerState: (sceneId, layerState) => {
+      if (sceneId && layerState) {
+        loadSceneLayerState(sceneId, layerState);
+        setTimeout(() => {
+          if (fabricCanvas.current) {
+            const canvas = fabricCanvas.current;
+            const objects = canvas.getObjects();
+
+            objects.forEach(obj => {
+              // 캔버스 경계선은 제외
+              if (obj.name === 'canvasBoundary') return;
+
+              if (!obj.layerId && layerState.activeLayerId) {
+                obj.set('layerId', layerState.activeLayerId);
+              }
+
+              const layerId = obj.layerId;
+              const layer = layerState.layers ? layerState.layers.find(l => l.id === layerId) : null;
+
+              if (layer) {
+                obj.set({
+                  visible: layer.visible,
+                  selectable: !layer.locked,
+                  evented: !layer.locked
+                });
+              }
+            });
+
+            canvas.renderAll();
+          }
+        }, 100);
+      }
+    },
   });
 
   /* 렌더링 */

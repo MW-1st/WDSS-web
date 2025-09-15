@@ -119,37 +119,54 @@ export default function EditorPage({projectId = DUMMY}) {
 
   // 레이어 상태를 업데이트하는 함수
   const updateLayerState = React.useCallback(() => {
-    if (stageRef.current && stageRef.current.layers) {
+    if (stageRef.current && selectedId) {
       try {
-        const layers = stageRef.current.layers.getLayers() || [];
-        const activeId = stageRef.current.layers.getActiveLayerId();
+        // 씬별 레이어 상태 가져오기
+        const canvas = stageRef.current;
+        if (canvas.getSceneLayerState) {
+          const layerState = canvas.getSceneLayerState(selectedId);
+          if (layerState && layerState.layers) {
+            const layers = layerState.layers || [];
+            const activeId = layerState.activeLayerId || 'layer-1';
 
-        setLayersState(prevLayers => {
-          const layersChanged = JSON.stringify(prevLayers.map(l => ({id: l.id, zIndex: l.zIndex, name: l.name, visible: l.visible, locked: l.locked}))) !== 
-                               JSON.stringify(layers.map(l => ({id: l.id, zIndex: l.zIndex, name: l.name, visible: l.visible, locked: l.locked})));
-          
-          if (layersChanged) {
-            console.log('Layers changed, updating state');
-            return [...layers];
-          } else {
-            return prevLayers;
+            setLayersState(prevLayers => {
+              const layersChanged = JSON.stringify(prevLayers.map(l => ({id: l.id, zIndex: l.zIndex, name: l.name, visible: l.visible, locked: l.locked}))) !==
+                                   JSON.stringify(layers.map(l => ({id: l.id, zIndex: l.zIndex, name: l.name, visible: l.visible, locked: l.locked})));
+
+              if (layersChanged) {
+                return [...layers];
+              } else {
+                return prevLayers;
+              }
+            });
+
+            setActiveLayerIdState(prevActiveId => {
+              if (prevActiveId !== activeId) {
+                return activeId;
+              } else {
+                return prevActiveId;
+              }
+            });
+            return;
           }
-        });
+        }
 
-        setActiveLayerIdState(prevActiveId => {
-          if (prevActiveId !== activeId) {
-            console.log('Active layer changed:', prevActiveId, '->', activeId);
-            return activeId;
-          } else {
-            return prevActiveId;
-          }
-        });
-
+        // 폴백: 기존 방식 사용
+        if (stageRef.current.layers) {
+          const layers = stageRef.current.layers.getLayers() || [];
+          const activeId = stageRef.current.layers.getActiveLayerId() || 'layer-1';
+          setLayersState([...layers]);
+          setActiveLayerIdState(activeId);
+        } else {
+          // 캔버스 레이어 시스템이 아직 준비되지 않은 경우 기본값 사용
+          console.log('Canvas layers not ready, using default values');
+          setActiveLayerIdState('layer-1');
+        }
       } catch (error) {
         console.warn('Error updating layer state:', error);
       }
     }
-  }, []);
+  }, [selectedId]);
 
   // unity 관련 상태
   const {isUnityVisible, showUnity, hideUnity, sendTestData} = useUnity();
@@ -333,28 +350,7 @@ export default function EditorPage({projectId = DUMMY}) {
         }
         updateLayerState();
 
-        // 캔버스 선택 이벤트 리스너 추가
-        const canvas = stageRef.current;
-        const handleSelectionChanged = () => {
-          const activeObject = canvas.getActiveObject();
-          if (activeObject && activeObject.layerId) {
-            setSelectedObjectLayerId(activeObject.layerId);
-          } else {
-            setSelectedObjectLayerId(null);
-          }
-        };
-
-        canvas.on('selection:created', handleSelectionChanged);
-        canvas.on('selection:updated', handleSelectionChanged);
-        canvas.on('selection:cleared', () => setSelectedObjectLayerId(null));
-
-        return () => {
-          if (canvas) {
-            canvas.off('selection:created', handleSelectionChanged);
-            canvas.off('selection:updated', handleSelectionChanged);
-            canvas.off('selection:cleared');
-          }
-        };
+        // 캔버스 선택 이벤트는 Canvas 컴포넌트의 onSelectionChange prop으로 처리됨
       } else {
         timeoutId = setTimeout(checkCanvasReady, 100);
       }
@@ -368,6 +364,42 @@ export default function EditorPage({projectId = DUMMY}) {
       if (cleanup) cleanup();
     };
   }, []);
+
+  useEffect(() => {
+    if (canvasReady && selectedId) {
+      // 첫 번째 시도: 즉시 업데이트
+      updateLayerState();
+
+      // 두 번째 시도: 200ms 후 다시 업데이트 (캔버스가 씬 데이터를 로드할 시간을 줌)
+      setTimeout(() => {
+        updateLayerState();
+      }, 200);
+
+      // 세 번째 시도: 500ms 후 최종 확인 (새 씬의 경우 레이어 시스템이 완전히 초기화될 시간)
+      setTimeout(() => {
+        updateLayerState();
+      }, 500);
+    }
+  }, [selectedId, canvasReady, updateLayerState]);
+
+
+  useEffect(() => {
+    if (canvasReady && selectedId && stageRef.current) {
+      const canvas = stageRef.current;
+      setTimeout(() => {
+        updateLayerState();
+
+        if (canvas.getSceneLayerState) {
+          const layerState = canvas.getSceneLayerState(selectedId);
+          if (layerState && layerState.layers && layerState.layers.length > 0) {
+            if (canvas.restoreSceneLayerState) {
+              canvas.restoreSceneLayerState(selectedId, layerState);
+            }
+          }
+        }
+      }, 200);
+    }
+  }, [selectedId, canvasReady, updateLayerState]);
 
   // 프로젝트가 없으면 생성하는 헬퍼
   const ensureProjectId = async () => {
@@ -553,6 +585,11 @@ export default function EditorPage({projectId = DUMMY}) {
       };
       const nextScenes = [...scenes, createdNorm];
       setScenes(nextScenes);
+
+      // 선택 상태 초기화
+      setSelectedObject(null);
+      setSelectedObjectLayerId(null);
+
       if (createdId) {
         await handleSelect(createdId);
       } else {
@@ -583,12 +620,13 @@ export default function EditorPage({projectId = DUMMY}) {
   const handleSelect = (id) => {
     if (id === "__ADD__" || id === selectedId) return;
 
-    // --- 1. 데이터 캡쳐 ---
-    // 씬이 바뀌기 직전, 현재 캔버스의 데이터를 미리 변수에 저장합니다.
-    let dataToSave = null;
-    let thumbnailToSave = null;
-    const sceneIdToSave = selectedId; // 떠나는 씬의 ID
-    const saveModeToUse = previousSaveModeRef.current; // 떠나는 씬의 저장 모드
+  // --- 1. 데이터 캡쳐 ---
+  // 씬이 바뀌기 직전, 현재 캔버스의 데이터를 미리 변수에 저장합니다.
+  let dataToSave = null;
+  let layerStateToSave = null;
+  let thumbnailToSave = null;
+  const sceneIdToSave = selectedId; // 떠나는 씬의 ID
+  const saveModeToUse = previousSaveModeRef.current; // 떠나는 씬의 저장 모드
 
     if (sceneIdToSave && stageRef.current) {
       const canvas = stageRef.current;
@@ -596,9 +634,18 @@ export default function EditorPage({projectId = DUMMY}) {
       thumbnailToSave = canvas.toDataURL({ format: 'png', quality: 0.5 });
     }
 
-    // --- 2. UI 즉시 업데이트 ---
-    // 캡쳐한 스냅샷으로 전환 효과를 주고, 씬 ID를 변경하여 UI를 즉시 전환합니다.
-    setSelectedId(id);
+  // --- 2. UI 즉시 업데이트 ---
+  // 캡쳐한 스냅샷으로 전환 효과를 주고, 씬 ID를 변경하여 UI를 즉시 전환합니다.
+  setSelectedId(id);
+  setSelectedObject(null);
+  setSelectedObjectLayerId(null);
+
+  // 캔버스 선택 해제
+  if (stageRef.current) {
+    const canvas = stageRef.current;
+    canvas.discardActiveObject();
+    canvas.renderAll();
+  }
 
     // --- 3. 백그라운드에서 저장 실행 ---
      // --- 3. 캡처해 둔 데이터로 백그라운드 저장 실행 ---
@@ -620,11 +667,30 @@ export default function EditorPage({projectId = DUMMY}) {
       handleModeChange('select');
     }
 
-    const items = [...scenes, {id: "__ADD__", isAdd: true}];
-    const idx = items.findIndex(it => it.id === id);
-    if (idx < start) setStart(idx);
-    if (idx >= start + VISIBLE) setStart(idx - VISIBLE + 1);
-  };
+  const items = [...scenes, {id: "__ADD__", isAdd: true}];
+  const idx = items.findIndex(it => it.id === id);
+  if (idx < start) setStart(idx);
+  if (idx >= start + VISIBLE) setStart(idx - VISIBLE + 1);
+
+  setTimeout(() => {
+    updateLayerState();
+    setSelectedObject(null);
+    setSelectedObjectLayerId(null);
+
+    // 새 씬인 경우 레이어 시스템이 올바르게 초기화되었는지 확인
+    setTimeout(() => {
+      updateLayerState();
+
+      // 여전히 활성 레이어가 없으면 강제로 기본값 설정
+      setTimeout(() => {
+        if (!activeLayerIdState || activeLayerIdState === null) {
+          console.log('Force setting default active layer');
+          setActiveLayerIdState('layer-1');
+        }
+      }, 100);
+    }, 200);
+  }, 100);
+};
 
   // scenes/selectedId 변경 시 선택 유효성 보정
   useEffect(() => {
@@ -1380,7 +1446,10 @@ export default function EditorPage({projectId = DUMMY}) {
               drawingColor={drawingColor}
               activeLayerId={activeLayerIdState}
               onModeChange={handleModeChange}
-              onSelectionChange={setSelectedObject}
+              onSelectionChange={(selection) => {
+                setSelectedObject(selection);
+                setSelectedObjectLayerId(selection?.layerId || null);
+              }}
               onPanChange={setIsPanMode}
               changeSaveMode={changeSaveMode}
               triggerAutoSave={triggerAutoSave}

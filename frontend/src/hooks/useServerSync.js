@@ -54,7 +54,10 @@ export const useServerSync = (projectId, sceneId, fabricCanvas, options = {}) =>
 
       // 메타데이터가 있는 형태인지 확인
       if (data.canvas_data && data.metadata) {
-        return data.canvas_data;
+        return {
+          ...data.canvas_data,
+          layerMetadata: data.metadata.layerMetadata
+        };
       } else {
         // 메타데이터 없이 바로 캔버스 데이터인 경우
         return data;
@@ -104,7 +107,10 @@ export const useServerSync = (projectId, sceneId, fabricCanvas, options = {}) =>
 
       // 메타데이터가 있는 형태인지 확인
       if (data.canvas_data && data.metadata) {
-        return data.canvas_data;
+        return {
+          ...data.canvas_data,
+          layerMetadata: data.metadata.layerMetadata
+        };
       } else {
         // 메타데이터 없이 바로 캔버스 데이터인 경우
         return data;

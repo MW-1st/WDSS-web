@@ -2,6 +2,18 @@ import { useLayoutEffect } from "react";
 import * as fabric from "fabric";
 import * as fabricLayerUtils from "../../utils/fabricLayerUtils";
 
+// 사용자 정의 속성(layerId, layerName)이 toJSON() 호출 시 포함되도록 설정
+// 이 설정은 이 모듈이 로드될 때 한 번만 실행됩니다.
+fabric.Object.prototype.toObject = (function (toObject) {
+  return function (propertiesToInclude) {
+    propertiesToInclude = (propertiesToInclude || []).concat([
+      'layerId',
+      'layerName',
+    ]);
+    return toObject.call(this, propertiesToInclude);
+  };
+})(fabric.Object.prototype.toObject);
+
 export default function useCanvasInit({
   canvasRef,
   fabricCanvasRef,
@@ -288,6 +300,7 @@ export default function useCanvasInit({
         radius: typeof active.radius === "number" ? active.radius : null,
         left: active.left ?? null,
         top: active.top ?? null,
+        layerId: active.layerId || null,
       });
     };
 
