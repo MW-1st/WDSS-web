@@ -1,5 +1,7 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from "react";
+import { createPortal } from "react-dom";
 import EditorToolbar from "../components/EditorToolbar.jsx";
+import "../styles/CanvasTools.css"; // ensure shared button styles loaded
 import MainCanvasSection from "../components/MainCanvasSection.jsx";
 import SceneCarousel from "../components/SceneCarousel.jsx";
 import ImageGallery from "../components/ImageGallery.jsx";
@@ -19,6 +21,7 @@ import ProjectSettingsModal from "../components/ProjectSettingsModal";
 import PortalPopover from "../components/PortalPopover.jsx";
 import { saveCanvasToIndexedDB } from "../utils/indexedDBUtils.js";
 import "../styles/EditorPage.css";
+import "../styles/CanvasTools.css"; // tooltip style reuse
 
 const VISIBLE = 4;
 const DUMMY = "11111111-1111-1111-1111-111111111111";
@@ -61,6 +64,8 @@ export default function EditorPage({projectId = DUMMY}) {
   const stageRef = useRef(null);
   const galleryRef = useRef(null);
   const toolButtonRef = useRef(null);
+  const [selectHovered, setSelectHovered] = useState(false);
+  const [selectTooltipPos, setSelectTooltipPos] = useState({ top: 0, left: 0 });
 
   // 캔버스 관련 상태
   const [drawingMode, setDrawingMode] = useState("select");
@@ -75,8 +80,40 @@ export default function EditorPage({projectId = DUMMY}) {
     selectedIdRef.current = selectedId;
   }, [selectedId]);
 
+  // Select/Pan toggle tooltip position tracking
+  useEffect(() => {
+    if (!selectHovered) return;
+    const el = toolButtonRef.current;
+    if (!el) return;
+    const update = () => {
+      const r = el.getBoundingClientRect();
+      setSelectTooltipPos({
+        top: Math.round(r.top + r.height / 2),
+        left: Math.round(r.right + 10),
+      });
+    };
+    update();
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
+  }, [selectHovered]);
+
+  const getSelectTooltipText = () =>
+    isPanMode ? "이동(H): 캔버스를 이동합니다." : "선택(V): 객체를 선택하고 이동합니다.";
+
   // 미리보기 패널 관련 상태
   const previewPanelRef = useRef(null);
+  const [rightPropsOpen, setRightPropsOpen] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('wdss:rightPropsOpen') ?? 'true'); } catch { return true; }
+  });
+  const [rightLayersOpen, setRightLayersOpen] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('wdss:rightLayersOpen') ?? 'true'); } catch { return true; }
+  });
+  useEffect(() => { try { localStorage.setItem('wdss:rightPropsOpen', JSON.stringify(rightPropsOpen)); } catch(_){} }, [rightPropsOpen]);
+  useEffect(() => { try { localStorage.setItem('wdss:rightLayersOpen', JSON.stringify(rightLayersOpen)); } catch(_){} }, [rightLayersOpen]);
 
   // 캔버스 변경 시 미리보기 업데이트
   const handleCanvasChange = React.useCallback(() => {
@@ -1206,21 +1243,28 @@ export default function EditorPage({projectId = DUMMY}) {
         >
           <div className="left-rail-inner">
 
-            <div className="tool-select-container">
+            <div className="tool-anchor">
               <button
                   ref={toolButtonRef}
                   onClick={() => setToolSelectionOpen(prev => !prev)}
                   title="도구 선택"
                   aria-label="도구 선택"
-                  className="tool-select-button"
-                  style={{
-                    border: `2px solid ${isSelectOrPan ? '#007bff' : '#e0e0e0'}`,
-                    backgroundColor: isSelectOrPan ? '#007bff' : '#ffffff',
-                    color: isSelectOrPan ? 'white' : '#333333',
-                  }}
+                  className={`tool-button tool-select-toggle ${isSelectOrPan ? 'active' : ''}`}
+                  data-open={isToolSelectionOpen ? 'true' : 'false'}
+                  onMouseEnter={() => setSelectHovered(true)}
+                  onMouseLeave={() => setSelectHovered(false)}
               >
                 {isPanMode ? <IoHandRightOutline/> : <LuMousePointer/>}
               </button>
+              {selectHovered && createPortal(
+                <div
+                  className="tooltip"
+                  style={{ top: selectTooltipPos.top, left: selectTooltipPos.left }}
+                >
+                  {getSelectTooltipText()}
+                </div>,
+                document.body
+              )}
               <PortalPopover
                   anchorRef={toolButtonRef}
                   open={isToolSelectionOpen}
@@ -1228,7 +1272,7 @@ export default function EditorPage({projectId = DUMMY}) {
                   placement="right"
                   align="start"
                   offset={8}
-                  width={100}
+                  width={120}
                   padding={4}
               >
                 <button
@@ -1238,14 +1282,10 @@ export default function EditorPage({projectId = DUMMY}) {
                     }}
                     title="선택 도구 (V)"
                     aria-label="선택 도구"
-                    className="popover-button"
-                    style={{
-                      backgroundColor: drawingMode === 'select' && !isPanMode ? '#007bff' : 'transparent',
-                      color: drawingMode === 'select' && !isPanMode ? 'white' : '#333333',
-                    }}
+                    className={`popover-button ${drawingMode === 'select' && !isPanMode ? 'active' : ''}`}
                 >
                   <LuMousePointer/>
-                  <span>선택</span>
+                  <span>선택(V)</span>
                 </button>
                 <button
                     onClick={() => {
@@ -1254,14 +1294,10 @@ export default function EditorPage({projectId = DUMMY}) {
                     }}
                     title="이동 도구 (H)"
                     aria-label="이동 도구"
-                    className="popover-button"
-                    style={{
-                      backgroundColor: isPanMode ? '#007bff' : 'transparent',
-                      color: isPanMode ? 'white' : '#333333',
-                    }}
+                    className={`popover-button ${isPanMode ? 'active' : ''}`}
                 >
                   <IoHandRightOutline/>
-                  <span>이동</span>
+                  <span>이동(H)</span>
                 </button>
               </PortalPopover>
             </div>
@@ -1306,7 +1342,7 @@ export default function EditorPage({projectId = DUMMY}) {
                     cursor: projectMeta ? "pointer" : "not-allowed",
                   }}
               >
-                <CiSettings size={20}/>
+                <CiSettings size={23}/>
               </button>
             </div>
           </div>
@@ -1365,6 +1401,64 @@ export default function EditorPage({projectId = DUMMY}) {
             className="right-panel"
         >
           <div className="right-panel-inner">
+
+                      {/* 미리보기 패널 - 변환 전에만 표시 */}
+            {!isSceneTransformed && (
+              <>
+
+                {/* 미리보기 패널 */}
+                <PreviewPanel
+                    ref={previewPanelRef}
+                    projectId={pid}
+                    sceneId={selectedId}
+                    stageRef={stageRef}
+                    targetDots={targetDots}
+                    drawingColor={drawingColor}
+                    onTransformComplete={handleTransform}
+                    processing={processing}
+                    enabled={true}
+                    layersState={layersState}
+                />
+              </>
+            )}
+            
+            {/* 변환 완료 상태 표시 */}
+            {isSceneTransformed && (
+         
+                
+                <div className="transform-complete-box">
+                  <div className="transform-complete-title">
+                    ✅ 변환 완료
+                  </div>
+                  <div className="transform-complete-text">
+                    브러쉬 도구로 추가 편집이 가능합니다
+                  </div>
+                </div>
+            )}
+            {/* 구분선 */}
+            <div className="separator"/>
+
+            {/* 객체 속성 패널 */}
+            <div className="accordion-section">
+              <button
+                type="button"
+                className="accordion-header"
+                aria-expanded={rightPropsOpen}
+                onClick={() => setRightPropsOpen(v => !v)}
+              >
+                개체 속성
+              </button>
+              {rightPropsOpen && (
+                <div className="accordion-body">
+              <ObjectPropertiesPanel
+                  selection={selectedObject}
+                  onChangeFill={handleSelectedFillChange}
+              />
+                </div>
+              )}
+            </div>
+            {/* 구분선 */}
+              <div className="separator"/>
             {/* 레이어 패널 */}
             {canvasReady ? (
                 <LayerPanel
@@ -1385,53 +1479,11 @@ export default function EditorPage({projectId = DUMMY}) {
                 </div>
             )}
 
-            {/* 구분선 */}
-            <div className="separator"/>
-
-            {/* 객체 속성 패널 */}
-            <ObjectPropertiesPanel
-                selection={selectedObject}
-                onChangeFill={handleSelectedFillChange}
-            />
-
-            {/* 미리보기 패널 - 변환 전에만 표시 */}
-            {!isSceneTransformed && (
-              <>
-                {/* 구분선 */}
-                <div className="separator" />
-
-                {/* 미리보기 패널 */}
-                <PreviewPanel
-                    ref={previewPanelRef}
-                    projectId={pid}
-                    sceneId={selectedId}
-                    stageRef={stageRef}
-                    targetDots={targetDots}
-                    drawingColor={drawingColor}
-                    onTransformComplete={handleTransform}
-                    processing={processing}
-                    enabled={true}
-                    layersState={layersState}
-                />
-              </>
-            )}
             
-            {/* 변환 완료 상태 표시 */}
-            {isSceneTransformed && (
-              <>
-                {/* 구분선 */}
-                <div className="separator" />
-                
-                <div className="transform-complete-box">
-                  <div className="transform-complete-title">
-                    ✅ 변환 완료
-                  </div>
-                  <div className="transform-complete-text">
-                    브러쉬 도구로 추가 편집이 가능합니다
-                  </div>
-                </div>
-              </>
-            )}
+
+            
+
+
           </div>
         </aside>
 

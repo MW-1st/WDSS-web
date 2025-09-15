@@ -3,60 +3,93 @@
   -webkit-appearance: none;
   -moz-appearance: none;
   appearance: none;
-  border: 2px solid #ddd;
-  border-radius: 6px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
   padding: 0;
   overflow: hidden;
   /* From inline styles */
-  width: 32px;
-  height: 32px;
+  width: 38px;
+  height: 38px;
   cursor: pointer;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+
   transition: all 0.2s ease;
 }
 
 .square-color-picker:hover {
-  transform: scale(1.1);
-  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  transform: scale(1.02);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 
 .square-color-picker::-webkit-color-swatch-wrapper {
   padding: 0;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
 .square-color-picker::-webkit-color-swatch {
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   min-height: 100%;
 }
 
 .square-color-picker::-moz-color-swatch {
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
 /* New Styles */
 .canvas-tools-container {
-  padding: 12px 0;
+  padding: 8px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center; /* center all tool rows */
 }
 
 .tools-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-bottom: 12px;
+  align-items: center; /* horizontal center of each item */
+  gap: 4px;
+  margin-bottom: 8px;
 }
 
 .tool-anchor {
   position: relative;
-  display: inline-flex;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  min-height: 40px; /* unify row height */
   z-index: 1000;
 }
 
 .tool-button {
-  border: 1px solid #e5e7eb;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 18px; /* slightly larger icons */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #ffffff;
+  color: #111827;
+
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.tool-button:hover {
+  background-color: #f3f4f6;
+}
+
+.tool-button.active {
+  background-color: #ffffff; /* keep background */
+  color: #007bff; /* change icon color only */
+}
+
+/* Select tool main button (pointer/hand) */
+.tool-select-button {
   width: 40px;
   height: 40px;
   padding: 0;
@@ -66,43 +99,99 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background-color: #ffffff;
+  background: #ffffff;
   color: #111827;
+
   transition: background-color 0.2s, color 0.2s, border-color 0.2s;
 }
-
-.tool-button:hover {
-    background-color: #f3f4f6;
+.tool-select-button:hover {
+  background-color: #f3f4f6;
 }
-
-.tool-button.active {
-  background-color: #007bff;
-  color: white;
+.tool-select-button.active {
+  background: #ffffff; /* keep background */
+  color: #007bff; /* icon color changes */
   border-color: #007bff;
 }
 
+/* Popover items for select/pan */
+.popover-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: transparent;
+  color: #333333;
+  cursor: pointer;
+  border: none;
+  transition: background-color 0.15s, color 0.15s;
+}
+.popover-button:hover {
+  background-color: #f3f4f6;
+}
+.popover-button.active {
+  background: transparent; /* keep background */
+  color: #007bff; /* text/icon color only */
+}
+
+/* Ensure the select toggle container centers like other buttons */
+.tool-select-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
 .tool-button.clear-button {
-    background-color: #dc3545;
-    color: white;
-    border-color: #dc3545;
-    font-weight: bold;
+  background-color: #dc3545;
+  color: white;
+  border-color: #dc3545;
+  font-weight: bold;
 }
 
 .tool-button.clear-button:hover {
-    background-color: #c82333;
-    border-color: #bd2130;
+  background-color: #c82333;
+  border-color: #bd2130;
 }
 
 .color-picker-group,
 .clear-tool-group {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .color-picker-wrapper {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center; /* center the picker */
   gap: 6px;
+}
+
+/* Palette button overlay to trigger native color picker */
+.color-palette-wrapper {
+  position: relative;
+  width: 40px;
+  height: 40px;
+}
+
+/* Make the visible palette button react on hover even when the invisible
+   overlay input is on top (so users still see hover feedback). */
+.color-palette-wrapper:hover .tool-button {
+  background-color: #f3f4f6;
+}
+
+.overlay-color-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0; /* visually hidden but clickable */
+  cursor: pointer;
+  border: none;
+  padding: 0;
 }
 
 .color-hex-code {
@@ -111,6 +200,25 @@
   color: #666;
   margin-left: 2px;
 }
+
+/* Special behavior for the select/pan toggle button on the editor page */
+.tool-select-toggle:hover {
+  background-color: #eef2ff; /* hover tint */
+  border-color: #93c5fd;
+}
+.tool-select-toggle.active {
+  background-color: #007bff; /* filled when active */
+  color: #fff;
+  border-color: #007bff;
+}
+.tool-select-toggle.active:hover {
+  background-color: #1a7cff; /* subtle hover change when active */
+}
+.tool-select-toggle[data-open="true"] {
+  outline: 2px solid #60a5fa; /* when the popover is open */
+  outline-offset: 0;
+}
+.tool-select-toggle:hover svg { transform: scale(1.05); }
 
 .tooltip {
   position: fixed;
@@ -122,6 +230,13 @@
   font-size: 12px;
   white-space: nowrap;
   z-index: 9999;
-  box-shadow: 0 2px 6px rgba(0,0,0,.2);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
   pointer-events: none;
+}
+
+/* Shared layout for sidebar stack */
+.editor-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px; /* 좁은 세로 간격 */
 }

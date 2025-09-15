@@ -50,7 +50,12 @@
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.tool-select-button:hover {
+  background-color: #f3f4f6;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
 }
 
 .popover-button {
@@ -76,10 +81,13 @@
   justify-content: center;
   gap: 6px;
   padding: 0;
-  border: 1px solid #e5e7eb;
   border-radius: 8px;
-  background: #f9fafb;
   color: #374151;
+}
+
+.settings-button:hover {
+  background-color: #eef2f7;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
 }
 
 .gallery-panel {
@@ -142,4 +150,31 @@
 .transform-complete-text {
   font-size: 14px;
   word-break: keep-all;
+}
+
+/* Right panel accordion */
+.accordion-section {
+  margin-top: 12px;
+}
+.accordion-header {
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f9fafb;
+  color: #111827;
+  font-weight: 600;
+  cursor: pointer;
+}
+.accordion-header:hover {
+  background: #eef2ff;
+  border-color: #93c5fd;
+}
+.accordion-header[aria-expanded="true"] {
+  background: #eef2ff;
+  border-color: #93c5fd;
+}
+.accordion-body {
+  margin-top: 8px;
 }
