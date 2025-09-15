@@ -180,3 +180,29 @@
 .accordion-body {
   margin-top: 8px;
 }
+
+/* Selection summary above properties header */
+.selection-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  margin-bottom: 6px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  color: #374151;
+  border-radius: 8px;
+  font-size: 12px;
+}
+.selection-summary .summary-type {
+  font-weight: 600;
+  color: #1f2937;
+}
+.selection-summary .summary-sep {
+  color: #9ca3af;
+}
+.selection-summary .summary-size,
+.selection-summary .summary-pos {
+  color: #4b5563;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}

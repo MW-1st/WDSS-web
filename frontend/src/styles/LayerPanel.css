@@ -12,6 +12,16 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
+/* Collapsed state: shrink the whole panel like properties */
+.layer-panel.collapsed {
+  min-height: 0;
+  max-height: none;
+}
+.layer-panel.collapsed .layer-list,
+.layer-panel.collapsed .layer-panel-footer {
+  display: none;
+}
+
 .layer-panel-header {
   display: flex;
   justify-content: space-between;

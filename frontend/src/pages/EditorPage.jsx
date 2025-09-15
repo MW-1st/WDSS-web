@@ -1438,8 +1438,25 @@ export default function EditorPage({projectId = DUMMY}) {
             {/* 구분선 */}
             <div className="separator"/>
 
-            {/* 객체 속성 패널 */}
+            {/* 객체 속성 패널 (예전 헤더 버튼 방식 복원) */}
             <div className="accordion-section">
+              {selectedObject && (
+                <div className="selection-summary" aria-label="현재 선택 요약">
+                  <span className="summary-type">{selectedObject.customType || selectedObject.type || '-'}</span>
+                  {(selectedObject.width && selectedObject.height) ? (
+                    <>
+                      <span className="summary-sep">·</span>
+                      <span className="summary-size">{Math.round(selectedObject.width)}×{Math.round(selectedObject.height)}px</span>
+                    </>
+                  ) : null}
+                  {(selectedObject.left !== undefined && selectedObject.top !== undefined) ? (
+                    <>
+                      <span className="summary-sep">·</span>
+                      <span className="summary-pos">({Math.round(selectedObject.left)}, {Math.round(selectedObject.top)})</span>
+                    </>
+                  ) : null}
+                </div>
+              )}
               <button
                 type="button"
                 className="accordion-header"
@@ -1450,10 +1467,10 @@ export default function EditorPage({projectId = DUMMY}) {
               </button>
               {rightPropsOpen && (
                 <div className="accordion-body">
-              <ObjectPropertiesPanel
-                  selection={selectedObject}
-                  onChangeFill={handleSelectedFillChange}
-              />
+                  <ObjectPropertiesPanel
+                    selection={selectedObject}
+                    onChangeFill={handleSelectedFillChange}
+                  />
                 </div>
               )}
             </div>
@@ -1472,6 +1489,8 @@ export default function EditorPage({projectId = DUMMY}) {
                     onToggleLock={handleToggleLock}
                     onRenameLayer={handleRenameLayer}
                     onLayerReorder={handleLayerReorder}
+                    open={rightLayersOpen}
+                    onToggleOpen={() => setRightLayersOpen(v => !v)}
                 />
             ) : (
                 <div className="canvas-loading">
