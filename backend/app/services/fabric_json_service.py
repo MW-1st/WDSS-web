@@ -109,8 +109,12 @@ def get_fabric_json_size(json_path: str) -> Tuple[float, float, float]:
         with open(json_path, "r", encoding="utf-8") as f:
             fabric_data = json.load(f)
 
-        w = _parse_float(str(fabric_data.get("width", 0)), 0.0)
-        h = _parse_float(str(fabric_data.get("height", 0)), 0.0)
+        # 1. 'canvasSize' 객체를 가져옵니다. 없으면 빈 딕셔너리({})를 사용합니다.
+        canvas_size_obj = fabric_data.get("canvasSize", {})
+
+        # 2. 'canvasSize' 객체 내부에서 'width'와 'height'를 가져옵니다.
+        w = _parse_float(str(canvas_size_obj.get("width", 0)), 0.0)
+        h = _parse_float(str(canvas_size_obj.get("height", 0)), 0.0)
 
         return float(w), float(h), 0.0
     except Exception:

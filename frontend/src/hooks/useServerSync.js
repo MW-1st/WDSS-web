@@ -156,10 +156,8 @@ export const useServerSync = (projectId, sceneId, fabricCanvas, options = {}) =>
       let result;
 
       if (syncType === 'original' || syncType === 'originals') {
-        console.log('📤 Syncing to originals endpoint');
         result = await saveOriginalToServer(canvasData);
       } else if (syncType === 'dots' || syncType === 'processed') {
-        console.log('📤 Syncing to processed endpoint');
         result = await saveDotCanvasToServer(canvasData);
       } else {
         throw new Error(`Unknown sync type: ${syncType}`);
@@ -170,18 +168,16 @@ export const useServerSync = (projectId, sceneId, fabricCanvas, options = {}) =>
       setLastSyncTime(new Date());
       pendingSyncRef.current = false;
 
-     if (onSync) {
-      onSync({
-        type: syncType,
-        sceneId,
-        success: true,
-        result,
-        // 서버 응답에서 s3_key 추출
-        s3_key: result?.s3_key || result?.scene?.s3_key || null
-      });
-    }
-
-      console.log(`Server sync completed: ${syncType} for scene ${sceneId}`);
+      if (onSync) {
+        onSync({
+          type: syncType,
+          sceneId,
+          success: true,
+          result,
+          // 서버 응답에서 s3_key 추출
+          s3_key: result?.s3_key || result?.scene?.s3_key || null
+        });
+      }
       return true;
 
     } catch (error) {
@@ -204,10 +200,36 @@ export const useServerSync = (projectId, sceneId, fabricCanvas, options = {}) =>
     if (!fabricCanvas?.current) return null;
 
     const canvas = fabricCanvas.current;
-    return canvas.toJSON([
+    const canvasData = canvas.toJSON([
       'layerId', 'layerName', 'customType', 'originalFill',
       'originalCx', 'originalCy'
     ]);
+
+
+    const allObjects = canvas.getObjects();
+
+    // 실제 그린 객체만 카운트 (경계선 제외)
+    const drawnObjects = allObjects.filter(obj =>
+      obj.name !== 'canvasBoundary' &&
+      obj.excludeFromExport !== true
+    );
+
+    const actualObjectCount = drawnObjects.length;
+
+    let layerMetadata = null;
+    if (canvas.saveCurrentSceneLayerState) {
+      layerMetadata = canvas.saveCurrentSceneLayerState();
+    }
+
+    const saveMetadata = {
+      objectCount: actualObjectCount,
+      canvasSize: {
+        width: canvas.getWidth(),
+        height: canvas.getHeight()
+      }
+    }
+
+    return {...canvasData, layerMetadata, ...saveMetadata}
   }, [fabricCanvas]);
 
   // 주기적 동기화 시작
@@ -391,7 +413,8 @@ export const useServerSync = (projectId, sceneId, fabricCanvas, options = {}) =>
       lastSync: lastSyncTime,
       error: syncError,
       hasPendingSync: pendingSyncRef.current
-    })
+    }),
+    getCurrentCanvasData,
   };
 };
 
