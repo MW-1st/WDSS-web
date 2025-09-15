@@ -13,16 +13,16 @@ def apply_sobel_edge_detection(gray_img, low_threshold, high_threshold):
     # OpenCV Sobel 연산자 사용 (C++ 최적화)
     grad_x = cv2.Sobel(gray_img, cv2.CV_64F, 1, 0, ksize=3)  # X 방향 기울기
     grad_y = cv2.Sobel(gray_img, cv2.CV_64F, 0, 1, ksize=3)  # Y 방향 기울기
-    
+
     # 기울기 크기 계산 (미리보기와 동일한 공식)
     magnitude = np.sqrt(grad_x**2 + grad_y**2)
-    
+
     # 임계값에 따른 분류 (미리보기와 동일)
     result = np.zeros_like(gray_img, dtype=np.uint8)
     result[magnitude > high_threshold] = 255
     result[(magnitude > low_threshold) & (magnitude <= high_threshold)] = 128
     # magnitude <= low_threshold인 경우는 이미 0으로 초기화됨
-    
+
     return result
 
 
@@ -59,13 +59,13 @@ def process_image(
     # 간단하고 빠른 엣지 검출
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-    # 기본 블러 
+    # 기본 블러
     k = max(3, blur_ksize | 1)
     blur = cv2.GaussianBlur(gray, (k, k), blur_sigma)
-    
+
     # Sobel 엣지 검출 (미리보기와 동일한 알고리즘)
     edges = apply_sobel_edge_detection(blur, canny_threshold1, canny_threshold2)
-    
+
     # 기존 Canny 엣지 검출 (주석 처리)
     # edges = cv2.Canny(blur, canny_threshold1, canny_threshold2)
 
@@ -86,11 +86,19 @@ def process_image(
 
     # 간단한 점 선택 (원래 방식)
     points: list[tuple[int, int]] = []  # (x, y)
+
+    border_margin = 5
+
     if target_dots and target_dots > 0:
         # 추정된 step 간격으로 그리드 형태 수집
         for y in range(0, h, step):
             for x in range(0, w, step):
-                if edges[y, x] != 0:
+                if edges[y, x] != 0 and (
+                    x >= border_margin
+                    and x < w - border_margin
+                    and y >= border_margin
+                    and y < h - border_margin
+                ):
                     points.append((x, y))
         # 목표 개수보다 많으면 무작위로 일부만 추출(그리드 좌표 유지)
         total = len(points)
@@ -100,7 +108,13 @@ def process_image(
     else:
         for y in range(0, h, step):
             for x in range(0, w, step):
-                if edges[y, x] != 0:
+                if edges[y, x] != 0 and (
+                    x >= border_margin
+                    and x < w - border_margin
+                    and y >= border_margin
+                    and y < h - border_margin
+                ):
+                    points.append((x, y))
                     points.append((x, y))
 
     # 최소 간격 유지(원 반지름 기준) + 중복 제거
