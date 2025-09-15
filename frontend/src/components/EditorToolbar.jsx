@@ -30,7 +30,6 @@ const Inner = ({
   onGalleryStateChange, // 부모에서 상태 관리
   isSceneTransformed, // 씬 변환 상태
   isToolAllowed, // 도구 허용 여부 확인 함수
-  pid, // 프로젝트 ID 추가
 }) => {
   // 🔸 로컬에서 열림여부를 갖지 않고, 부모에게 토글만 알림
   const [galleryHovered, setGalleryHovered] = React.useState(false);
@@ -171,7 +170,6 @@ const Inner = ({
               sceneId={selectedId}
               layout={layout}
               stageRef={stageRef}
-              projectId={pid}
             />
           </div>
 
@@ -179,7 +177,6 @@ const Inner = ({
             isUnityVisible={isUnityVisible}
             showUnity={showUnity}
             hideUnity={hideUnity}
-            projectId={pid}
           />
         </>
       )}
