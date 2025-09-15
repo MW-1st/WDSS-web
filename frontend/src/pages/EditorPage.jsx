@@ -68,6 +68,7 @@ export default function EditorPage({projectId = DUMMY}) {
   const [eraserSize, setEraserSize] = useState(20);
   const [drawingColor, setDrawingColor] = useState('#222222');
   const [selectedObject, setSelectedObject] = useState(null);
+  const [selectionVersion, setSelectionVersion] = useState(0);
   const [isPanMode, setIsPanMode] = useState(false);
   const [isToolSelectionOpen, setToolSelectionOpen] = useState(false);
   const previousSceneId = useRef(selectedId);
@@ -241,7 +242,7 @@ export default function EditorPage({projectId = DUMMY}) {
       const canvas = stageRef.current;
       const canvasData = canvas.toJSON([
         'layerId', 'layerName', 'customType', 'originalFill',
-        'originalCx', 'originalCy'
+        'originalCx', 'originalCy', 'brightness'
       ]);
 
       // 현재 saveMode에 맞게 서버에 저장
@@ -1003,7 +1004,56 @@ export default function EditorPage({projectId = DUMMY}) {
 
     canvas.renderAll && canvas.renderAll();
     setSelectedObject((prev) => (prev ? {...prev, fill: hex, stroke: hex} : prev));
-  }, []);
+    triggerAutoSave();
+  }, [triggerAutoSave]);
+
+  const handleBrightnessChange = useCallback((brightness) => {
+    const canvas = stageRef.current;
+    if (!canvas) return;
+    const active = canvas.getActiveObject && canvas.getActiveObject();
+    if (!active) return;
+
+    // UI: 0.0 (dark) to 1.0 (normal).
+    // Fabric Filter: -1 (dark) to 1 (bright), 0 is normal.
+    // Map UI [0.0, 1.0] to Fabric [-1.0, 0.0].
+    const fabricBrightnessValue = brightness - 1.0;
+
+    const applyBrightness = (obj) => {
+      if (!obj) return;
+      
+      // Ensure filters array exists. It might not on all object types.
+      obj.filters = obj.filters || [];
+
+      // Remove existing brightness filter to prevent stacking.
+      obj.filters = obj.filters.filter(f => f.type !== 'Brightness');
+
+      // Add new brightness filter if the value is not default (1.0).
+      if (brightness < 1.0) {
+        // fabric is assumed to be available globally in this project setup
+        obj.filters.push(new fabric.Image.filters.Brightness({
+          brightness: fabricBrightnessValue,
+        }));
+      }
+
+      // Store the UI-facing value (0-1) on the object for persistence and retrieval.
+      obj.set({ brightness: brightness });
+
+      // Apply the filters to the object.
+      if (obj.applyFilters) {
+        obj.applyFilters();
+      }
+    };
+
+    if (active.type === 'activeSelection') {
+      active.getObjects().forEach(applyBrightness);
+    } else {
+      applyBrightness(active);
+    }
+
+    canvas.renderAll();
+    setSelectedObject((prev) => (prev ? { ...prev, brightness } : null));
+    triggerAutoSave();
+  }, [triggerAutoSave]);
 
   // 레이어 관련 핸들러들
   const handleLayerSelect = React.useCallback((layerId) => {
@@ -1459,7 +1509,9 @@ export default function EditorPage({projectId = DUMMY}) {
             {/* 객체 속성 패널 */}
             <ObjectPropertiesPanel
                 selection={selectedObject}
+                selectionVersion={selectionVersion}
                 onChangeFill={handleSelectedFillChange}
+                onChangeBrightness={handleBrightnessChange}
             />
 
             {/* 미리보기 패널 - 변환 전에만 표시 */}
