@@ -28,6 +28,10 @@ export default function useCanvasExternalStageApi({
   handleLayerLockChange,
   reorderLayers,
   changeSaveMode,
+  loadSceneLayerState,
+  getSceneLayerState,
+  saveCurrentSceneLayerState,
+  restoreSceneLayerState,
 }) {
   useEffect(() => {
     if (externalStageRef && externalStageRef.current) {
@@ -118,6 +122,10 @@ export default function useCanvasExternalStageApi({
       };
 
       externalStageRef.current.changeSaveMode = changeSaveMode;
+      externalStageRef.current.saveCurrentSceneLayerState = saveCurrentSceneLayerState;
+      externalStageRef.current.restoreSceneLayerState = restoreSceneLayerState;
+      externalStageRef.current.loadSceneLayerState = loadSceneLayerState;
+      externalStageRef.current.getSceneLayerState = getSceneLayerState;
     }
   }, [
     externalStageRef,
@@ -131,6 +139,10 @@ export default function useCanvasExternalStageApi({
     handleLayerLockChange,
     reorderLayers,
     changeSaveMode,
+    saveCurrentSceneLayerState,
+    restoreSceneLayerState,
+    loadSceneLayerState,
+    getSceneLayerState,
     // keep stable references to functions passed in
     getCurrentCanvasAsSvg,
     exportCanvasAsImage,

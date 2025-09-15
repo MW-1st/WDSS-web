@@ -64,10 +64,20 @@ export const useAutoSave = (projectId, sceneId, fabricCanvas, options = {}, scen
 
       try {
         const canvas = fabricCanvas.current;
-        const canvasData = canvas.toJSON([
+        const baseCanvasData = canvas.toJSON([
           'layerId', 'layerName', 'customType', 'originalFill',
           'originalCx', 'originalCy'
         ]);
+
+        let layerMetadata = null;
+        if (canvas.saveCurrentSceneLayerState) {
+          layerMetadata = canvas.saveCurrentSceneLayerState();
+        }
+
+        const canvasData = {
+          ...baseCanvasData,
+          layerMetadata
+        };
 
 
         const allObjects = canvas.getObjects();
