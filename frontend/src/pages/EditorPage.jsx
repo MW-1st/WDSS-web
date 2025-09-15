@@ -17,7 +17,7 @@ import { LuMousePointer } from "react-icons/lu";
 import { IoHandRightOutline } from "react-icons/io5";
 import ProjectSettingsModal from "../components/ProjectSettingsModal";
 import PortalPopover from "../components/PortalPopover.jsx";
-import { saveCanvasToIndexedDB } from "../utils/indexedDBUtils.js";
+import {deleteCanvasFromIndexedDB, saveCanvasToIndexedDB} from "../utils/indexedDBUtils.js";
 
 const VISIBLE = 4;
 const DUMMY = "11111111-1111-1111-1111-111111111111";
@@ -885,53 +885,66 @@ export default function EditorPage({projectId = DUMMY}) {
   }, [handleModeChange]);
 
   const handleClearAll = React.useCallback(async () => {
-    if (stageRef.current && stageRef.current.clear) {
+    const canvas = stageRef.current;
+
+    if (canvas && canvas.clear) {
       if (
           confirm(
               "캔버스의 모든 내용을 지우시겠습니까? 이 작업은 되돌릴 수 없습니다."
           )
       ) {
         try {
-          // 1. 캔버스 초기화
-          stageRef.current.clear();
-          console.log("캔버스가 초기화되었습니다");
+          // 1. 모든 이벤트 리스너 임시 제거 (필요시)
+          canvas.off('mouse:down');
+          canvas.off('mouse:move');
+          canvas.off('mouse:up');
 
-          // 2. 서버에 씬 초기화 요청
+          // 2. 캔버스 완전 초기화
+          canvas.clear();
+          canvas.isDrawingMode = false;
+          canvas.selection = true; // 선택 가능하게 설정
+
+          // 3. 서버 데이터 업데이트
           const response = await client.patch(`/projects/${pid}/scenes/${selectedId}`, {
             status: 'reset'
           });
 
-          // 씬 상태를 초기화된 상태로 업데이트
+          await deleteCanvasFromIndexedDB(selectedId)
+
+          // 4. React 상태 초기화
           setScenes(prevScenes =>
             prevScenes.map(scene => {
               if (scene.id === selectedId) {
                 return {
                   ...scene,
-                  saveMode: 'originals', // 변환 상태를 원본으로 리셋
-                  isTransformed: false, // 백업 필드
+                  saveMode: 'originals',
+                  isTransformed: false,
                 };
               }
               return scene;
             })
           );
-          if (stageRef.current?.changeSaveMode) {
-              stageRef.current.changeSaveMode('originals');
-              console.log(stageRef.current.changeSaveMode);
-          }
-          console.log("서버 씬 초기화 완료:", response.data);
-          window.location.reload();
 
-          // 3. 성공 메시지 (선택사항)
-          // alert("씬이 완전히 초기화되었습니다.");
+          // 5. 캔버스 내부 저장 모드 변경
+          if (canvas?.changeSaveMode) {
+              canvas.changeSaveMode('originals');
+          }
+
+          // React 상태 설정
+          setDrawingMode('select');
+          setIsPanMode(false);
+
+          //
+          // // 8. 즉시 렌더링
+          // canvas.renderAll();
 
         } catch (error) {
           console.error("씬 초기화 중 오류 발생:", error);
-          // 에러 처리 - 사용자에게 알림
           alert("씬 초기화 중 오류가 발생했습니다. 다시 시도해주세요.");
         }
       }
     }
-  }, [client, pid, selectedId]); // client, projectId, sceneId를 dependency에 추가
+  }, [client, pid, selectedId, drawingMode, isPanMode]);
 
   const handleColorChange = React.useCallback((color) => {
     setDrawingColor(color);
