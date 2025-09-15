@@ -1,5 +1,9 @@
 import os
 from datetime import timedelta
+from dotenv import load_dotenv
+
+# .env 파일 로드
+load_dotenv()
 
 
 # Basic JWT configuration; consider overriding via environment variables

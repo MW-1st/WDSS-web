@@ -13,6 +13,7 @@ async def get_user_by_username(
             SELECT u.id, \
                    u.username, \
                    u.email, \
+                   u.is_email_verified, \
                    ac.password_hash AS hashed_password -- auth_credentials 테이블의 password_hash를 가져옴
             FROM users AS u \
                      JOIN \
