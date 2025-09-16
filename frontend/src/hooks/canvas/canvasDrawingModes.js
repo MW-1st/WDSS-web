@@ -9,6 +9,7 @@ export function createDrawingModes({
   layersRef,
   setCanvasRevision,
   triggerAutoSave,
+  saveToHistory,
   onCanvasChangeRef,
   width,
   height,
@@ -83,6 +84,7 @@ export function createDrawingModes({
 
           if (setCanvasRevision) setCanvasRevision((c) => c + 1);
           if (triggerAutoSave) triggerAutoSave({ drawingMode: "draw" });
+          if (saveToHistory) saveToHistory("draw")
           if (onCanvasChangeRef && onCanvasChangeRef.current) onCanvasChangeRef.current();
         }
       };
@@ -130,6 +132,7 @@ export function createDrawingModes({
         isDrawing = false;
         if (setCanvasRevision) setCanvasRevision((c) => c + 1);
         if (triggerAutoSave) triggerAutoSave({ drawingMode: "brush" });
+        if (saveToHistory) saveToHistory("brush")
         if (onCanvasChangeRef && onCanvasChangeRef.current) onCanvasChangeRef.current();
       };
 
@@ -263,6 +266,7 @@ export function createDrawingModes({
       const stopErase = () => {
         isErasing = false;
         if (triggerAutoSave) triggerAutoSave({ drawingMode: "erase" });
+        if (saveToHistory) saveToHistory("erase");
         if (onCanvasChangeRef && onCanvasChangeRef.current) onCanvasChangeRef.current();
       };
 
@@ -305,6 +309,7 @@ export function createDrawingModes({
         if (objectsToRemove.length > 0) {
           canvas.renderAll();
           if (triggerAutoSave) triggerAutoSave({ drawingMode: "erase", erased: objectsToRemove.length });
+          if (saveToHistory) saveToHistory("erase")
           if (onCanvasChangeRef && onCanvasChangeRef.current) onCanvasChangeRef.current();
         }
       };

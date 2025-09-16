@@ -18,6 +18,7 @@ import { IoHandRightOutline } from "react-icons/io5";
 import ProjectSettingsModal from "../components/ProjectSettingsModal";
 import PortalPopover from "../components/PortalPopover.jsx";
 import {deleteCanvasFromIndexedDB, saveCanvasToIndexedDB} from "../utils/indexedDBUtils.js";
+import { useUndoRedo } from '../hooks/useUndoRedo';
 
 const VISIBLE = 4;
 const DUMMY = "11111111-1111-1111-1111-111111111111";
@@ -220,6 +221,14 @@ export default function EditorPage({projectId = DUMMY}) {
     selectedScene
   });
   const {syncToServer, uploadThumbnail, getCurrentCanvasData} = useServerSync(pid, selectedId, stageRef);
+
+  const { saveToHistory, undo, redo, canUndo, canRedo, isProcessing } = useUndoRedo(
+    selectedId,
+    stageRef,
+    {
+      getCurrentCanvasData: () => getCurrentCanvasData()
+    }
+  );
 
    const saveCurrentScene = useCallback(async (sceneIdToSave, saveModeToUse, options = {}) => {
     const {
@@ -963,6 +972,7 @@ export default function EditorPage({projectId = DUMMY}) {
             status: 'reset'
           });
           triggerAutoSave({action: "clearAll"});
+          saveToHistory('clearAll')
 
           // 3. 씬 상태 초기화
           setScenes(prevScenes =>
@@ -1212,7 +1222,13 @@ export default function EditorPage({projectId = DUMMY}) {
       setTargetDots,
       handleTransform,
       handleManualSave,
-      handleJsonGeneration
+      handleJsonGeneration,
+      // undo redo
+      undo,
+      redo,
+      canUndo,
+      canRedo,
+      isProcessing
     };
     // notify listeners (e.g., Navbar) that editor state changed
     window.dispatchEvent(
@@ -1227,7 +1243,7 @@ export default function EditorPage({projectId = DUMMY}) {
           },
         })
     );
-  }, [targetDots, processing, imageUrl, selectedId, projectName]);
+  }, [targetDots, processing, imageUrl, selectedId, projectName, canUndo, canRedo, isProcessing, undo, redo]);
 
   const isSelectOrPan = drawingMode === 'select' || isPanMode;
 
@@ -1434,6 +1450,7 @@ export default function EditorPage({projectId = DUMMY}) {
               onPanChange={setIsPanMode}
               changeSaveMode={changeSaveMode}
               triggerAutoSave={triggerAutoSave}
+              saveToHistory = {saveToHistory}
               isSceneTransformed={isSceneTransformed}
           />
 

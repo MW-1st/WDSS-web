@@ -1,4 +1,4 @@
-export function createCanvasActions({ fabricCanvasRef, drawingColorRef, layersRef, activeLayerIdRef, triggerAutoSave, onCanvasChangeRef, setCanvasRevision, width = 800, height = 500, getSceneLayerState, sceneId }) {
+export function createCanvasActions({ fabricCanvasRef, drawingColorRef, layersRef, activeLayerIdRef, triggerAutoSave, saveToHistory, onCanvasChangeRef, setCanvasRevision, width = 800, height = 500, getSceneLayerState, sceneId }) {
   const handleClearAll = () => {
     if (!fabricCanvasRef.current) return;
 
@@ -13,6 +13,7 @@ export function createCanvasActions({ fabricCanvasRef, drawingColorRef, layersRe
       if (typeof triggerAutoSave === "function") {
         triggerAutoSave({ action: "clearAll", clearedCount: objectCount });
       }
+      if (saveToHistory) saveToHistory("clearAll")
       if (onCanvasChangeRef && onCanvasChangeRef.current) onCanvasChangeRef.current();
     }
   };
