@@ -13,7 +13,8 @@ import { useServerSync } from '../hooks/useServerSync';
 import client from "../api/client";
 import { getImageUrl } from '../utils/imageUtils';
 import { useUnity } from "../contexts/UnityContext.jsx";
-import { useParams } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
+import { ImExit } from "react-icons/im";
 import { CiSettings } from "react-icons/ci";
 import { LuMousePointer } from "react-icons/lu";
 import { IoHandRightOutline } from "react-icons/io5";
@@ -1229,7 +1230,17 @@ export default function EditorPage({projectId = DUMMY}) {
             isSceneTransformed={isSceneTransformed}
             isToolAllowed={isToolAllowed}
           />
-          <div className="settings-container">
+          
+          <div className="settings-container" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <Link
+              to="/dashboard"
+              className="tool-button"
+              title="대시보드로 이동"
+              aria-label="대시보드로 이동"
+            >
+              <ImExit size={20} />
+            </Link>
+            
             <button
               type="button"
               title="프로젝트 설정"

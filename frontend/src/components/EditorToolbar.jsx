@@ -4,7 +4,8 @@ import ImageTransformControls from "../components/ImageTransformControls.jsx";
 import UnitySimulatorControls from "../components/UnitySimulatorControls.jsx";
 import { FaImage, FaPen, FaPaintBrush, FaEraser, FaRegTrashAlt } from "react-icons/fa";
 import "../styles/CanvasTools.css";
-
+import { ImExit } from "react-icons/im";
+import { CiInboxOut } from "react-icons/ci";
 const Inner = ({
   onImageDragStart,
   drawingMode,

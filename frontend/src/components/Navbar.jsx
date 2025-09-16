@@ -1,5 +1,5 @@
 import React from "react";
-import { Link, useLocation, useParams } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { useUnity } from "../contexts/UnityContext.jsx";
 import client from "../api/client";
@@ -90,17 +90,9 @@ export default function Navbar({ transparent: propTransparent = false }) {
             </div>
           </div>
 
-          <div className="flex flex-1 justify-end">
-            {/* Dashboard + JSON + Unity */}
-            <div className="flex items-center gap-2">
-              <Link
-                to="/dashboard"
-                className="px-3 py-1.5 rounded border border-gray-300 text-gray-800 hover:bg-gray-100 flex items-center"
-                title="대시보드로 이동"
-              >
-                <ImExit />
-              </Link>
-              <button
+          {/* JSON + Unity */}
+          <div className="flex items-center gap-2">
+            <button
                 onClick={async () => {
                   // EditorPage의 JSON 생성 함수 사용
                   if (api?.handleJsonGeneration) {
@@ -178,7 +170,6 @@ export default function Navbar({ transparent: propTransparent = false }) {
                   Unity 시뮬레이터닫기
                 </button>
               )}
-            </div>
           </div>
         </div>
       </nav>
