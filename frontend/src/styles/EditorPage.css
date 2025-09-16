@@ -44,67 +44,19 @@
   padding: 8px; /* tighter padding for compact rail */
   display: flex;
   flex-direction: column;
+  gap: 0;
+}
+.left-rail-inner > * + * {
+  margin-top: 12px;
 }
 
-.tool-select-container {
-  position: relative;
-  display: inline-block;
-  margin-bottom: 12px;
-}
 
-.tool-select-button {
-  width: 40px;
-  height: 40px;
-  padding: 0;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 16px;
-  line-height: 0; /* remove baseline gap for SVG */
-  display: inline-flex; /* center icon */
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.tool-select-button:hover {
-  background-color: #f3f4f6;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
-}
-
-.popover-button {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border: none;
-  width: 100%;
-  text-align: left;
-  cursor: pointer;
-}
 
 .settings-container {
   margin-top: auto;
   display: flex;
   align-items: center;
   justify-content: center; /* center settings button like other tools */
-}
-
-.settings-button {
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 0;
-  border-radius: 8px;
-  color: #374151;
-}
-
-.settings-button:hover {
-  background-color: #eef2f7;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
 }
 
 .gallery-panel {
@@ -142,6 +94,30 @@
   padding: 20px;
   text-align: center;
   color: #666;
+}
+
+.editor-loading {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  z-index: 1000;
+}
+
+.editor-loading-content {
+  text-align: center;
+  color: var(--primary);
+  font-size: 1.2rem;
+}
+
+.editor-loading-content p {
+  margin: 0;
+  padding: 1rem;
 }
 
 .separator {

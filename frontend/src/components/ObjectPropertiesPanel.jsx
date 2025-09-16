@@ -270,7 +270,7 @@ export default function ObjectPropertiesPanel({
           <div className="properties-section">
             {/* Fill Color Section */}
             {supportsColorAndBrightness ? (
-              <div className="properties-field">
+              <div className="properties-field color-field">
                 <div className="label">Fill Color{isMulti ? " (multi)" : ""}</div>
                 <ColorPicker
                   color={localColor}

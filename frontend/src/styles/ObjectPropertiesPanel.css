@@ -64,6 +64,12 @@
   margin-bottom: 6px;
 }
 
+.color-field .label {
+  font-size: 20px;
+  font-weight: 900;
+  margin-bottom: 12px;
+}
+
 .properties-note {
   color: #777;
   font-size: 12px;

@@ -96,10 +96,16 @@ const LayerPanel = ({
         style={{cursor: 'pointer'}}
       >
         <h3>{title}</h3>
-        <button 
+        <button
           type="button"
           className="create-layer-btn"
-          onClick={(e) => { e.stopPropagation(); onCreateLayer?.(); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!isOpen && onToggleOpen) {
+              onToggleOpen();
+            }
+            onCreateLayer?.();
+          }}
           title="새 레이어 생성"
         >
           +

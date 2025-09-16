@@ -7,11 +7,9 @@
   border-radius: 8px;
   padding: 0;
   overflow: hidden;
-  /* Fill the wrapper so the picker matches tool button size */
   width: 100%;
   height: 100%;
   cursor: pointer;
-
   transition: all 0.2s ease;
 }
 
@@ -37,14 +35,14 @@
   border-radius: 6px;
 }
 
-/* New Styles */
+/* Shared tool button styling */
 .canvas-tools-container {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 16px;
-  padding: 32px 0;
+  padding: 0;
   height: 100%;
 }
 
@@ -62,99 +60,66 @@
   padding: 0;
   border-radius: 8px;
   cursor: pointer;
-  font-size: 18px; /* slightly larger icons */
-  line-height: 0; /* avoid baseline gaps for SVG icons */
+  font-size: 18px;
+  line-height: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background-color: transparent;
+  background-color: #ffffff;
   color: #111827;
   border: 1px solid transparent;
-  box-sizing: border-box;
-
-  transition: background-color 0.2s, color 0.2s, border-color 0.2s,
-    box-shadow 0.2s;
+  box-shadow: none;
+  transition: background-color 0.2s ease, color 0.2s ease,
+    border-color 0.2s ease, box-shadow 0.2s ease, transform 0.1s ease;
 }
 
-.tool-button:hover {
+.tool-button:hover:not(:disabled) {
   background-color: #f3f4f6;
+  box-shadow: 0 3px 8px rgba(15, 47, 95, 0.15);
+  transform: translateY(-1px);
 }
 
-.tool-button.active {
-  background-color: var(--primary-soft);
-  color: var(--primary-strong);
-  box-shadow: 0 0 0 2px var(--primary-border);
+.tool-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--primary-border, #c1d1ff),
+    0 0 0 4px var(--primary-glow, rgba(30, 58, 138, 0.32));
 }
 
-/* Select tool main button (pointer/hand) */
-.tool-select-button {
-  width: 40px;
-  height: 40px;
-  padding: 0;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 16px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: #ffffff;
-  color: #111827;
-  border: 1px solid transparent;
-  box-sizing: border-box;
-
-  transition: background-color 0.2s, color 0.2s, border-color 0.2s,
-    box-shadow 0.2s;
-}
-.tool-select-button:hover {
-  background-color: #f3f4f6;
-}
-.tool-select-button.active {
-  background: var(--primary-soft);
-  color: var(--primary-strong);
-  border-color: var(--primary-border);
-  box-shadow: 0 0 0 2px var(--primary-border);
+.tool-button.active,
+.tool-button[data-open="true"] {
+  background-color: var(--primary-soft, #e3ebff);
+  color: var(--primary-strong, #0f2f5f);
+  border-color: var(--primary-border, #c1d1ff);
+  box-shadow: 0 0 0 2px var(--primary-border, #c1d1ff);
+  transform: none;
 }
 
-/* Popover items for select/pan */
-.popover-button {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 8px 10px;
-  border-radius: 6px;
-  background: transparent;
-  color: #333333;
-  cursor: pointer;
-  border: none;
-  transition: background-color 0.15s, color 0.15s;
-}
-.popover-button:hover {
-  background-color: #f3f4f6;
-}
-.popover-button.active {
-  background: var(--primary-soft);
-  color: var(--primary-strong);
-}
-
-/* Ensure the select toggle container centers like other buttons */
-.tool-select-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 8px;
+.tool-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  color: var(--muted, #6c757d);
+  background-color: #f9fafb;
+  border-color: transparent;
+  box-shadow: none;
+  transform: none;
 }
 
 .tool-button.clear-button {
-  background-color: var(--danger);
-  color: white;
-  border-color: var(--danger);
-  font-weight: bold;
+  background-color: var(--danger, #dc3545);
+  color: #ffffff;
+  border-color: var(--danger, #dc3545);
+  font-weight: 600;
 }
 
-.tool-button.clear-button:hover {
-  background-color: var(--danger-dark);
-  border-color: var(--danger-dark);
+.tool-button.clear-button:hover:not(:disabled) {
+  background-color: var(--danger-dark, #c82333);
+  border-color: var(--danger-dark, #c82333);
+  box-shadow: 0 3px 8px rgba(220, 53, 69, 0.35);
+}
+
+.tool-button.clear-button:focus-visible {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9),
+    0 0 0 4px rgba(220, 53, 69, 0.55);
 }
 
 .color-picker-wrapper {
@@ -174,8 +139,6 @@
   height: 40px;
 }
 
-/* Make the visible palette button react on hover even when the invisible
-   overlay input is on top (so users still see hover feedback). */
 .color-palette-wrapper:hover .tool-button {
   background-color: #f3f4f6;
 }
@@ -185,7 +148,7 @@
   inset: 0;
   width: 100%;
   height: 100%;
-  opacity: 0; /* visually hidden but clickable */
+  opacity: 0;
   cursor: pointer;
   border: none;
   padding: 0;
@@ -194,15 +157,46 @@
 .color-hex-code {
   font-family: monospace;
   font-size: 13px;
-  color: #666;
+  color: #666666;
   margin-left: 2px;
+}
+
+.popover-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: transparent;
+  color: #333333;
+  cursor: pointer;
+  border: none;
+  font: inherit;
+  transition: background-color 0.15s ease, color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.popover-button:hover {
+  background-color: #f3f4f6;
+}
+
+.popover-button.active {
+  background: var(--primary-soft, #e3ebff);
+  color: var(--primary-strong, #0f2f5f);
+}
+
+.popover-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--primary-border, #c1d1ff),
+    0 0 0 4px var(--primary-glow, rgba(30, 58, 138, 0.32));
 }
 
 .tooltip {
   position: fixed;
   transform: translateY(-50%);
-  background: #000;
-  color: #fff;
+  background: #000000;
+  color: #ffffff;
   padding: 6px 8px;
   border-radius: 6px;
   font-size: 12px;
@@ -212,9 +206,8 @@
   pointer-events: none;
 }
 
-/* Shared layout for sidebar stack */
 .editor-sidebar {
   display: flex;
   flex-direction: column;
-  gap: 16px; /* gallery toggle spacing */
+  gap: 16px;
 }
