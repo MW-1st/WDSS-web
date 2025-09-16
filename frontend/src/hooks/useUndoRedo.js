@@ -300,14 +300,73 @@ export const useUndoRedo = (sceneId, fabricCanvas, { getCurrentCanvasData }) => 
     }
   }, [sceneId, fabricCanvas, globalHistoryStack, isProcessing]);
 
+  const clearHistoryAndSetNew = useCallback(async (actionType = 'conversion') => {
+    if (!sceneId || !fabricCanvas?.current) {
+      return false;
+    }
+
+    try {
+      // 1. 현재 씬의 모든 기존 히스토리 수집
+      const currentSceneItems = [
+        ...globalHistoryStack.undoStack.filter(item => item.sceneId === sceneId),
+        ...globalHistoryStack.redoStack.filter(item => item.sceneId === sceneId)
+      ];
+
+      if (globalHistoryStack.currentStates[sceneId]) {
+        currentSceneItems.push(globalHistoryStack.currentStates[sceneId]);
+      }
+
+      // 2. 현재 상태를 새로운 초기 상태로 저장
+      const canvasData = getCurrentCanvasData();
+      const newHistoryKey = `history_${sceneId}_${actionType}_${Date.now()}`;
+
+      await saveCanvasToIndexedDB(newHistoryKey, canvasData, {
+        isHistory: true,
+        actionType,
+        parentSceneId: sceneId
+      });
+
+      // 3. 메모리에서 기존 히스토리 제거 + 새 상태 설정
+      setGlobalHistoryStack(prev => ({
+        undoStack: prev.undoStack.filter(item => item.sceneId !== sceneId),
+        currentStates: {
+          ...prev.currentStates,
+          [sceneId]: {
+            historyKey: newHistoryKey,
+            sceneId,
+            actionType,
+            timestamp: Date.now()
+          }
+        },
+        currentStatesOrder: [sceneId, ...prev.currentStatesOrder.filter(id => id !== sceneId)],
+        redoStack: prev.redoStack.filter(item => item.sceneId !== sceneId),
+        pendingCleanup: prev.pendingCleanup,
+        maxHistorySize: prev.maxHistorySize,
+        maxSceneStates: prev.maxSceneStates
+      }));
+
+      // 4. 기존 히스토리 백그라운드에서 삭제
+      if (currentSceneItems.length > 0) {
+        scheduleCleanup(currentSceneItems);
+      }
+
+      console.log(`히스토리 클리어 완료. 새 시작점 설정: ${sceneId}`);
+      return true;
+    } catch (error) {
+      console.error('Failed to clear history:', error);
+      return false;
+    }
+  }, [sceneId, fabricCanvas, getCurrentCanvasData, globalHistoryStack, scheduleCleanup]);
+
   return {
+    globalHistoryStack,
     saveToHistory,
     undo,
     redo,
     canUndo: globalHistoryStack.undoStack.some(item => item.sceneId === sceneId),
     canRedo: globalHistoryStack.redoStack.some(item => item.sceneId === sceneId),
     isProcessing,
-    globalHistoryStack,
+    clearHistoryAndSetNew,
 
     // 디버깅/관리용 함수들
     getHistoryStats: () => ({

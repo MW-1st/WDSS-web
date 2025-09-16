@@ -222,7 +222,7 @@ export default function EditorPage({projectId = DUMMY}) {
   });
   const {syncToServer, uploadThumbnail, getCurrentCanvasData} = useServerSync(pid, selectedId, stageRef);
 
-  const { saveToHistory, undo, redo, canUndo, canRedo, isProcessing, globalHistoryStack, } = useUndoRedo(
+  const { saveToHistory, undo, redo, canUndo, canRedo, isProcessing, clearHistoryAndSetNew, globalHistoryStack, } = useUndoRedo(
     selectedId,
     stageRef,
     {
@@ -897,6 +897,9 @@ export default function EditorPage({projectId = DUMMY}) {
 
     setDrawingMode('select');
     setIsPanMode(false);
+
+    // 히스토리 설정
+    clearHistoryAndSetNew("scene_transformed");
 
   } catch (e) {
     console.error("Transform error", e);
