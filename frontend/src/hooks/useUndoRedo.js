@@ -194,8 +194,15 @@ export const useUndoRedo = (sceneId, fabricCanvas, { getCurrentCanvasData }) => 
         return false;
       }
 
-      fabricCanvas.current.loadFromJSON(canvasData, () => {
-        fabricCanvas.current.renderAll();
+      const canvas = fabricCanvas.current;
+      canvas.clear();
+      canvas.renderOnAddRemove = false; // 개별 렌더링 비활성화
+      canvas.skipTargetFind = true;     // 이벤트 감지 임시 비활성화
+
+      canvas.loadFromJSON(canvasData, () => {
+        canvas.renderOnAddRemove = true;
+        canvas.skipTargetFind = false;
+        canvas.renderAll();
       });
 
       setGlobalHistoryStack(prev => {
@@ -259,8 +266,15 @@ export const useUndoRedo = (sceneId, fabricCanvas, { getCurrentCanvasData }) => 
         return false;
       }
 
-      fabricCanvas.current.loadFromJSON(canvasData, () => {
-        fabricCanvas.current.renderAll();
+      const canvas = fabricCanvas.current;
+      canvas.clear();
+      canvas.renderOnAddRemove = false; // 개별 렌더링 비활성화
+      canvas.skipTargetFind = true;     // 이벤트 감지 임시 비활성화
+
+      canvas.loadFromJSON(canvasData, () => {
+        canvas.renderOnAddRemove = true;
+        canvas.skipTargetFind = false;
+        canvas.renderAll();
       });
 
       setGlobalHistoryStack(prev => {
