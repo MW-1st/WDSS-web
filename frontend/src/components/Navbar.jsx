@@ -206,14 +206,18 @@ export default function Navbar({ transparent: propTransparent = false }) {
                   }
                 })()}
               >
-                <span className="text-base font-medium">드론 횟수 :</span>
+                <span className="text-base font-medium">드론 개수 </span>
                 <span className="text-base">
-                  {(() => {
-                    try {
-                      if (sceneId) return perSceneCounts?.[sceneId] ?? 0;
-                    } catch (_) {}
-                    return savedObjectCount;
-                  })()}
+                  {(() => { try {
+                    if (sceneId) {
+                      if (api?.imageUrl.startsWith("/processed")) {
+                        return perSceneCounts?.[sceneId] ?? 0;
+                      }
+                      return "-";
+                    }
+                  } catch (_) {}
+                  return savedObjectCount;
+                })()}
                 </span>
               </span>
             </div>
