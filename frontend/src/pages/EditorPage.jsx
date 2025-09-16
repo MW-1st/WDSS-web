@@ -1504,6 +1504,8 @@ export default function EditorPage({projectId = DUMMY}) {
             <ObjectPropertiesPanel
                 selection={selectedObject}
                 onChangeFill={handleSelectedFillChange}
+                triggerAutoSave={triggerAutoSave}
+                saveToHistory={saveToHistory}
             />
 
             {/* 미리보기 패널 - 변환 전에만 표시 */}
