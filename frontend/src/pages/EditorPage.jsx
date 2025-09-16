@@ -86,11 +86,22 @@ export default function EditorPage({projectId = DUMMY}) {
   const [selectedObject, setSelectedObject] = useState(null);
   const [isPanMode, setIsPanMode] = useState(false);
   const [isToolSelectionOpen, setToolSelectionOpen] = useState(false);
+  const [isPropertiesPanelOpen, setIsPropertiesPanelOpen] = useState(false);
+  const [isLayerPanelOpen, setIsLayerPanelOpen] = useState(false);
   const previousSceneId = useRef(selectedId);
   const selectedIdRef = useRef(selectedId);
   useEffect(() => {
     selectedIdRef.current = selectedId;
   }, [selectedId]);
+
+  // 선택된 개체 상태에 따라 개체 속성 패널 자동 열기/닫기
+  useEffect(() => {
+    if (selectedObject) {
+      setIsPropertiesPanelOpen(true);
+    } else {
+      setIsPropertiesPanelOpen(false);
+    }
+  }, [selectedObject]);
 
   // Select/Pan 토글 툴팁 위치
   useEffect(() => {
@@ -1005,6 +1016,8 @@ export default function EditorPage({projectId = DUMMY}) {
           const finalName =
             (layerName.trim() === '' || layerName.trim() === defaultName) ? null : layerName.trim();
           stageRef.current.layers.createLayer(finalName);
+          // 레이어 생성 시 레이어 패널 자동으로 열기
+          setRightLayersOpen(true);
           setTimeout(updateLayerState, 10);
         } catch (error) {
           console.error('Error creating layer:', error);
@@ -1317,8 +1330,8 @@ export default function EditorPage({projectId = DUMMY}) {
             <button
               type="button"
               className="accordion-header"
-              aria-expanded={rightPropsOpen}
-              onClick={() => setRightPropsOpen(v => !v)}
+              aria-expanded={isPropertiesPanelOpen}
+              onClick={() => setIsPropertiesPanelOpen(v => !v)}
             >
               <span>객체 속성</span>
               {selectedObject && (
@@ -1327,7 +1340,7 @@ export default function EditorPage({projectId = DUMMY}) {
                 </span>
               )}
             </button>
-            {rightPropsOpen && (
+            {isPropertiesPanelOpen && (
               <div className="accordion-body">
                 <ObjectPropertiesPanel
                   selection={selectedObject}
@@ -1352,8 +1365,8 @@ export default function EditorPage({projectId = DUMMY}) {
               onToggleLock={handleToggleLock}
               onRenameLayer={handleRenameLayer}
               onLayerReorder={handleLayerReorder}
-              open={rightLayersOpen}
-              onToggleOpen={() => setRightLayersOpen(v => !v)}
+              open={isLayerPanelOpen}
+              onToggleOpen={() => setIsLayerPanelOpen(v => !v)}
             />
           ) : (
             <div className="canvas-loading">캔버스를 불러오는 중...</div>
