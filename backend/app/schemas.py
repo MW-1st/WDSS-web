@@ -25,6 +25,12 @@ class UserResponse(BaseModel):
 
 class UserInDB(UserResponse):
     hashed_password: str
+    is_email_verified: bool = False
+
+
+class SendVerificationRequest(BaseModel):
+    email: EmailStr = Field(max_length=32)
+
 
 
 class RegisterRequest(BaseModel):
@@ -157,6 +163,14 @@ class ProjectDetailDataResponse(SuccessResponse):
     """상세 프로젝트 데이터를 포함하는 성공 응답 모델"""
 
     project: ProjectDetailResponse
+
+
+class ProjectListDataResponse(BaseModel):
+    """프로젝트 목록 + 전체 개수 반환 모델"""
+
+    success: bool = True
+    projects: List[ProjectResponse]
+    total: int = 0
 
 
 # schemas.py에서 Scene 관련 스키마 수정
