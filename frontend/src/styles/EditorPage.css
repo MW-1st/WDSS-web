@@ -1,11 +1,16 @@
-/* C:\WDSS-web\WDSS-web\frontend\src\styles\EditorPage.css */
+:root {
+  --app-header-h: 64px; /* 실제 navbar 높이로 맞춰줘 */
+  --right-panel-w: clamp(240px, 22vw, 320px);
+  --carousel-h: clamp(120px, 18vh, 180px);
+}
 
 .editor-shell {
   width: 100%;
-  height: 100%;
+  height: auto;
+  min-height: calc(100dvh - var(--app-header-h));
   background: #fff;
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
   gap: 16px;
   box-sizing: border-box;
   overflow-x: hidden;
@@ -25,33 +30,33 @@
   --on-primary: #ffffff;
 }
 
+/* 좌측 레일 */
 .left-rail {
-  width: 64px; /* compact left tool rail */
+  width: 64px;
   border-right: 1px solid #eee;
   position: sticky;
-  top: 0;
-  height: 100%;
+  top: var(--app-header-h);
+  height: calc(100dvh - var(--app-header-h));
   background: #fff;
-  flex: 0 0 auto;
   box-sizing: border-box;
-  overflow: visible;
-  /* Ensure tooltips inside the rail layer above neighbors */
   z-index: 1200;
+
+  /* ✅ sticky가 ‘얼마나 길지’ 알아야 하므로 높이 명시 */
+  height: 100dvh; /* 헤더가 있으면 calc(100dvh - var(--app-header-h)) */
+  display: flex; /* 내부를 flex column으로 채우기 위해 */
 }
 
+/* 내부는 컬럼 + 꽉 채우기 + 내부 스크롤 */
 .left-rail-inner {
-  height: 100%;
-  overflow-y: auto;
-  /* Hide scrollbar while keeping scroll functionality */
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE 10+ */
-  padding: 8px; /* tighter padding for compact rail */
+  flex: 1 1 auto; /* ✅ 부모 높이를 꽉 채움 */
   display: flex;
   flex-direction: column;
-  gap: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: 8px;
 }
 .left-rail-inner::-webkit-scrollbar {
-  /* Chromium, Safari */
   width: 0;
   height: 0;
 }
@@ -104,31 +109,50 @@
 }
 
 .main-content {
-  flex: 1 1 0%;
-  min-width: 0;
-  padding-top: 1rem;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  max-height: calc(100dvh - var(--app-header-h)); /* ✅ 한 화면에 고정 */
+  overflow: hidden; /* 페이지 스크롤 제거 */
+  padding-top: 12px;
+}
+/* 캔버스 영역은 남는 높이를 전부 먹고 내부 스크롤 */
+.canvas-area {
+  flex: 1 1 auto; /* 남는 높이 전부 */
+  min-height: 0;
+  overflow: auto; /* ✅ 캔버스가 커질 때만 이 안에서 스크롤 */
+}
+
+/* 캐러셀은 항상 보이도록 고정 높이 */
+.scene-carousel-wrapper {
+  flex: 0 0 clamp(110px, 16vh, 160px); /* 항상 보이도록 고정 높이 */
+  min-height: clamp(110px, 16vh, 160px);
 }
 
 .right-panel {
-  width: 280px; /* RIGHT_PANEL_WIDTH */
+  width: 280px;
   border-left: 1px solid #eee;
   position: sticky;
-  top: 0;
-  height: 100%;
+  top: var(--app-header-h);
+  height: calc(100dvh - var(--app-header-h));
   background: #fff;
-  flex: 0 0 auto;
   box-sizing: border-box;
-  overflow: visible;
   z-index: 50;
-}
 
+  /* ✅ 전고정 높이 */
+  height: 100dvh; /* 헤더 있으면 calc(100dvh - var(--app-header-h)) */
+  display: flex;
+}
 .right-panel-inner {
-  height: 100%;
-  /* Allow scroll when needed but hide the scrollbar */
+  flex: 1 1 auto; /* ✅ 부모 높이를 꽉 채움 */
   overflow-y: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
   padding: 16px;
+}
+.right-panel-inner::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 .right-panel-inner::-webkit-scrollbar {
   width: 0;
@@ -300,4 +324,21 @@
   background-color: #f8f8f8;
   box-shadow: none;
   transform: translateY(-50%);
+}
+
+/* 갤러리 패널은 화면 폭에 따라 자동 축소 */
+.gallery-panel {
+  flex: 0 0 clamp(200px, 18vw, 260px);
+}
+
+/* 작은 화면에서는 우측패널/캐러셀을 더 줄여서 1스크린 유지 */
+@media (max-height: 820px) {
+  :root {
+    --carousel-h: clamp(100px, 15vh, 140px);
+  }
+}
+@media (max-width: 1200px) {
+  :root {
+    --right-panel-w: clamp(220px, 24vw, 280px);
+  }
 }
