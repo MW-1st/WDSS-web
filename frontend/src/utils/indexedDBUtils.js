@@ -154,6 +154,22 @@ export const saveCanvasToIndexedDB = async (sceneId, canvasData, metadata = {}) 
         // 메모리 캐시도 업데이트
         setMemoryCache(sceneId, canvasData);
 
+        // UI 등에서 실시간 변화를 감지할 수 있도록 이벤트 발행
+        try {
+          if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+            const ev = new CustomEvent('indexeddb:canvas-saved', {
+              detail: {
+                sceneId,
+                objectCount: canvasState.objectCount || 0,
+                savedAt: canvasState.savedAt
+              }
+            });
+            window.dispatchEvent(ev);
+          }
+        } catch (e) {
+          console.warn('Failed to dispatch indexeddb:canvas-saved event', e);
+        }
+
         resolve(canvasState);
       };
 
@@ -245,6 +261,17 @@ export const deleteCanvasFromIndexedDB = async (sceneId) => {
 
       request.onsuccess = () => {
         console.log(`Canvas state deleted from IndexedDB: ${sceneId}`);
+        // 삭제 이벤트 발행
+        try {
+          if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+            const ev = new CustomEvent('indexeddb:canvas-deleted', {
+              detail: { sceneId }
+            });
+            window.dispatchEvent(ev);
+          }
+        } catch (e) {
+          console.warn('Failed to dispatch indexeddb:canvas-deleted event', e);
+        }
         resolve(true);
       };
 
