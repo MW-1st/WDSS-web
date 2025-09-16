@@ -395,7 +395,7 @@ async def verify_email(token: str):
                     </p>
 
                     <a
-                        href="http://localhost:5173/login"
+                        href="{config.FRONTEND_BASE_URL}/login"
                         class="w-full inline-block rounded bg-[#646cff] hover:bg-[#5c64ed] text-white py-2 font-yuniverse transition font-bold text-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 text-center"
                     >
                         Try Again
