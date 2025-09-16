@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import client from "../api/client.js";
 import { useNavigate } from "react-router-dom";
@@ -47,11 +47,18 @@ export default function DashboardPage() {
   const navigate = useNavigate();
 
   const [projects, setProjects] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // don't auto-load on mount; wait for user scroll
+  const [loading, setLoading] = useState(false);
+  const [pageLoading, setPageLoading] = useState(false);
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [userScrolled, setUserScrolled] = useState(false);
+  const sentinelRef = useRef(null);
   const [editingProject, setEditingProject] = useState(null);
   const [creating, setCreating] = useState(false);
   const [bannerUrl, setBannerUrl] = useState("/img/banner_01.png");
   const [thumbs, setThumbs] = useState({});
+  const PAGE_SIZE = 12;
 
   // Pick a random banner when the dashboard mounts
   useEffect(() => {
@@ -67,22 +74,54 @@ export default function DashboardPage() {
   }, []);
 
 
+  // don't fetch automatically on mount — wait for the user to scroll
   useEffect(() => {
     if (!isAuthenticated) {
       setLoading(false);
-      return;
+      setProjects([]);
+      setOffset(0);
+      setHasMore(true);
+    } else {
+      // authenticated but we still wait for user's scroll to load data
+      setLoading(false);
     }
-    (async () => {
-      try {
-        const res = await client.get("/projects");
-        setProjects(res.data.projects);
-      } catch (err) {
-        console.error("Failed to fetch projects:", err);
-      } finally {
-        setLoading(false);
-      }
-    })();
   }, [isAuthenticated]);
+
+  // load more when offset changes or on explicit request
+  const loadMore = async () => {
+    if (pageLoading || !hasMore) return;
+    setPageLoading(true);
+    try {
+  const res = await client.get("/projects", { params: { limit: PAGE_SIZE, offset } });
+      const newItems = res.data.projects || [];
+      setProjects((prev) => [...prev, ...newItems]);
+      const newOffset = offset + newItems.length;
+      setOffset(newOffset);
+      setHasMore(newOffset < (res.data.total || 0));
+    } catch (err) {
+      console.error("Failed to load more projects:", err);
+    } finally {
+      setPageLoading(false);
+    }
+  };
+
+  // initial load function (fetch first page) -- keep this so the dashboard shows projects on first render
+  const loadFirst = async () => {
+    // avoid clashing with pageLoading
+    if (pageLoading) return;
+    setLoading(true);
+    try {
+      const res = await client.get("/projects", { params: { limit: PAGE_SIZE, offset: 0 } });
+      const items = res.data.projects || [];
+      setProjects(items);
+      setHasMore((res.data.total || 0) > items.length);
+      setOffset(items.length);
+    } catch (err) {
+      console.error("Failed to fetch projects:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Fetch thumbnail (scene 1) for each project
   useEffect(() => {
@@ -127,6 +166,72 @@ export default function DashboardPage() {
       cancelled = true;
     };
   }, [projects]);
+
+  // IntersectionObserver for infinite scroll
+  useEffect(() => {
+    const node = sentinelRef.current;
+    if (!node) return;
+
+    const obs = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          // only trigger loading after the user has scrolled
+          if (entry.isIntersecting && hasMore && !pageLoading && userScrolled) {
+            loadMore();
+          }
+        });
+      },
+      { root: null, rootMargin: "200px", threshold: 0.1 }
+    );
+
+    obs.observe(node);
+    return () => obs.disconnect();
+  }, [userScrolled, hasMore, pageLoading]);
+
+  // If the page is too short to scroll (e.g. small/minimized window) and we haven't
+  // received a user scroll, auto-trigger loading so content fills the viewport.
+  useEffect(() => {
+    try {
+      if (userScrolled) return;
+      const doc = document.documentElement;
+      const canScroll = doc.scrollHeight > window.innerHeight;
+      if (!canScroll && hasMore && !pageLoading) {
+        // Allow intersection observer and other logic to run as if the user scrolled
+        setUserScrolled(true);
+        // Load next page to try to fill viewport
+        loadMore();
+      }
+    } catch (e) {
+      // ignore if DOM not available
+    }
+  }, [projects, userScrolled, hasMore, pageLoading]);
+
+  // ensure first page is loaded when the user is authenticated (so the dashboard is not empty)
+  useEffect(() => {
+    if (isAuthenticated && projects.length === 0) {
+      loadFirst();
+    }
+  }, [isAuthenticated]);
+
+  // listen for the user's first scroll action; after that, allow intersection to trigger loads
+  useEffect(() => {
+    const onFirstScroll = () => {
+      setUserScrolled(true);
+      window.removeEventListener("scroll", onFirstScroll);
+
+      // If the sentinel is already in view when the user scrolls, trigger a load
+      const sentinel = sentinelRef.current;
+      if (sentinel && hasMore && !pageLoading) {
+        const rect = sentinel.getBoundingClientRect();
+        if (rect.top <= window.innerHeight + 200) {
+          loadMore();
+        }
+      }
+    };
+
+    window.addEventListener("scroll", onFirstScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onFirstScroll);
+  }, [hasMore, pageLoading]);
 
   const handleCreateProject = () => {
     setCreating(true);
@@ -197,9 +302,9 @@ export default function DashboardPage() {
 
             {loading ? (
               <p>프로젝트를 불러오는 중입니다...</p>
-            ) : projects.length > 0 ? (
+              ) : projects.length > 0 ? (
               <div className="project-grid">
-                {projects.map((project) => (
+                  {projects.map((project) => (
                   <div
                     key={project.id}
                     className="project-card"
@@ -247,6 +352,9 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 ))}
+
+                {/* sentinel for infinite scroll */}
+                <div id="projects-sentinel" ref={sentinelRef} style={{ height: 1 }} />
               </div>
             ) : (
               <div className="empty-state">
@@ -254,6 +362,9 @@ export default function DashboardPage() {
                 <p>'새 프로젝트 생성' 버튼을 눌러 프로젝트를 시작해보세요!</p>
               </div>
             )}
+            {/* page loading and end message */}
+            {pageLoading && <p style={{ textAlign: "center", marginTop: 12 }}>더 불러오는 중...</p>}
+            {!hasMore && projects.length > 0 && <p style={{ textAlign: "center", marginTop: 12 }}>모든 프로젝트를 불러왔습니다.</p>}
           </section>
         </main>
       </div>

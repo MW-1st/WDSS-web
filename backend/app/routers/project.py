@@ -4,7 +4,7 @@ from app.db.database import get_db
 from app.dependencies import get_current_user
 from app.schemas import (
     UserResponse,
-    ProjectListResponse,
+    ProjectListDataResponse,
     ProjectDataResponse,
     ProjectCreate,
     ProjectDetailDataResponse,
@@ -13,6 +13,7 @@ from app.schemas import (
 )
 from app.db.project import (
     get_projects_by_user_id,
+    get_projects_by_user_id_paginated,
     create_project,
     get_project_by_id,
     update_project_by_id,
@@ -31,16 +32,26 @@ import uuid
 router = APIRouter()
 
 
-@router.get("", response_model=ProjectListResponse, summary="프로젝트 목록 조회")
+@router.get("", response_model=ProjectListDataResponse, summary="프로젝트 목록 조회")
 async def list_projects(
     current_user: UserResponse = Depends(get_current_user),
     conn: asyncpg.Connection = Depends(get_db),
+    limit: int = 12,
+    offset: int = 0,
 ):
     """
     현재 로그인한 사용자의 모든 **프로젝트 목록**을 조회합니다.
     """
-    projects_list = await get_projects_by_user_id(conn, current_user.id)
-    return {"projects": projects_list}
+    # 안전장치: limit 상한
+    if limit <= 0:
+        limit = 10
+    if limit > 100:
+        limit = 100
+
+    projects_list, total = await get_projects_by_user_id_paginated(
+        conn, current_user.id, limit=limit, offset=offset
+    )
+    return {"success": True, "projects": projects_list, "total": total}
 
 
 @router.post(
