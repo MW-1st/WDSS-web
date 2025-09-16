@@ -24,7 +24,7 @@ export default function LoginModal() {
     let eventSource = null;
 
     if (emailSent && email && !tokenValidated) {
-      eventSource = new EventSource(`http://localhost:8000/auth/verification-stream/${encodeURIComponent(email)}`);
+      eventSource = new EventSource(`/api/auth/verification-stream/${encodeURIComponent(email)}`);
 
       eventSource.onmessage = (event) => {
         try {
