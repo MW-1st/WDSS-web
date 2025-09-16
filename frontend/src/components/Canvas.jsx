@@ -43,6 +43,7 @@ export default function Canvas({
   projectId,
   changeSaveMode,
   triggerAutoSave,
+  saveToHistory,
   isSceneTransformed = false,
 }) {
   // Canvas: 캔버스 훅들을 조합하고 외부 API를 노출합니다.
@@ -166,6 +167,7 @@ export default function Canvas({
     drawingModeRef,
     onSelectionChangeRef,
     triggerAutoSave,
+    saveToHistory,
     onCanvasChangeRef
   );
 
@@ -183,6 +185,7 @@ export default function Canvas({
     layersRef,
     setCanvasRevision,
     triggerAutoSave,
+    saveToHistory,
     onCanvasChangeRef,
     width,
     height,
@@ -212,7 +215,6 @@ export default function Canvas({
     externalActiveLayerId,
     setActiveLayerId,
     updateBrushColor,
-    triggerAutoSave,
     onCanvasChangeRef,
     setCanvasRevision,
     loadSceneLayerState,
@@ -231,6 +233,7 @@ export default function Canvas({
     activeLayerIdRef,
     layersRef,
     triggerAutoSave,
+    saveToHistory,
     onCanvasChangeRef,
     onSelectionChangeRef,
     setCanvasRevision,
@@ -257,6 +260,7 @@ export default function Canvas({
     layers,
     setCanvasRevision,
     triggerAutoSave,
+    saveToHistory,
     onCanvasChangeRef,
   });
   const { addImageToCanvas } = canvasImageActions;
@@ -295,6 +299,7 @@ export default function Canvas({
     layersRef,
     activeLayerIdRef,
     triggerAutoSave,
+    saveToHistory,
     onCanvasChangeRef,
     setCanvasRevision,
     width,
@@ -440,6 +445,7 @@ export default function Canvas({
       action: "deleteButton",
       deletedCount: activeObjects.length,
     });
+    saveToHistory("deleteButton");
     if (onCanvasChangeRef.current) onCanvasChangeRef.current();
   };
 

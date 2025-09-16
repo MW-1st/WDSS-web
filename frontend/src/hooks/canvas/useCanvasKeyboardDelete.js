@@ -5,6 +5,7 @@ export default function useCanvasKeyboardDelete(
   drawingModeRef,
   onSelectionChangeRef,
   triggerAutoSave,
+  saveToHistory,
   onCanvasChangeRef
 ) {
   useEffect(() => {
@@ -27,6 +28,7 @@ export default function useCanvasKeyboardDelete(
       } catch (err) {}
       try {
         triggerAutoSave({ action: "delete", deletedCount: activeObjects.length });
+        saveToHistory("delete")
       } catch (err) {}
       try {
         if (onCanvasChangeRef && onCanvasChangeRef.current) onCanvasChangeRef.current();
@@ -34,5 +36,5 @@ export default function useCanvasKeyboardDelete(
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [fabricCanvasRef, drawingModeRef, onSelectionChangeRef, triggerAutoSave, onCanvasChangeRef]);
+  }, [fabricCanvasRef, drawingModeRef, onSelectionChangeRef, triggerAutoSave, saveToHistory, onCanvasChangeRef]);
 }
