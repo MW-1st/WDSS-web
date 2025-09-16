@@ -31,7 +31,8 @@ export const useAutoSave = (projectId, sceneId, fabricCanvas, options = {}, scen
     isSyncing: isServerSyncing,
     lastSyncTime: lastServerSyncTime,
     syncError: serverSyncError,
-    setEnabled: setServerSyncEnabled
+    setEnabled: setServerSyncEnabled,
+    getCurrentCanvasData
   } = useServerSync(projectId, sceneId, fabricCanvas, {
     // 🔥 onSync 콜백 추가 - useServerSync에서 받은 데이터를 EditorPage로 전달
     onSync: (syncData) => {
@@ -63,33 +64,9 @@ export const useAutoSave = (projectId, sceneId, fabricCanvas, options = {}, scen
       setSaveError(null);
 
       try {
-        const canvas = fabricCanvas.current;
-        const canvasData = canvas.toJSON([
-          'layerId', 'layerName', 'customType', 'originalFill',
-          'originalCx', 'originalCy'
-        ]);
+        const canvasData = getCurrentCanvasData();
 
-
-        const allObjects = canvas.getObjects();
-
-        // 실제 그린 객체만 카운트 (경계선 제외)
-        const drawnObjects = allObjects.filter(obj =>
-          obj.name !== 'canvasBoundary' &&
-          obj.excludeFromExport !== true
-        );
-
-        const actualObjectCount = drawnObjects.length;
-
-        const saveMetadata = includeMetadata ? {
-          objectCount: canvas.getObjects().length,
-          canvasSize: {
-            width: canvas.getWidth(),
-            height: canvas.getHeight()
-          },
-          ...metadata
-        } : metadata;
-
-        await saveCanvasToIndexedDB(sceneId, canvasData, saveMetadata);
+        await saveCanvasToIndexedDB(sceneId, canvasData);
 
         setLastSaveTime(new Date());
 
@@ -99,7 +76,6 @@ export const useAutoSave = (projectId, sceneId, fabricCanvas, options = {}, scen
 
           onSave({
             sceneId,
-            objectCount: actualObjectCount,
             s3_key: virtualS3Key, // 가상의 s3_key 추가
             source: 'indexedDB' // 출처 표시
           });
@@ -340,10 +316,7 @@ export const useAutoSave = (projectId, sceneId, fabricCanvas, options = {}, scen
     syncToServerNow: () => {
       const canvas = fabricCanvas?.current;
       if (canvas) {
-        const canvasData = canvas.toJSON([
-          'layerId', 'layerName', 'customType', 'originalFill',
-          'originalCx', 'originalCy'
-        ]);
+        const canvasData = getCurrentCanvasData();
         return syncToServer(canvasData, saveMode);
       }
       return Promise.resolve(false);

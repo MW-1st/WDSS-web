@@ -1,54 +1,87 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 
-const useLayers = () => {
-  const [layers, setLayers] = useState([
-    {
-      id: 'background',
-      name: '배경',
-      visible: true,
-      locked: false,
-      zIndex: 0,
-      type: 'background'
-    },
-    {
-      id: 'layer-1',
-      name: '레이어 1',
-      visible: true,
-      locked: false,
-      zIndex: 1,
-      type: 'drawing'
+const createDefaultLayers = () => [
+  {
+    id: 'background',
+    name: '배경',
+    visible: true,
+    locked: false,
+    zIndex: 0,
+    type: 'background'
+  },
+  {
+    id: 'layer-1',
+    name: '레이어 1',
+    visible: true,
+    locked: false,
+    zIndex: 1,
+    type: 'drawing'
+  }
+];
+
+const useLayers = (currentSceneId = null) => {
+  const [sceneLayersMap, setSceneLayersMap] = useState(new Map());
+  const [sceneActiveLayerMap, setSceneActiveLayerMap] = useState(new Map());
+
+  const initializeSceneIfNeeded = useCallback((sceneId) => {
+    if (!sceneId) return;
+
+    setSceneLayersMap(prev => {
+      const newMap = new Map(prev);
+      if (!newMap.has(sceneId)) {
+        newMap.set(sceneId, createDefaultLayers());
+      }
+      return newMap;
+    });
+
+    setSceneActiveLayerMap(prev => {
+      const newMap = new Map(prev);
+      if (!newMap.has(sceneId)) {
+        newMap.set(sceneId, 'layer-1');
+      }
+      return newMap;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (currentSceneId) {
+      initializeSceneIfNeeded(currentSceneId);
     }
-  ]);
-  
-  const [activeLayerId, setActiveLayerId] = useState('layer-1');
-  
-  // setActiveLayerId를 래핑해서 로그 추가
-  const setActiveLayerIdWithLog = useCallback((newLayerId) => {
-    console.log('=== ACTIVE LAYER CHANGE DEBUG ===');
-    console.log('Previous activeLayerId:', activeLayerId);
-    console.log('New activeLayerId:', newLayerId);
-    console.log('All layers:', layers.map(l => ({ id: l.id, name: l.name })));
-    setActiveLayerId(newLayerId);
-    console.log('setActiveLayerId completed');
-    console.log('=== ACTIVE LAYER CHANGE DEBUG END ===');
-  }, [activeLayerId, layers]);
+  }, [currentSceneId, initializeSceneIfNeeded]);
 
-  // 새 레이어 생성
+  const layers = useMemo(() => {
+    if (!currentSceneId) return createDefaultLayers();
+    return sceneLayersMap.get(currentSceneId) || createDefaultLayers();
+  }, [currentSceneId, sceneLayersMap]);
+
+  const activeLayerId = useMemo(() => {
+    if (!currentSceneId) return 'layer-1';
+    return sceneActiveLayerMap.get(currentSceneId) || 'layer-1';
+  }, [currentSceneId, sceneActiveLayerMap]);
+  
+  const setActiveLayerId = useCallback((newLayerId) => {
+    if (!currentSceneId) return;
+    setSceneActiveLayerMap(prev => {
+      const newMap = new Map(prev);
+      newMap.set(currentSceneId, newLayerId);
+      return newMap;
+    });
+  }, [currentSceneId]);
+
   const createLayer = useCallback((name = null) => {
+    if (!currentSceneId) return null;
+
     const layerId = `layer-${Date.now()}`;
-    
-    // 그리기 레이어만 카운트해서 순차적 번호 생성
     const drawingLayers = layers.filter(layer => layer.type === 'drawing');
     let layerNumber = drawingLayers.length + 1;
-    
-    // 기본 이름이 이미 있는지 확인하고 중복되지 않는 번호 찾기
+
     while (layers.some(layer => layer.name === `레이어 ${layerNumber}`)) {
       layerNumber++;
     }
-    
+
     const layerName = name || `레이어 ${layerNumber}`;
     const maxZIndex = Math.max(...layers.map(layer => layer.zIndex));
-    
+
     const newLayer = {
       id: layerId,
       name: layerName,
@@ -57,59 +90,83 @@ const useLayers = () => {
       zIndex: maxZIndex + 1,
       type: 'drawing'
     };
-    
-    setLayers(prev => [...prev, newLayer]);
+
+    setSceneLayersMap(prev => {
+      const newMap = new Map(prev);
+      const currentLayers = newMap.get(currentSceneId) || createDefaultLayers();
+      newMap.set(currentSceneId, [...currentLayers, newLayer]);
+      return newMap;
+    });
+
     setActiveLayerId(layerId);
     return newLayer;
-  }, [layers]);
+  }, [currentSceneId, layers, setActiveLayerId]);
 
-  // 레이어 삭제
   const deleteLayer = useCallback((layerId) => {
-    if (layerId === 'background') return; // 배경 레이어는 삭제 불가
-    
-    setLayers(prev => {
-      const filtered = prev.filter(layer => layer.id !== layerId);
-      // 활성 레이어가 삭제되면 다른 레이어를 활성화
+    if (layerId === 'background' || !currentSceneId) return;
+
+    setSceneLayersMap(prev => {
+      const newMap = new Map(prev);
+      const currentLayers = newMap.get(currentSceneId) || createDefaultLayers();
+      const filtered = currentLayers.filter(layer => layer.id !== layerId);
+
       if (activeLayerId === layerId) {
         const newActiveLayer = filtered.find(layer => layer.type === 'drawing') || filtered[0];
         setActiveLayerId(newActiveLayer?.id || 'background');
       }
-      return filtered;
-    });
-  }, [activeLayerId]);
 
-  // 레이어 가시성 토글
+      newMap.set(currentSceneId, filtered);
+      return newMap;
+    });
+  }, [currentSceneId, activeLayerId, setActiveLayerId]);
+
   const toggleLayerVisibility = useCallback((layerId) => {
-    setLayers(prev => 
-      prev.map(layer => 
-        layer.id === layerId 
+    if (!currentSceneId) return;
+
+    setSceneLayersMap(prev => {
+      const newMap = new Map(prev);
+      const currentLayers = newMap.get(currentSceneId) || createDefaultLayers();
+      const updatedLayers = currentLayers.map(layer =>
+        layer.id === layerId
           ? { ...layer, visible: !layer.visible }
           : layer
-      )
-    );
-  }, []);
+      );
+      newMap.set(currentSceneId, updatedLayers);
+      return newMap;
+    });
+  }, [currentSceneId]);
 
-  // 레이어 잠금 토글
   const toggleLayerLock = useCallback((layerId) => {
-    setLayers(prev => 
-      prev.map(layer => 
-        layer.id === layerId 
+    if (!currentSceneId) return;
+
+    setSceneLayersMap(prev => {
+      const newMap = new Map(prev);
+      const currentLayers = newMap.get(currentSceneId) || createDefaultLayers();
+      const updatedLayers = currentLayers.map(layer =>
+        layer.id === layerId
           ? { ...layer, locked: !layer.locked }
           : layer
-      )
-    );
-  }, []);
+      );
+      newMap.set(currentSceneId, updatedLayers);
+      return newMap;
+    });
+  }, [currentSceneId]);
 
-  // 레이어 이름 변경
   const renameLayer = useCallback((layerId, newName) => {
-    setLayers(prev => 
-      prev.map(layer => 
-        layer.id === layerId 
+    if (!currentSceneId) return;
+
+    setSceneLayersMap(prev => {
+      const newMap = new Map(prev);
+      const currentLayers = newMap.get(currentSceneId) || createDefaultLayers();
+      const updatedLayers = currentLayers.map(layer =>
+        layer.id === layerId
           ? { ...layer, name: newName }
           : layer
-      )
-    );
-  }, []);
+      );
+      newMap.set(currentSceneId, updatedLayers);
+      return newMap;
+    });
+  }, [currentSceneId]);
 
 
   // 활성 레이어 정보 가져오기
@@ -124,55 +181,82 @@ const useLayers = () => {
 
   // zIndex 순으로 정렬된 레이어 목록
   const getSortedLayers = useCallback(() => {
-    return [...layers].sort((a, b) => b.zIndex - a.zIndex); // 높은 zIndex부터 (UI에서 위에 표시)
+    return [...layers].sort((a, b) => a.zIndex - b.zIndex); // 낮은 zIndex부터 (배경이 아래에 표시)
   }, [layers]);
 
-  // 드래그 앤 드롭으로 레이어 순서 변경
   const reorderLayers = useCallback((draggedLayerId, targetLayerId) => {
-    // 배경 레이어는 드래그하거나 다른 레이어의 타겟이 될 수 없음 (순서 고정)
-    if (draggedLayerId === 'background' || targetLayerId === 'background') {
+    if (draggedLayerId === 'background' || targetLayerId === 'background' || !currentSceneId) {
       return;
     }
 
-    setLayers(prev => {
-      const layersWithoutBg = prev.filter(l => l.id !== 'background');
-      const backgroundLayer = prev.find(l => l.id === 'background');
+    setSceneLayersMap(prev => {
+      const newMap = new Map(prev);
+      const currentLayers = newMap.get(currentSceneId) || createDefaultLayers();
 
-      // UI에 표시되는 순서대로 정렬 (zIndex가 높은 것이 위)
+      const layersWithoutBg = currentLayers.filter(l => l.id !== 'background');
+      const backgroundLayer = currentLayers.find(l => l.id === 'background');
+
       const sortedLayers = [...layersWithoutBg].sort((a, b) => b.zIndex - a.zIndex);
 
       const draggedIndex = sortedLayers.findIndex(l => l.id === draggedLayerId);
       const targetIndex = sortedLayers.findIndex(l => l.id === targetLayerId);
 
       if (draggedIndex === -1 || targetIndex === -1 || draggedIndex === targetIndex) {
-        return prev; // 변경 필요 없음
+        return prev;
       }
 
-      // 배열에서 드래그된 아이템을 제거하고 타겟 위치에 삽입
       const reordered = Array.from(sortedLayers);
       const [draggedItem] = reordered.splice(draggedIndex, 1);
       reordered.splice(targetIndex, 0, draggedItem);
 
-      // zIndex를 UI 순서에 맞게 재할당
-      // reordered 배열의 인덱스가 0일수록 UI에서 위에 있으므로 zIndex가 높아야 함
       const updatedLayers = reordered.map((layer, index) => ({
         ...layer,
         zIndex: reordered.length - index,
       }));
 
-      // 배경 레이어가 있으면 zIndex: 0으로 다시 추가
       if (backgroundLayer) {
         updatedLayers.push({ ...backgroundLayer, zIndex: 0 });
       }
 
-      return updatedLayers;
+      newMap.set(currentSceneId, updatedLayers);
+      return newMap;
+    });
+  }, [currentSceneId]);
+
+  const loadSceneLayerState = useCallback((sceneId, layerData) => {
+    if (!sceneId || !layerData) return;
+
+    setSceneLayersMap(prev => {
+      const newMap = new Map(prev);
+      newMap.set(sceneId, layerData.layers || createDefaultLayers());
+      return newMap;
+    });
+
+    setSceneActiveLayerMap(prev => {
+      const newMap = new Map(prev);
+      newMap.set(sceneId, layerData.activeLayerId || 'layer-1');
+      return newMap;
     });
   }, []);
+
+  const getSceneLayerState = useCallback((sceneId) => {
+    if (!sceneId) return null;
+
+    const sceneLayers = sceneLayersMap.get(sceneId);
+    const sceneActiveLayerId = sceneActiveLayerMap.get(sceneId);
+
+    if (!sceneLayers) return null;
+
+    return {
+      layers: sceneLayers,
+      activeLayerId: sceneActiveLayerId || 'layer-1'
+    };
+  }, [sceneLayersMap, sceneActiveLayerMap]);
 
   return {
     layers,
     activeLayerId,
-    setActiveLayerId: setActiveLayerIdWithLog,
+    setActiveLayerId,
     createLayer,
     deleteLayer,
     toggleLayerVisibility,
@@ -181,7 +265,9 @@ const useLayers = () => {
     reorderLayers,
     getActiveLayer,
     getLayer,
-    getSortedLayers
+    getSortedLayers,
+    loadSceneLayerState,
+    getSceneLayerState
   };
 };
 
