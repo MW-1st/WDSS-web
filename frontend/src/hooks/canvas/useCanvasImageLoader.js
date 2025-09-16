@@ -24,7 +24,6 @@ export default function useCanvasImageLoader({
   externalActiveLayerId,
   setActiveLayerId,
   updateBrushColor,
-  triggerAutoSave,
   onCanvasChangeRef,
   setCanvasRevision,
   loadSceneLayerState,

@@ -86,6 +86,28 @@ export default function Navbar({ transparent: propTransparent = false }) {
             >
               {editorState.projectName || "Untitled Project"}
             </div>
+            <div className="flex items-center gap-2 ml-6">
+              <button
+                onClick={() => api?.undo?.()}
+                disabled={!api?.canUndo || api?.isProcessing}
+                className="p-2 rounded border border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                title="실행 취소 (Ctrl+Z)"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/>
+                </svg>
+              </button>
+              <button
+                onClick={() => api?.redo?.()}
+                disabled={!api?.canRedo || api?.isProcessing}
+                className="p-2 rounded border border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                title="다시 실행 (Ctrl+Shift+Z)"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M18.4 10.6C16.55 8.99 14.15 8 11.5 8c-4.65 0-8.58 3.03-9.96 7.22L3.9 16c1.05-3.19 4.05-5.5 7.6-5.5 1.95 0 3.73.72 5.12 1.88L13 16h9V7l-3.6 3.6z"/>
+                </svg>
+              </button>
+            </div>
           </div>
 
           <div className="flex flex-1 justify-end">
