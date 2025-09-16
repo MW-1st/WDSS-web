@@ -28,7 +28,18 @@ pip install -r requirements.txt
 cd frontend
 npm install
 ```
+3. 환경변수 설정
+```bash
+DATABASE_URL=your_db
 
+# Gmail SMTP Settings (실제 이메일 발송용)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_STARTTLS=true
+SMTP_USERNAME=your@gmail.com
+SMTP_PASSWORD=your_password
+SMTP_FROM=your@gmail.com
+```
 ## 실행
 1. 백엔드 실행
 ```bash

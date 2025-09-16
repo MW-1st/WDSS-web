@@ -25,6 +25,12 @@ class UserResponse(BaseModel):
 
 class UserInDB(UserResponse):
     hashed_password: str
+    is_email_verified: bool = False
+
+
+class SendVerificationRequest(BaseModel):
+    email: EmailStr = Field(max_length=32)
+
 
 
 class RegisterRequest(BaseModel):

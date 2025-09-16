@@ -1,5 +1,9 @@
 import os
 from datetime import timedelta
+from dotenv import load_dotenv
+
+# .env 파일 로드
+load_dotenv()
 
 
 # Basic JWT configuration; consider overriding via environment variables
@@ -30,3 +34,9 @@ SMTP_STARTTLS = os.getenv("SMTP_STARTTLS", "true").lower() in ("1", "true", "yes
 SMTP_USERNAME = os.getenv("SMTP_USERNAME", "")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 SMTP_FROM = os.getenv("SMTP_FROM", "no-reply@localhost")
+
+# Redis settings
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", "")
+REDIS_DB = int(os.getenv("REDIS_DB", "0"))
