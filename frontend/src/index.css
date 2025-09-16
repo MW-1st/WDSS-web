@@ -1,4 +1,4 @@
-﻿@import "tailwindcss";
+@import "tailwindcss";
 
 @font-face {
   font-family: "TwaySky";
@@ -8,7 +8,7 @@
   font-display: swap;
 }
 @theme {
-  --font-tway: "TwaySky", ui-sans-serif, system-ui, sans-serif;
+  --font-tway: "TwaySky", ui-sans-serif, system-ui, sans-serif, sans-serif;
 }
 
 @font-face {
