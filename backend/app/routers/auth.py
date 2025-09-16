@@ -87,7 +87,7 @@ async def login(
         httponly=True,  # JavaScript에서 접근 불가
         secure=False,  # 프로덕션(HTTPS) 환경에서는 True로 설정 권장
         samesite="lax",  # CSRF 방어
-        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        max_age=config.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
     user_response_data = UserResponse.model_validate(user)
 
