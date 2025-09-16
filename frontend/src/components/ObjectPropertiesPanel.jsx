@@ -1,7 +1,6 @@
 import React, { useMemo, useState, useCallback, useEffect } from "react";
 import ColorPicker from "./ColorPicker.jsx";
 import "../styles/ObjectPropertiesPanel.css";
-import useAutoSave from "../hooks/useAutoSave.js";
 
 function normalizeColorToHex(color) {
   if (!color) return "#000000";
@@ -74,17 +73,6 @@ const BrightnessControl = ({
     setInputValue(value.toString());
     setSliderValue(value);
     setError("");
-    // const canvas = stageRef.current;
-    // dataToSave = canvas.toJSON([
-    //   'layerId', 'layerName', 'customType', 'originalFill',
-    //   'originalCx', 'originalCy'
-    // ]);
-    // saveImmediately(dataToSave)
-    //   .catch(e => console.error('백그라운드 IndexedDB 저장 실패:', e));
-    //
-    // // 서버에 저장
-    // syncToServerNow(dataToSave, saveModeToUse)
-    //   .catch(e => console.error('백그라운드 서버 저장 실패:', e));
   }, [value]);
 
   return (
@@ -143,7 +131,9 @@ const BrightnessControl = ({
 export default function ObjectPropertiesPanel({ 
   selection, 
   onChangeFill, 
-  onChangeBrightness 
+  onChangeBrightness,
+  triggerAutoSave,
+  saveToHistory,
 }) {
   const isMulti = selection?.type === "activeSelection";
   
@@ -217,7 +207,16 @@ export default function ObjectPropertiesPanel({
       onChangeBrightness(localBrightness);
     }
     setHasChanges(false);
-  }, [onChangeFill, onChangeBrightness, localColor, localBrightness]);
+
+    if (triggerAutoSave) {
+      console.log("🙏🏻🙏🏻🙏🏻 triggerAutoSave")
+      triggerAutoSave();
+    }
+    if (saveToHistory) {
+      console.log("🙏🏻🙏🏻🙏🏻 saveToHistory")
+      saveToHistory('property_change');
+    }
+  }, [onChangeFill, onChangeBrightness, localColor, localBrightness, triggerAutoSave, saveToHistory]);
 
   // 초기화 버튼 핸들러
   const handleResetChanges = useCallback(() => {

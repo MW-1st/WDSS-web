@@ -9,6 +9,7 @@ export function createCanvasImageActions({
   layers,
   setCanvasRevision,
   triggerAutoSave,
+  saveToHistory,
   onCanvasChangeRef,
 }) {
   const addImageToCanvas = (imageUrl, clientX = null, clientY = null) => {
@@ -59,6 +60,7 @@ export function createCanvasImageActions({
         canvas.setActiveObject(img);
         if (typeof setCanvasRevision === "function") setCanvasRevision((c) => c + 1);
         if (typeof triggerAutoSave === "function") triggerAutoSave({ action: "imageDropped", imageUrl });
+        if (typeof saveToHistory === "function") saveToHistory("imageDropped")
         if (onCanvasChangeRef && onCanvasChangeRef.current) onCanvasChangeRef.current();
         canvas.renderAll();
       })

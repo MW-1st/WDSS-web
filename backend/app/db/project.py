@@ -9,9 +9,30 @@ async def get_projects_by_user_id(
 ) -> List[dict]:
     """사용자 ID로 프로젝트 목록을 조회합니다."""
     rows = await conn.fetch(
-        "SELECT * FROM project WHERE user_id = $1 AND max_drone IS NOT NULL ORDER BY updated_at DESC", user_id
+        "SELECT * FROM project WHERE user_id = $1 AND max_drone IS NOT NULL ORDER BY updated_at DESC",
+        user_id,
     )
     return [dict(row) for row in rows]
+
+
+async def get_projects_by_user_id_paginated(
+    conn: asyncpg.Connection, user_id: uuid.UUID, limit: int = 10, offset: int = 0
+) -> tuple[list[dict], int]:
+    """페이징으로 사용자 프로젝트 목록을 조회합니다. 반환값: (rows, total_count)"""
+    # total count
+    total_row = await conn.fetchrow(
+        "SELECT COUNT(1) AS cnt FROM project WHERE user_id = $1 AND max_drone IS NOT NULL",
+        user_id,
+    )
+    total = int(total_row["cnt"]) if total_row else 0
+
+    rows = await conn.fetch(
+        "SELECT * FROM project WHERE user_id = $1 AND max_drone IS NOT NULL ORDER BY updated_at DESC LIMIT $2 OFFSET $3",
+        user_id,
+        limit,
+        offset,
+    )
+    return [dict(row) for row in rows], total
 
 
 async def create_project(

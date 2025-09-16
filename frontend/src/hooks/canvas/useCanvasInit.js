@@ -26,6 +26,7 @@ export default function useCanvasInit({
   activeLayerIdRef,
   layersRef,
   triggerAutoSave,
+  saveToHistory,
   onCanvasChangeRef,
   onSelectionChangeRef,
   setCanvasRevision,
@@ -266,6 +267,7 @@ export default function useCanvasInit({
           setCanvasRevision((c) => c + 1);
 
           triggerAutoSave({ drawingMode: "draw" });
+          saveToHistory("draw")
           if (onCanvasChangeRef.current) onCanvasChangeRef.current();
         }
       }
@@ -388,21 +390,25 @@ export default function useCanvasInit({
 
     const handleObjectMoved = () => {
       triggerAutoSave({ action: "objectMoved" });
+      saveToHistory("objectMoved");
       if (onCanvasChangeRef.current) onCanvasChangeRef.current();
     };
 
     const handleObjectScaled = () => {
       triggerAutoSave({ action: "objectScaled" });
+      saveToHistory("objectScaled");
       if (onCanvasChangeRef.current) onCanvasChangeRef.current();
     };
 
     const handleObjectRotated = () => {
       triggerAutoSave({ action: "objectRotated" });
+      saveToHistory("objectRotated");
       if (onCanvasChangeRef.current) onCanvasChangeRef.current();
     };
 
     const handleObjectModified = () => {
       triggerAutoSave({ action: "objectModified" });
+      saveToHistory("objectModified");
       if (onCanvasChangeRef.current) onCanvasChangeRef.current();
     };
 

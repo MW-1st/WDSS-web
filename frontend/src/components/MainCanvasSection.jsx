@@ -18,6 +18,7 @@ function MainCanvasSection({
   onPanChange,
   changeSaveMode,
   triggerAutoSave,
+  saveToHistory,
   isSceneTransformed = false // 씬 변환 상태
 }) {
   return (
@@ -63,6 +64,7 @@ function MainCanvasSection({
               onPanChange={onPanChange}
               changeSaveMode={changeSaveMode}
               triggerAutoSave={triggerAutoSave}
+              saveToHistory = {saveToHistory}
               isSceneTransformed={isSceneTransformed}
             />
 

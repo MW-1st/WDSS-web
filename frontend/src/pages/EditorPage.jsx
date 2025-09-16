@@ -21,6 +21,7 @@ import { IoHandRightOutline } from "react-icons/io5";
 import ProjectSettingsModal from "../components/ProjectSettingsModal";
 import PortalPopover from "../components/PortalPopover.jsx";
 import { saveCanvasToIndexedDB } from "../utils/indexedDBUtils.js";
+import { useUndoRedo } from '../hooks/useUndoRedo';
 import "../styles/EditorPage.css";
 
 const VISIBLE = 4;
@@ -305,6 +306,16 @@ export default function EditorPage({projectId = DUMMY}) {
     },
     selectedScene
   });
+  const {syncToServer, uploadThumbnail, getCurrentCanvasData} = useServerSync(pid, selectedId, stageRef);
+
+  const { saveToHistory, undo, redo, canUndo, canRedo, isProcessing, clearHistoryAndSetNew, globalHistoryStack, } = useUndoRedo(
+    selectedId,
+    stageRef,
+    {
+      getCurrentCanvasData: () => getCurrentCanvasData(),
+      onCanvasChange: handleCanvasChange
+    }
+  );
 
   const {syncToServer, uploadThumbnail, getCurrentCanvasData} =
     useServerSync(pid, selectedId, stageRef);
@@ -582,12 +593,25 @@ export default function EditorPage({projectId = DUMMY}) {
     }
   }, [selectedId, pid]);
 
-  // 씬 변경 핸들러
+  useEffect(() => {
+    if (selectedId && scenes.find(scene => scene.id === selectedId)) {
+      // 씬이 선택되고 로드가 완료되었을 때
+      if (!globalHistoryStack.currentStates[selectedId]) {
+        // 약간의 딜레이를 두고 히스토리 저장 (캔버스 로드 완료 후)
+        setTimeout(() => {
+          saveToHistory('scene_loaded', selectedId);
+        }, 500);
+      }
+    }
+  }, [selectedId]);
+
+  // Canvas → 변경 반영
   const handleSceneChange = React.useCallback(
-    (id, patch) => {
-      setScenes((prev) => prev.map((s) => (s.id === id ? {...s, ...patch} : s)));
-    },
-    [imageUrl, originalCanvasState, setScenes]
+      (id, patch) => {
+        setScenes((prev) =>
+            prev.map((s) => (s.id === id ? {...s, ...patch} : s))
+        );
+      }, [imageUrl, originalCanvasState, setScenes]
   );
 
   // 씬 추가
@@ -624,6 +648,9 @@ export default function EditorPage({projectId = DUMMY}) {
 
       if (createdId) {
         await handleSelect(createdId);
+        // setTimeout(() => {
+        //   saveToHistory('scene_created', createdId);
+        // }, 500);
       } else {
         setSelectedId(null);
       }
@@ -646,32 +673,35 @@ export default function EditorPage({projectId = DUMMY}) {
 
   // 씬 선택
   const handleSelect = (id) => {
-    if (id === "__ADD__" || id === selectedId) return;
+      if (id === "__ADD__" || id === selectedId) return;
 
-    // --- 1. 현재 씬 데이터 캡쳐 ---
+    // --- 1. 데이터 캡쳐 ---
+    // 씬이 바뀌기 직전, 현재 캔버스의 데이터를 미리 변수에 저장합니다.
     let dataToSave = null;
+    let layerStateToSave = null;
     let thumbnailToSave = null;
-    const sceneIdToSave = selectedId;
-    const saveModeToUse = previousSaveModeRef.current;
+    const sceneIdToSave = selectedId; // 떠나는 씬의 ID
+    const saveModeToUse = previousSaveModeRef.current; // 떠나는 씬의 저장 모드
 
-    if (sceneIdToSave && stageRef.current) {
-      const canvas = stageRef.current;
-      dataToSave = getCurrentCanvasData();
-      thumbnailToSave = canvas.toDataURL({ format: 'png', quality: 0.5 });
-    }
+      if (sceneIdToSave && stageRef.current) {
+        const canvas = stageRef.current;
+        dataToSave = getCurrentCanvasData();
+        thumbnailToSave = canvas.toDataURL({ format: 'png', quality: 0.5 });
+      }
 
-    // --- 2. UI 전환 ---
+    // --- 2. UI 즉시 업데이트 ---
     setSelectedId(id);
     setSelectedObject(null);
     setSelectedObjectLayerId(null);
 
+    // 캔버스 선택 해제
     if (stageRef.current) {
       const canvas = stageRef.current;
       canvas.discardActiveObject();
       canvas.renderAll();
     }
 
-    // --- 3. 백그라운드 저장 ---
+    // --- 3. 백그라운드에서 저장 실행 ---
     if (sceneIdToSave && dataToSave) {
       saveCurrentScene(sceneIdToSave, saveModeToUse, {
         shouldSaveThumbnail: true,
@@ -680,7 +710,16 @@ export default function EditorPage({projectId = DUMMY}) {
       });
     }
 
-    // --- 캐러셀 처리 ---
+    // --- 캐러셀 스크롤 등 나머지 UI 로직 ---
+    const nextScene = scenes.find(s => s.id === id);
+    const nextSceneTransformed = nextScene?.saveMode === 'processed' || nextScene?.isTransformed === true;
+
+    if (nextSceneTransformed) {
+      handleModeChange('select');
+    } else {
+      handleModeChange('select');
+    }
+
     const items = [...scenes, {id: "__ADD__", isAdd: true}];
     const idx = items.findIndex(it => it.id === id);
     if (idx < start) setStart(idx);
@@ -690,9 +729,16 @@ export default function EditorPage({projectId = DUMMY}) {
       updateLayerState();
       setSelectedObject(null);
       setSelectedObjectLayerId(null);
+    setTimeout(() => {
+      updateLayerState();
+      setSelectedObject(null);
+      setSelectedObjectLayerId(null);
 
+      // 새 씬인 경우 레이어 시스템이 올바르게 초기화되었는지 확인
       setTimeout(() => {
         updateLayerState();
+
+        // 여전히 활성 레이어가 없으면 강제로 기본값 설정
         setTimeout(() => {
           if (!activeLayerIdState || activeLayerIdState === null) {
             console.log('Force setting default active layer');
@@ -702,7 +748,8 @@ export default function EditorPage({projectId = DUMMY}) {
       }, 200);
     }, 100);
   };
-  // 씬/selectedId 유효성 보정
+
+  // scenes/selectedId 변경 시 선택 유효성 보정
   useEffect(() => {
     if (!Array.isArray(scenes)) return;
     if (scenes.length === 0) {
@@ -859,7 +906,9 @@ export default function EditorPage({projectId = DUMMY}) {
         }
         const transformedJsonData = await jsonDataResponse.json();
 
-        await saveCanvasToIndexedDB(sceneIdToTransform, transformedJsonData);
+    // 2. 가져온 데이터를 IndexedDB에 먼저 저장합니다.
+    await saveCanvasToIndexedDB(sceneIdToTransform, transformedJsonData);
+    await clearHistoryAndSetNew("scene_transformed", sceneIdToTransform, transformedJsonData);
 
         setScenes((prevScenes) =>
           prevScenes.map((scene) =>
@@ -874,14 +923,17 @@ export default function EditorPage({projectId = DUMMY}) {
           )
         );
 
-        if (stageRef.current && selectedIdRef.current === sceneIdToTransform) {
-          if (stageRef.current.clear) {
-            stageRef.current.clear();
-          }
-          stageRef.current.loadFromJSON(transformedJsonData, () => {
-            stageRef.current.renderAll();
-          });
-        }
+    // 4. 현재 씬이 변환하던 씬일 경우, IndexedDB에 저장된 데이터를 캔버스에 로드합니다.
+    if (stageRef.current && selectedIdRef.current === sceneIdToTransform) {
+      if (stageRef.current.clear) {
+        stageRef.current.clear();
+      }
+      stageRef.current.loadFromJSON(transformedJsonData, () => {
+        stageRef.current.renderAll();
+      });
+    } else {
+      console.log(`변환은 완료되었지만 사용자가 다른 씬(${selectedId})으로 이동하여 캔버스는 업데이트하지 않습니다.`);
+    }
 
         stageRef.current.isDrawingMode = false;
         stageRef.current.selection = true;
@@ -924,17 +976,37 @@ export default function EditorPage({projectId = DUMMY}) {
         e.preventDefault();
         handleModeChange('pan');
       }
+
+      // Ctrl/Cmd + Z: Undo
+      if ((e.ctrlKey || e.metaKey) && key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        if (canUndo && !isProcessing) {
+          undo();
+        }
+      }
+
+      // Ctrl/Cmd + Shift + Z: Redo (또는 Ctrl/Cmd + Y)
+      if ((e.ctrlKey || e.metaKey) && ((key === 'z' && e.shiftKey) || key === 'y')) {
+        e.preventDefault();
+        if (canRedo && !isProcessing) {
+          redo();
+        }
+      }
     };
 
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [handleModeChange]);
+  }, [handleModeChange, undo, redo, canUndo, canRedo, isProcessing]);
 
   // 전체 지우기
   const handleClearAll = React.useCallback(async () => {
-    const canvas = stageRef.current;
+    const canvas = stageRef?.current;
     if (canvas && canvas.clear) {
-      if (confirm("캔버스의 모든 내용을 지우시겠습니까?")) {
+      if (
+        confirm(
+          "캔버스의 모든 내용을 지우시겠습니까? 이 작업은 되돌릴 수 없습니다. - editor page"
+        )
+      ) {
         try {
           canvas.off('mouse:down');
           canvas.off('mouse:move');
@@ -944,15 +1016,25 @@ export default function EditorPage({projectId = DUMMY}) {
           canvas.isDrawingMode = false;
           canvas.selection = true;
 
-          await client.patch(`/projects/${pid}/scenes/${selectedId}`, {status: 'reset'});
-          await deleteCanvasFromIndexedDB(selectedId);
+          // 2. 서버 및 indexedDB 데이터 업데이트
+          await client.patch(`/projects/${pid}/scenes/${selectedId}`, {
+            status: 'reset'
+          });
+          triggerAutoSave({action: "clearAll"});
+          saveToHistory('clearAll')
 
-          setScenes((prevScenes) =>
-            prevScenes.map((scene) =>
-              scene.id === selectedId
-                ? {...scene, saveMode: 'originals', isTransformed: false}
-                : scene
-            )
+          // 3. 씬 상태 초기화
+          setScenes(prevScenes =>
+            prevScenes.map(scene => {
+              if (scene.id === selectedId) {
+                return {
+                  ...scene,
+                  saveMode: 'originals',
+                  isTransformed: false,
+                };
+              }
+              return scene;
+            })
           );
 
           if (canvas?.changeSaveMode) {
@@ -1156,13 +1238,19 @@ export default function EditorPage({projectId = DUMMY}) {
       handleTransform,
       handleManualSave,
       handleJsonGeneration,
+      // undo redo
+      undo,
+      redo,
+      canUndo,
+      canRedo,
+      isProcessing
     };
     window.dispatchEvent(
       new CustomEvent("editor:updated", {
         detail: {targetDots, processing, imageUrl, selectedId, projectName, isServerSyncing},
       })
     );
-  }, [targetDots, processing, imageUrl, selectedId, projectName]);
+  }, [targetDots, processing, imageUrl, selectedId, projectName, canUndo, canRedo, isProcessing, undo, redo]);
 
   const isSelectOrPan = drawingMode === 'select' || isPanMode;
 
@@ -1332,6 +1420,7 @@ export default function EditorPage({projectId = DUMMY}) {
           onPanChange={setIsPanMode}
           changeSaveMode={changeSaveMode}
           triggerAutoSave={triggerAutoSave}
+              saveToHistory = {saveToHistory}
           isSceneTransformed={isSceneTransformed}
         />
 

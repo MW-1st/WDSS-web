@@ -27,6 +27,12 @@ export default function Navbar({ transparent: propTransparent = false }) {
       projectName: api?.projectName || "",
     }));
 
+    // IndexedDB에 저장된 objectCount 합계 (현재 프로젝트의 씬만)
+    const [savedObjectCount, setSavedObjectCount] = React.useState(0);
+    // 씬 목록(이름 포함)과 씬별 카운트 맵
+    const [projectScenes, setProjectScenes] = React.useState([]); // [{id, name, ...}]
+    const [perSceneCounts, setPerSceneCounts] = React.useState({}); // { [sceneId]: count }
+
     const sceneId = editorState.selectedId;
 
     // Export prerequisites and last JSON URL
@@ -47,7 +53,7 @@ export default function Navbar({ transparent: propTransparent = false }) {
       const handler = (e) => {
         const { jsonUrl } = e.detail || {};
         if (jsonUrl) {
-          console.log('JSON URL received from editor:', jsonUrl);
+          console.log("JSON URL received from editor:", jsonUrl);
           setLastJsonUrl(jsonUrl);
           setJsonBuilt(true);
         }
@@ -55,6 +61,97 @@ export default function Navbar({ transparent: propTransparent = false }) {
       window.addEventListener("editor:json-ready", handler);
       return () => window.removeEventListener("editor:json-ready", handler);
     }, []);
+
+    // 현재 프로젝트에 속한 씬 목록을 서버에서 불러옴
+    React.useEffect(() => {
+      const loadProjectScenes = async () => {
+        try {
+          if (!projectId) {
+            setProjectScenes([]);
+            return;
+          }
+          const res = await client.get(`/projects/${projectId}/scenes`);
+          const list = res.data?.scenes || [];
+          // normalize scene objects (id and name)
+          const scenes = list.map((s) => ({
+            id: s.id,
+            name: s.name || `Scene ${s.scene_num || ""}`,
+          }));
+          setProjectScenes(scenes);
+        } catch (e) {
+          console.warn("Failed to load project scenes for Navbar:", e);
+          setProjectScenes([]);
+        }
+      };
+
+      loadProjectScenes();
+    }, [projectId]);
+
+    // IndexedDB에 저장된 씬들 중 현재 프로젝트의 씬만 objectCount 합산
+    const refreshSavedObjectCount = React.useCallback(async () => {
+      try {
+        const states = await getAllCanvasStates();
+        // build per-scene map only for scenes in current project
+        const ids = new Set(projectScenes.map((s) => s.id));
+        const map = {};
+        let total = 0;
+        states.forEach((s) => {
+          if (ids.has(s.sceneId)) {
+            const c = s.objectCount || 0;
+            map[s.sceneId] = c;
+            total += c;
+          }
+        });
+        // Ensure scenes with no saved state show 0
+        projectScenes.forEach((sc) => {
+          if (!map[sc.id]) map[sc.id] = 0;
+        });
+        setPerSceneCounts(map);
+        setSavedObjectCount(total);
+      } catch (err) {
+        console.warn("Failed to refresh saved object count:", err);
+      }
+    }, [projectScenes]);
+
+    // 실시간 반영: indexeddb 저장 이벤트 및 에디터 이벤트에 반응
+    React.useEffect(() => {
+      // 초기 로드
+      refreshSavedObjectCount();
+
+      const onIndexedDbSave = (e) => {
+        const d = e.detail || {};
+        // 프로젝트에 속한 씬에 대한 저장이면 갱신
+        if (d && d.sceneId && projectScenes.find((p) => p.id === d.sceneId)) {
+          refreshSavedObjectCount();
+        }
+      };
+
+      const onIndexedDbDelete = (e) => {
+        const d = e.detail || {};
+        if (d && d.sceneId && projectScenes.find((p) => p.id === d.sceneId)) {
+          // 삭제된 씬의 카운트는 0으로 처리
+          refreshSavedObjectCount();
+        }
+      };
+
+      const onEditorUpdated = () => refreshSavedObjectCount();
+      const onJsonReady = () => refreshSavedObjectCount();
+
+      window.addEventListener("indexeddb:canvas-saved", onIndexedDbSave);
+      window.addEventListener("indexeddb:canvas-deleted", onIndexedDbDelete);
+      window.addEventListener("editor:updated", onEditorUpdated);
+      window.addEventListener("editor:json-ready", onJsonReady);
+
+      return () => {
+        window.removeEventListener("indexeddb:canvas-saved", onIndexedDbSave);
+        window.removeEventListener(
+          "indexeddb:canvas-deleted",
+          onIndexedDbDelete
+        );
+        window.removeEventListener("editor:updated", onEditorUpdated);
+        window.removeEventListener("editor:json-ready", onJsonReady);
+      };
+    }, [refreshSavedObjectCount]);
 
     const [localDots, setLocalDots] = React.useState(
       () => Number(api?.targetDots) || 2000
@@ -75,13 +172,16 @@ export default function Navbar({ transparent: propTransparent = false }) {
       api.setTargetDots(safe);
     };
 
-
     return (
       <nav className="px-4 py-2 flex justify-center font-nanumhuman border-b border-gray-200">
         <div className="w-full flex justify-between items-center gap-40">
           {/* Logo + Project name */}
           <div className="flex items-center gap-3">
-            <Link to="/" title="메인 페이지" className="logo-press flex items-center">
+            <Link
+              to="/"
+              title="메인 페이지"
+              className="logo-press flex items-center"
+            >
               <img src="/img/Logo.png" alt="Logo" className="h-10 w-auto" />
             </Link>
             <div
@@ -89,12 +189,46 @@ export default function Navbar({ transparent: propTransparent = false }) {
               title={editorState.projectName || "Untitled Project"}
             >
               {editorState.projectName || "Untitled Project"}
+              <span
+                className="ml-3 inline-flex items-center gap-2 text-sm font-medium text-gray-800"
+                title={(() => {
+                  // 툴팁: 각 씬별 카운트 나열
+                  try {
+                    const lines = projectScenes.map((sc) => {
+                      const c = perSceneCounts?.[sc.id] ?? 0;
+                      return `${sc.name || sc.id}: ${c}`;
+                    });
+                    if (lines.length === 0) return `Total: ${savedObjectCount}`;
+                    return (
+                      `Selected scene: ${
+                        sceneId || "-"
+                      }\nTotal: ${savedObjectCount}\n` + lines.join("\n")
+                    );
+                  } catch (_) {
+                    return `Total: ${savedObjectCount}`;
+                  }
+                })()}
+              >
+                <span className="text-base font-medium">드론 개수 </span>
+                <span className="text-base">
+                  {(() => { try {
+                    if (sceneId) {
+                      if (api?.imageUrl.startsWith("/processed")) {
+                        return perSceneCounts?.[sceneId] ?? 0;
+                      }
+                      return "-";
+                    }
+                  } catch (_) {}
+                  return savedObjectCount;
+                })()}
+                </span>
+              </span>
             </div>
           </div>
           {/* JSON + Unity Controls */}
           <div className="flex items-center gap-2">
             <div className="relative group">
-              <button
+ <button
                   onClick={async () => {
                     let url = lastJsonUrl;
                     // If no JSON generated yet, try to generate via editor API
@@ -181,6 +315,7 @@ export default function Navbar({ transparent: propTransparent = false }) {
       </nav>
     );
   }
+
 
   // ===== ② 일반 Navbar =====
   const routeTransparent =
