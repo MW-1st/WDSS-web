@@ -314,46 +314,49 @@ export const useUndoRedo = (sceneId, fabricCanvas, { getCurrentCanvasData }) => 
     }
   }, [sceneId, fabricCanvas, globalHistoryStack, isProcessing]);
 
-  const clearHistoryAndSetNew = useCallback(async (actionType = 'conversion') => {
-    if (!sceneId || !fabricCanvas?.current) {
+  const clearHistoryAndSetNew = useCallback(async (actionType = 'conversion', targetSceneId = null, providedCanvasData = null) => {
+    // targetSceneId가 없으면 현재 sceneId 사용
+    const effectiveSceneId = targetSceneId || sceneId;
+
+    if (!effectiveSceneId || !fabricCanvas?.current) {
       return false;
     }
 
     try {
-      // 1. 현재 씬의 모든 기존 히스토리 수집
+      // 1. 해당 씬의 모든 기존 히스토리 수집
       const currentSceneItems = [
-        ...globalHistoryStack.undoStack.filter(item => item.sceneId === sceneId),
-        ...globalHistoryStack.redoStack.filter(item => item.sceneId === sceneId)
+        ...globalHistoryStack.undoStack.filter(item => item.sceneId === effectiveSceneId),
+        ...globalHistoryStack.redoStack.filter(item => item.sceneId === effectiveSceneId)
       ];
 
-      if (globalHistoryStack.currentStates[sceneId]) {
-        currentSceneItems.push(globalHistoryStack.currentStates[sceneId]);
+      if (globalHistoryStack.currentStates[effectiveSceneId]) {
+        currentSceneItems.push(globalHistoryStack.currentStates[effectiveSceneId]);
       }
 
-      // 2. 현재 상태를 새로운 초기 상태로 저장
-      const canvasData = getCurrentCanvasData();
-      const newHistoryKey = `history_${sceneId}_${actionType}_${Date.now()}`;
+      // 2. 캔버스 데이터 결정: 제공된 데이터 우선, 없으면 현재 캔버스에서
+      const canvasData = providedCanvasData || getCurrentCanvasData();
+      const newHistoryKey = `history_${effectiveSceneId}_${actionType}_${Date.now()}`;
 
       await saveCanvasToIndexedDB(newHistoryKey, canvasData, {
         isHistory: true,
         actionType,
-        parentSceneId: sceneId
+        parentSceneId: effectiveSceneId
       });
 
       // 3. 메모리에서 기존 히스토리 제거 + 새 상태 설정
       setGlobalHistoryStack(prev => ({
-        undoStack: prev.undoStack.filter(item => item.sceneId !== sceneId),
+        undoStack: prev.undoStack.filter(item => item.sceneId !== effectiveSceneId),
         currentStates: {
           ...prev.currentStates,
-          [sceneId]: {
+          [effectiveSceneId]: {
             historyKey: newHistoryKey,
-            sceneId,
+            sceneId: effectiveSceneId,
             actionType,
             timestamp: Date.now()
           }
         },
-        currentStatesOrder: [sceneId, ...prev.currentStatesOrder.filter(id => id !== sceneId)],
-        redoStack: prev.redoStack.filter(item => item.sceneId !== sceneId),
+        currentStatesOrder: [effectiveSceneId, ...prev.currentStatesOrder.filter(id => id !== effectiveSceneId)],
+        redoStack: prev.redoStack.filter(item => item.sceneId !== effectiveSceneId),
         pendingCleanup: prev.pendingCleanup,
         maxHistorySize: prev.maxHistorySize,
         maxSceneStates: prev.maxSceneStates
@@ -364,7 +367,7 @@ export const useUndoRedo = (sceneId, fabricCanvas, { getCurrentCanvasData }) => 
         scheduleCleanup(currentSceneItems);
       }
 
-      console.log(`히스토리 클리어 완료. 새 시작점 설정: ${sceneId}`);
+      console.log(`히스토리 클리어 완료. 새 시작점 설정: ${effectiveSceneId}`);
       return true;
     } catch (error) {
       console.error('Failed to clear history:', error);

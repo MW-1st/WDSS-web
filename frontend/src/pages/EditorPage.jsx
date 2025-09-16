@@ -859,7 +859,7 @@ export default function EditorPage({projectId = DUMMY}) {
 
     // 2. 가져온 데이터를 IndexedDB에 먼저 저장합니다.
     await saveCanvasToIndexedDB(sceneIdToTransform, transformedJsonData);
-    console.log(`✅ 변환된 데이터가 ${sceneIdToTransform} 씬의 IndexedDB에 저장되었습니다.`);
+    await clearHistoryAndSetNew("scene_transformed", sceneIdToTransform, transformedJsonData);
 
     // 3. scenes 배열의 상태를 업데이트합니다. (기존과 동일)
     setScenes(prevScenes =>
@@ -878,17 +878,14 @@ export default function EditorPage({projectId = DUMMY}) {
 
     // 4. 현재 씬이 변환하던 씬일 경우, IndexedDB에 저장된 데이터를 캔버스에 로드합니다.
     if (stageRef.current && selectedIdRef.current === sceneIdToTransform) {
-        if (stageRef.current.clear) {
-          stageRef.current.clear();
-        }
-        // loadFromJSON은 Fabric.js의 기본 함수이며, Canvas.jsx에 이미 구현되어 있습니다.
-        // 여기서는 이미 JSON 객체를 가지고 있으므로 직접 로드합니다.
-        stageRef.current.loadFromJSON(transformedJsonData, () => {
-          stageRef.current.renderAll();
-          console.log("변환된 데이터가 현재 캔버스에 로드되었습니다.", selectedId, sceneIdToTransform);
-        });
+      if (stageRef.current.clear) {
+        stageRef.current.clear();
+      }
+      stageRef.current.loadFromJSON(transformedJsonData, () => {
+        stageRef.current.renderAll();
+      });
     } else {
-        console.log(`변환은 완료되었지만 사용자가 다른 씬(${selectedId})으로 이동하여 캔버스는 업데이트하지 않습니다.`);
+      console.log(`변환은 완료되었지만 사용자가 다른 씬(${selectedId})으로 이동하여 캔버스는 업데이트하지 않습니다.`);
     }
 
     // React 상태 설정
@@ -897,9 +894,6 @@ export default function EditorPage({projectId = DUMMY}) {
 
     setDrawingMode('select');
     setIsPanMode(false);
-
-    // 히스토리 설정
-    clearHistoryAndSetNew("scene_transformed");
 
   } catch (e) {
     console.error("Transform error", e);
@@ -942,11 +936,27 @@ export default function EditorPage({projectId = DUMMY}) {
         e.preventDefault();
         handleModeChange('pan');
       }
+
+      // Ctrl/Cmd + Z: Undo
+      if ((e.ctrlKey || e.metaKey) && key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        if (canUndo && !isProcessing) {
+          undo();
+        }
+      }
+
+      // Ctrl/Cmd + Shift + Z: Redo (또는 Ctrl/Cmd + Y)
+      if ((e.ctrlKey || e.metaKey) && ((key === 'z' && e.shiftKey) || key === 'y')) {
+        e.preventDefault();
+        if (canRedo && !isProcessing) {
+          redo();
+        }
+      }
     };
 
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [handleModeChange]);
+  }, [handleModeChange, undo, redo, canUndo, canRedo, isProcessing]);
 
   const handleClearAll = React.useCallback(async () => {
     const canvas = stageRef?.current;
