@@ -10,19 +10,19 @@
   box-sizing: border-box;
   overflow-x: hidden;
   /* Editor theme variables (scoped to editor only) */
-  --primary: #1E3A8A;        /* deep navy highlight */
-  --primary-dark: #162766;   /* pressed state */
-  --accent: #38BDF8;         /* bright cyan accent */
-  --primary-strong: #0F2F5F; /* text/icons on soft surfaces */
-  --primary-soft: #E3EBFF;   /* subtle highlight fills */
-  --primary-border: #C1D1FF; /* light borders */
+  --primary: #1e3a8a; /* deep navy highlight */
+  --primary-dark: #162766; /* pressed state */
+  --accent: #38bdf8; /* bright cyan accent */
+  --primary-strong: #0f2f5f; /* text/icons on soft surfaces */
+  --primary-soft: #e3ebff; /* subtle highlight fills */
+  --primary-border: #c1d1ff; /* light borders */
   --primary-glow: rgba(30, 58, 138, 0.32); /* focus halo */
-  --danger: #DC3545;
-  --danger-dark: #C82333;
-  --muted: #6C757D;
-  --muted-weak: #ADB5BD;     /* lighter gray for secondary buttons */
-  --muted-dark: #5A6268;
-  --on-primary: #FFFFFF;
+  --danger: #dc3545;
+  --danger-dark: #c82333;
+  --muted: #6c757d;
+  --muted-weak: #adb5bd; /* lighter gray for secondary buttons */
+  --muted-dark: #5a6268;
+  --on-primary: #ffffff;
 }
 
 .left-rail {
@@ -35,28 +35,66 @@
   flex: 0 0 auto;
   box-sizing: border-box;
   overflow: visible;
-  z-index: 50;
+  /* Ensure tooltips inside the rail layer above neighbors */
+  z-index: 1200;
 }
 
 .left-rail-inner {
   height: 100%;
   overflow-y: auto;
+  /* Hide scrollbar while keeping scroll functionality */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE 10+ */
   padding: 8px; /* tighter padding for compact rail */
   display: flex;
   flex-direction: column;
   gap: 0;
 }
+.left-rail-inner::-webkit-scrollbar {
+  /* Chromium, Safari */
+  width: 0;
+  height: 0;
+}
 .left-rail-inner > * + * {
   margin-top: 12px;
 }
-
-
 
 .settings-container {
   margin-top: auto;
   display: flex;
   align-items: center;
   justify-content: center; /* center settings button like other tools */
+  z-index: 3000; /* above left-rail-inner but below any app overlays */
+}
+
+.settings-container a.tool-button {
+  position: relative;
+}
+
+.settings-container a.tool-button::after {
+  content: attr(aria-label);
+  position: absolute;
+  top: 50%;
+  left: calc(100% + 12px);
+  transform: translateY(-50%) scale(0.95);
+  background: #000000;
+  color: #ffffff;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  /* Slightly above the rail to ensure visibility */
+  z-index: 1300;
+}
+
+.settings-container a.tool-button:hover::after,
+.settings-container a.tool-button:focus-visible::after {
+  opacity: 1;
+  transform: translateY(-50%);
 }
 
 .gallery-panel {
@@ -86,8 +124,15 @@
 
 .right-panel-inner {
   height: 100%;
-  overflow-y: scroll;
+  /* Allow scroll when needed but hide the scrollbar */
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   padding: 16px;
+}
+.right-panel-inner::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .canvas-loading {
@@ -212,4 +257,47 @@
   line-height: 1.4;
   white-space: nowrap;
   text-transform: lowercase;
+}
+
+/* Scene Carousel Navigation */
+.scene-carousel-nav-button {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 1px solid #cfcfe6;
+  background-repeat: no-repeat;
+  background-position: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  color: #5b5bd6;
+  z-index: 100;
+  cursor: pointer;
+  transition: all 0.2s ease-out;
+  padding-bottom: 2px;
+}
+
+.scene-carousel-nav-button:hover {
+  border-color: #5b5bd6;
+  transform: translateY(-50%) scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.scene-carousel-nav-button:active {
+  transform: translateY(-50%) scale(0.98);
+  background-color: #f0f0f8;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+}
+
+.scene-carousel-nav-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  background-color: #f8f8f8;
+  box-shadow: none;
+  transform: translateY(-50%);
 }

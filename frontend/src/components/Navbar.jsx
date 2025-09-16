@@ -4,7 +4,9 @@ import { useAuth } from "../contexts/AuthContext.jsx";
 import { useUnity } from "../contexts/UnityContext.jsx";
 import client from "../api/client";
 import { ImExit } from "react-icons/im";
-import { CiInboxOut } from "react-icons/ci";
+import { FaFileExport } from "react-icons/fa6";
+import { FaRegCirclePlay } from "react-icons/fa6";
+
 
 export default function Navbar({ transparent: propTransparent = false }) {
   const location = useLocation();
@@ -83,93 +85,97 @@ export default function Navbar({ transparent: propTransparent = false }) {
               <img src="/img/Logo.png" alt="Logo" className="h-10 w-auto" />
             </Link>
             <div
-              className="font-extrabold text-3xl max-w-[480px] truncate"
+              className="font-extrabold text-2xl max-w-[480px] truncate"
               title={editorState.projectName || "Untitled Project"}
             >
               {editorState.projectName || "Untitled Project"}
             </div>
           </div>
-
-          {/* JSON + Unity */}
+          {/* JSON + Unity Controls */}
           <div className="flex items-center gap-2">
-            <button
-                onClick={async () => {
-                  // EditorPage의 JSON 생성 함수 사용
-                  if (api?.handleJsonGeneration) {
-                    const jsonUrl = await api.handleJsonGeneration();
-                    if (jsonUrl) {
-                      setLastJsonUrl(jsonUrl);
-                      setJsonBuilt(true);
-                    }
-                  } else {
-                    alert("JSON 생성 기능을 사용할 수 없습니다.");
-                  }
-                }}
-                className="px-3 py-1.5 rounded !bg-blue-600 hover:!bg-blue-700 text-white"
-              >
-                JSON 파일로만들기
-              </button>
-
+            <div className="relative group">
               <button
-                onClick={async () => {
-                  let url = lastJsonUrl;
-                  // If no JSON generated yet, try to generate via editor API
-                  if (!jsonBuilt || !url) {
-                    if (api?.handleJsonGeneration) {
-                      try {
-                        const generated = await api.handleJsonGeneration();
-                        if (generated) {
-                          url = generated;
-                          setLastJsonUrl(generated);
-                          setJsonBuilt(true);
+                  onClick={async () => {
+                    let url = lastJsonUrl;
+                    // If no JSON generated yet, try to generate via editor API
+                    if (!jsonBuilt || !url) {
+                      if (api?.handleJsonGeneration) {
+                        try {
+                          const generated = await api.handleJsonGeneration();
+                          if (generated) {
+                            url = generated;
+                            setLastJsonUrl(generated);
+                            setJsonBuilt(true);
+                          }
+                        } catch (err) {
+                          console.error("JSON generation failed:", err);
                         }
-                      } catch (err) {
-                        console.error("JSON generation failed:", err);
                       }
                     }
-                  }
 
-                  if (!url) {
-                    alert(
-                      "JSON 생성에 실패했습니다. 에디터에서 변환을 완료해주세요."
-                    );
-                    return;
-                  }
+                    if (!url) {
+                      alert(
+                        "JSON 생성에 실패했습니다. 에디터에서 변환을 완료해주세요."
+                      );
+                      return;
+                    }
 
-                  try {
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = `${(
-                      editorState.projectName || "project"
-                    ).replace(/[^\\w.-]+/g, "_")}.json`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                  } catch (_) {
-                    window.open(url, "_blank", "noopener");
-                  }
-                }}
-                className="px-3 py-1.5 rounded border border-gray-300 text-gray-800 hover:bg-gray-100 flex items-center gap-2"
-                title="Export"
-              >
-                <CiInboxOut size={20} />
-              </button>
-
-              {!isUnityVisible ? (
-                <button
-                  className="px-3 py-1.5 rounded !bg-blue-600 hover:!bg-blue-700 text-white"
-                  onClick={showUnity}
+                    try {
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `${(
+                        editorState.projectName || "project"
+                      ).replace(/[^\\w.-]+/g, "_")}.json`;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                    } catch (_) {
+                      window.open(url, "_blank", "noopener");
+                    }
+                  }}
+                  className="px-3 rounded text-[#111827] font-extrabold text-2xl transition-all duration-200 hover:translate-y-[1px] active:translate-y-[2px]"
                 >
-                  Unity 시뮬레이터열기
+                  <FaFileExport size={26} />
                 </button>
-              ) : (
+                <span className="absolute -left-12 top-full mt-2 px-2 py-0.5 text-xs bg-gray-800 text-white rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-[100] pointer-events-none">
+                  JSON으로 내보내기
+                </span>
+            </div>
+            
+            <div className="relative group">
+              <button
+                  onClick={async () => {
+                    // JSON 생성 및 Unity 시뮬레이터 실행
+                    if (api?.handleJsonGeneration) {
+                      const jsonUrl = await api.handleJsonGeneration();
+                      if (jsonUrl) {
+                        setLastJsonUrl(jsonUrl);
+                        setJsonBuilt(true);
+                        showUnity(); // JSON 생성 후 Unity 시뮬레이터 실행
+                      }
+                    } else {
+                      alert("JSON 생성 기능을 사용할 수 없습니다.");
+                    }
+                  }}
+                  className="rounded text-[#111827] font-bold text-2xl transition-all duration-200 hover:translate-y-[1px] active:translate-y-[2px]"
+                >
+                  <FaRegCirclePlay size={26}/>
+                </button>
+                <span className="absolute -left-24 top-full mt-2 px-2 py-0.5 text-xs bg-gray-800 text-white rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-[100] pointer-events-none">
+                  Unity 시뮬레이터 실행
+                </span>
+            </div>
+
+              {isUnityVisible && (
                 <button
-                  className="px-3 py-1.5 rounded !bg-red-600 hover:!bg-red-700 text-white"
+                  className="px-3 py-1.5 rounded !bg-red-600 hover:!bg-red-700 text-white flex items-center gap-2"
                   onClick={hideUnity}
                 >
-                  Unity 시뮬레이터닫기
+                  Unity 시뮬레이터 닫기
                 </button>
               )}
+
+              
           </div>
         </div>
       </nav>

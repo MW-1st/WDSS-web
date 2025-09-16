@@ -40,7 +40,8 @@ const Inner = ({
   const eraseRef = React.useRef(null);
   const pixelEraseRef = React.useRef(null);
   const clearRef = React.useRef(null);
-  const [toolTooltipPos, setToolTooltipPos] = React.useState({ top: 0, left: 0 });
+  const dashboardBtnRef = React.useRef(null); // ✅ 대시보드 버튼 ref 추가
+  const [toolTooltipPos, setToolTooltipPos] = React.useState({ top: 0, left: 0 })
 
   const toggleGallery = () => {
     onGalleryStateChange?.((prev) => !prev);
@@ -77,6 +78,8 @@ const Inner = ({
         return pixelEraseRef;
       case "clear":
         return clearRef;
+      case "dashboard":
+        return dashboardBtnRef;
       default:
         return null;
     }
@@ -145,6 +148,8 @@ const Inner = ({
         return "픽셀 지우개: 세밀하게 픽셀 단위로 지우기";
       case "clear":
         return "전체 삭제: 현재 캔버스 내용을 모두 지우기";
+      case "dashboard":
+        return "대시보드로 이동";
       default:
         return "";
     }
@@ -223,14 +228,19 @@ const Inner = ({
     toolHovered
       ? createPortal(
           <div
-            className="tooltip"
-            style={{ top: toolTooltipPos.top, left: toolTooltipPos.left }}
+            className="tool-tooltip"
+            style={{
+              top: toolTooltipPos.top,
+              left: toolTooltipPos.left,
+            }}
           >
             {getToolTooltipText(toolHovered)}
           </div>,
           document.body
         )
       : null;
+
+
 
   return (
     <>

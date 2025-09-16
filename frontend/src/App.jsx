@@ -65,8 +65,8 @@ const showGlobalNav = location.pathname !== "/" && location.pathname !== "/login
 
   const closeButtonStyle = {
     position: "absolute",
-    top: "10px",
-    right: "10px",
+    top: "9px",
+    right: "9px",
     zIndex: 1001,
     padding: "8px 12px",
     backgroundColor: "#dc3545",
@@ -75,6 +75,7 @@ const showGlobalNav = location.pathname !== "/" && location.pathname !== "/login
     borderRadius: "4px",
     cursor: "pointer",
     fontSize: "14px",
+    fontWeight: "extra bold",
   };
 
   const iframeStyle = {
@@ -126,7 +127,7 @@ return (
               hideUnity();
             }}
           >
-            ✕ 닫기
+            ✕
           </button>
           <iframe
             src="/unity-build/index.html"

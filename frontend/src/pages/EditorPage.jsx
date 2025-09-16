@@ -22,7 +22,6 @@ import ProjectSettingsModal from "../components/ProjectSettingsModal";
 import PortalPopover from "../components/PortalPopover.jsx";
 import { saveCanvasToIndexedDB } from "../utils/indexedDBUtils.js";
 import "../styles/EditorPage.css";
-import "../styles/CanvasTools.css"; // tooltip style 재사용
 
 const VISIBLE = 4;
 const DUMMY = "11111111-1111-1111-1111-111111111111";
@@ -77,8 +76,14 @@ export default function EditorPage({projectId = DUMMY}) {
   const stageRef = useRef(null);
   const galleryRef = useRef(null);
   const toolButtonRef = useRef(null);
+  // 대시보드 버튼 툴팁용
+  const dashboardBtnRef = useRef(null);
+  const [dashboardHovered, setDashboardHovered] = useState(false);
+  const [dashboardTooltipPos, setDashboardTooltipPos] = useState({ top: 0, left: 0 });
   const [selectHovered, setSelectHovered] = useState(false);
   const [selectTooltipPos, setSelectTooltipPos] = useState({ top: 0, left: 0 });
+
+
 
   // 캔버스 관련 상태
   const [drawingMode, setDrawingMode] = useState("select");
@@ -125,6 +130,27 @@ export default function EditorPage({projectId = DUMMY}) {
     };
   }, [selectHovered]);
 
+
+  /* ------------------- ✅ 여기: 대시보드 툴팁 위치 useEffect ------------------- */
+  useEffect(() => {
+  if (!dashboardHovered) return;
+  const el = dashboardBtnRef.current;
+  if (!el) return;
+  const update = () => {
+    const r = el.getBoundingClientRect();
+    setDashboardTooltipPos({
+      top: Math.round(r.top + r.height / 2),
+      left: Math.round(r.right + 10),
+    });
+  };
+  update();
+  window.addEventListener("scroll", update, true);
+  window.addEventListener("resize", update);
+  return () => {
+    window.removeEventListener("scroll", update, true);
+    window.removeEventListener("resize", update);
+  };
+}, [dashboardHovered]);
   const getSelectTooltipText = () =>
     isPanMode
       ? "이동(H): 캔버스를 드래그해서 이동"
@@ -1232,15 +1258,33 @@ export default function EditorPage({projectId = DUMMY}) {
           />
           
           <div className="settings-container" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <Link
-              to="/dashboard"
+            <a
+              href="/dashboard"
+              ref={dashboardBtnRef}
               className="tool-button"
-              title="대시보드로 이동"
               aria-label="대시보드로 이동"
+              onMouseEnter={() => setDashboardHovered(true)}
+              onMouseLeave={() => setDashboardHovered(false)}
             >
-              <ImExit size={20} />
-            </Link>
-            
+              <ImExit />
+            </a>
+
+             {/* ✅ 여기 툴팁 Portal 추가 */}
+              {dashboardHovered && createPortal(
+                <div
+                  className="tool-tooltip"
+                  style={{
+                    top: dashboardTooltipPos.top,
+                    left: dashboardTooltipPos.left,
+                    position: "absolute",
+                    zIndex: 9999
+                  }}
+                >
+                  대시보드로 이동
+                </div>,
+                document.body
+              )}
+
             <button
               type="button"
               title="프로젝트 설정"
