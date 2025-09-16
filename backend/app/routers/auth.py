@@ -87,6 +87,7 @@ async def login(
         httponly=True,  # JavaScript에서 접근 불가
         secure=False,  # 프로덕션(HTTPS) 환경에서는 True로 설정 권장
         samesite="lax",  # CSRF 방어
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
     user_response_data = UserResponse.model_validate(user)
 
@@ -126,14 +127,16 @@ async def verification_stream(email: str):
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers": "Cache-Control"
-        }
+            "Access-Control-Allow-Headers": "Cache-Control",
+        },
     )
 
 
 async def _send_verification_email_internal(email: str, is_resend: bool = False):
     """내부 이메일 발송 함수 (재발송 제한 로직 포함)"""
-    print(f"[FUNCTION_CALLED] _send_verification_email_internal: {email}, is_resend: {is_resend}")
+    print(
+        f"[FUNCTION_CALLED] _send_verification_email_internal: {email}, is_resend: {is_resend}"
+    )
 
     import time
 
@@ -146,7 +149,7 @@ async def _send_verification_email_internal(email: str, is_resend: bool = False)
         if remaining_time > 0:
             raise HTTPException(
                 status_code=429,
-                detail=f"Please wait {remaining_time} seconds before resending"
+                detail=f"Please wait {remaining_time} seconds before resending",
             )
 
     # 이미 존재하는 이메일인지 확인 (신규 발송 시에만)
@@ -156,9 +159,7 @@ async def _send_verification_email_internal(email: str, is_resend: bool = False)
                 "SELECT 1 FROM users WHERE email = $1", email_str
             )
             if existing:
-                raise HTTPException(
-                    status_code=400, detail="Email already exists"
-                )
+                raise HTTPException(status_code=400, detail="Email already exists")
 
     # 토큰 생성 및 이메일 발송
     verify_token = security.create_email_verification_token(email_str)
@@ -189,7 +190,7 @@ async def _send_verification_email_internal(email: str, is_resend: bool = False)
         action = "resent" if is_resend else "sent"
         return MessageResponse(
             success=True,
-            message=f"Verification email {action} to {email_str}. Please check your inbox."
+            message=f"Verification email {action} to {email_str}. Please check your inbox.",
         )
     except Exception as e:
         print(f"[EMAIL_ERROR] Failed to send email: {e}")
@@ -202,7 +203,7 @@ async def _send_verification_email_internal(email: str, is_resend: bool = False)
         action = "resent" if is_resend else "sent"
         return MessageResponse(
             success=True,
-            message=f"Verification email {action} to {email_str}. Check console for development."
+            message=f"Verification email {action} to {email_str}. Check console for development.",
         )
 
 
@@ -219,7 +220,6 @@ async def resend_verification_email(payload: SendVerificationRequest):
     return await _send_verification_email_internal(payload.email, is_resend=True)
 
 
-
 @router.post(
     "/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED
 )
@@ -227,7 +227,8 @@ async def register(payload: RegisterRequest):
     # Redis에서 이메일 인증 여부 확인
     if not VerificationStore.is_verified(str(payload.email)):
         raise HTTPException(
-            status_code=400, detail="Email verification required. Please verify your email first."
+            status_code=400,
+            detail="Email verification required. Please verify your email first.",
         )
 
     user_id = str(uuid.uuid4())
@@ -263,7 +264,6 @@ async def register(payload: RegisterRequest):
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Email or username already exists",
             )
-
 
     return RegisterResponse(id=user_id, email=payload.email, username=payload.username)
 
