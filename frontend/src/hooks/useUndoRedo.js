@@ -1,5 +1,5 @@
 import {deleteCanvasFromIndexedDB, loadCanvasFromIndexedDB, saveCanvasToIndexedDB} from "../utils/indexedDBUtils.js";
-import {useCallback, useEffect, useRef, useState} from "react";
+import {useCallback, useRef, useState} from "react";
 
 // debounce 헬퍼 함수
 const debounce = (func, delay) => {
@@ -49,8 +49,11 @@ export const useUndoRedo = (sceneId, fabricCanvas, { getCurrentCanvasData }) => 
   ).current;
 
   // 액션 후 현재 상태 저장
-  const saveToHistory = useCallback(async (actionType = 'unknown') => {
-    if (!sceneId || !fabricCanvas?.current || isProcessing) {
+  const saveToHistory = useCallback(async (actionType = 'unknown', targetSceneId = null) => {
+    // targetSceneId가 없으면 현재 sceneId 사용
+    const effectiveSceneId = targetSceneId || sceneId;
+
+    if (!effectiveSceneId || !fabricCanvas?.current || isProcessing) {
       return false;
     }
 
@@ -58,36 +61,36 @@ export const useUndoRedo = (sceneId, fabricCanvas, { getCurrentCanvasData }) => 
 
     // 중복 호출 방지
     if (lastSaveRef.current.actionType === actionType &&
-        lastSaveRef.current.sceneId === sceneId &&
+        lastSaveRef.current.sceneId === effectiveSceneId &&
         now - lastSaveRef.current.timestamp < 100) {
       console.log(`🚫 Duplicate saveToHistory ignored: ${actionType}`);
       return false;
     }
 
-    lastSaveRef.current = { actionType, timestamp: now, sceneId: sceneId };
+    lastSaveRef.current = { actionType, timestamp: now, sceneId: effectiveSceneId };
 
     try {
       setIsProcessing(true);
 
       const canvasData = getCurrentCanvasData();
-      const historyKey = `history_${sceneId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const historyKey = `history_${effectiveSceneId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
       await saveCanvasToIndexedDB(historyKey, canvasData, {
         isHistory: true,
         actionType,
-        parentSceneId: sceneId
+        parentSceneId: effectiveSceneId
       });
 
       setGlobalHistoryStack(prev => {
         const newCurrentState = {
           historyKey,
-          sceneId,
+          sceneId: effectiveSceneId,
           actionType,
           timestamp: Date.now()
         };
 
         // LRU 순서 업데이트
-        const newOrder = [sceneId, ...prev.currentStatesOrder.filter(id => id !== sceneId)];
+        const newOrder = [effectiveSceneId, ...prev.currentStatesOrder.filter(id => id !== effectiveSceneId)];
 
         // 제거될 씬들 식별 (10개 초과시)
         const scenesToRemove = newOrder.length > prev.maxSceneStates
@@ -114,7 +117,7 @@ export const useUndoRedo = (sceneId, fabricCanvas, { getCurrentCanvasData }) => 
 
         // 현재 씬의 기존 curr를 undo 스택으로 이동
         let newUndoStack = prev.undoStack;
-        const currentSceneCurr = prev.currentStates[sceneId];
+        const currentSceneCurr = prev.currentStates[effectiveSceneId];
         if (currentSceneCurr) {
           newUndoStack = [...prev.undoStack, currentSceneCurr];
         }
@@ -138,7 +141,7 @@ export const useUndoRedo = (sceneId, fabricCanvas, { getCurrentCanvasData }) => 
           Object.entries(prev.currentStates)
             .filter(([sid]) => !scenesToRemove.includes(sid))
         );
-        newCurrentStates[sceneId] = newCurrentState;
+        newCurrentStates[effectiveSceneId] = newCurrentState;
 
         // 지연 정리 스케줄링 (논블로킹)
         if (historyItemsToDelete.length > 0) {
@@ -151,7 +154,7 @@ export const useUndoRedo = (sceneId, fabricCanvas, { getCurrentCanvasData }) => 
           currentStatesOrder: newOrder.slice(0, prev.maxSceneStates),
           redoStack: prev.redoStack
             .filter(item => activeScenes.has(item.sceneId))
-            .filter(item => item.sceneId !== sceneId), // 현재 씬 redo 클리어
+            .filter(item => item.sceneId !== effectiveSceneId), // 현재 씬 redo 클리어
           pendingCleanup: prev.pendingCleanup,
           maxHistorySize: prev.maxHistorySize,
           maxSceneStates: prev.maxSceneStates
@@ -304,6 +307,7 @@ export const useUndoRedo = (sceneId, fabricCanvas, { getCurrentCanvasData }) => 
     canUndo: globalHistoryStack.undoStack.some(item => item.sceneId === sceneId),
     canRedo: globalHistoryStack.redoStack.some(item => item.sceneId === sceneId),
     isProcessing,
+    globalHistoryStack,
 
     // 디버깅/관리용 함수들
     getHistoryStats: () => ({
