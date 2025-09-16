@@ -10,7 +10,7 @@ const debounce = (func, delay) => {
   };
 };
 
-export const useUndoRedo = (sceneId, fabricCanvas, { getCurrentCanvasData }) => {
+export const useUndoRedo = (sceneId, fabricCanvas, { getCurrentCanvasData, onCanvasChange }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const lastSaveRef = useRef({ actionType: '', timestamp: 0, sceneId: null });
 
@@ -205,6 +205,10 @@ export const useUndoRedo = (sceneId, fabricCanvas, { getCurrentCanvasData }) => 
         canvas.renderAll();
       });
 
+      if (onCanvasChange) {
+        onCanvasChange();
+      }
+
       setGlobalHistoryStack(prev => {
         const undoIndex = prev.undoStack.findIndex(
           item => item.historyKey === currentSceneUndoHistory.historyKey
@@ -276,6 +280,10 @@ export const useUndoRedo = (sceneId, fabricCanvas, { getCurrentCanvasData }) => 
         canvas.skipTargetFind = false;
         canvas.renderAll();
       });
+
+      if (onCanvasChange) {
+        onCanvasChange();
+      }
 
       setGlobalHistoryStack(prev => {
         const redoIndex = prev.redoStack.findIndex(

@@ -226,7 +226,8 @@ export default function EditorPage({projectId = DUMMY}) {
     selectedId,
     stageRef,
     {
-      getCurrentCanvasData: () => getCurrentCanvasData()
+      getCurrentCanvasData: () => getCurrentCanvasData(),
+      onCanvasChange: handleCanvasChange
     }
   );
 
