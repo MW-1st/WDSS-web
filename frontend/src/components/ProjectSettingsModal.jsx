@@ -118,14 +118,14 @@ export default function ProjectSettingsModal({ project, onClose, onSaved, mode: 
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-[70] grid place-items-center p-4 bg-black/30">
+    <div className="fixed inset-0 z-[70] grid place-items-center p-4 bg-blurred backdrop-blur-sm bg-black/30">
       <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl ring-1 ring-black/5 overflow-hidden">
-        <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b">
+        <div className="flex items-center justify-between px-5 pt-5 pb-3 ">
           <h3 className="text-xl font-bold">{mode === "create" ? "프로젝트 생성" : "프로젝트 설정"}</h3>
           <button
             onClick={onClose}
             aria-label="Close"
-            className="rounded p-1 text-gray-500 hover:bg-gray-100"
+            className="rounded px-1.5 text-gray-500 hover:bg-gray-100"
           >
             ×
           </button>

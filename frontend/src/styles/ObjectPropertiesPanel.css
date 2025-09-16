@@ -29,9 +29,9 @@
 .type-badge {
   padding: 2px 8px;
   font-size: 12px;
-  background: #eef4ff;
-  color: #2952cc;
-  border: 1px solid #cfe0ff;
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+  border: 1px solid var(--primary-border);
   border-radius: 999px;
   line-height: 1.6;
   white-space: nowrap;
@@ -59,9 +59,15 @@
 }
 
 .properties-field .label {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 17px;
+  font-weight: 900;
   margin-bottom: 6px;
+}
+
+.color-field .label {
+  font-size: 20px;
+  font-weight: 900;
+  margin-bottom: 12px;
 }
 
 .properties-note {
@@ -100,19 +106,20 @@
 }
 
 .brightness-number-input {
-  flex: 1;
-  padding: 8px 12px;
+  flex: 0.4;
+  padding: 8px 10px;
   border: 2px solid #e0e0e0;
   border-radius: 6px;
   font-size: 14px;
   transition: border-color 0.2s ease;
   background: #fff;
+  caret-color: transparent;
 }
 
 .brightness-number-input:focus {
   outline: none;
-  border-color: #007bff;
-  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-glow);
 }
 
 .brightness-number-input.error {
@@ -136,7 +143,7 @@
   width: 100%;
   height: 6px;
   border-radius: 3px;
-  background: linear-gradient(to right, #f0f0f0, #007bff);
+  background: linear-gradient(to right, #f0f0f0, var(--primary));
   outline: none;
   -webkit-appearance: none;
   appearance: none;
@@ -149,7 +156,7 @@
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: #007bff;
+  background: var(--primary);
   border: 2px solid #fff;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   cursor: pointer;
@@ -164,7 +171,7 @@
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: #007bff;
+  background: var(--primary);
   border: 2px solid #fff;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   cursor: pointer;
@@ -181,7 +188,7 @@
 
 .slider-current {
   font-weight: 600;
-  color: #007bff;
+  color: var(--primary);
   background: #f8f9fa;
   padding: 2px 6px;
   border-radius: 4px;
@@ -328,30 +335,53 @@
 }
 
 .btn-apply {
-  background: #28a745;
-  color: white;
+  background: var(--primary);
+  color: var(--on-primary);
   flex: 1;
+  padding: 3px;
+  justify-content: center;
+  flex: 0.4;
+  gap: 4px;
 }
 
 .btn-apply:hover {
-  background: #218838;
+  background: var(--primary-dark);
   transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(40, 167, 69, 0.2);
+  box-shadow: 0 2px 4px var(--primary-glow);
 }
 
 .btn-reset {
-  background: #6c757d;
+  background: var(--muted-weak);
   color: white;
-  flex: 0.8;
+  flex: 0.4;
+  justify-content: center;
+  gap: 4px;
 }
 
 .btn-reset:hover {
-  background: #5a6268;
+  background: var(--muted);
   transform: translateY(-1px);
   box-shadow: 0 2px 4px rgba(108, 117, 125, 0.2);
 }
 
-.btn-icon {
+/* Field-level actions (compact) */
+.field-actions {
+  display: flex;
+  gap: 16px; /* 원하는 간격으로 조정 */
+  margin-top: 8px;
+  align-items: center;
+  justify-content: flex-start; /* 기본은 좌측 정렬 */
+}
+
+/* 필드 내 버튼은 늘어나지 않도록 글로벌 flex 덮어쓰기 */
+.field-actions .btn-apply,
+.field-actions .btn-reset {
+  flex: 0 0 auto;
+}
+
+.btn-sm {
+  padding: 6px 10px;
+  min-height: 30px;
   font-size: 12px;
 }
 
@@ -366,4 +396,13 @@
 .metadata-value.pending {
   color: #856404;
   font-weight: 600;
+}
+
+/* Separator Style */
+.properties-section .separator {
+  height: 1px;
+  background-color: #e9ecef;
+  margin: 12px 0;
+  display: block;
+  width: 100%;
 }

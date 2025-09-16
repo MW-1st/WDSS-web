@@ -270,8 +270,8 @@ const ColorPicker = React.memo(function ColorPicker({ color, onChange, onPreview
         <button
           onClick={() => setIsOpen(prev => { const next = !prev; if (next) window.dispatchEvent(new CustomEvent("app-colorpicker-open", { detail: instanceIdRef.current })); return next; })}
           style={{
-            width: '40px',
-            height: '30px',
+            width: '45px',
+            height: '35px',
             backgroundColor: previewColor,
             border: '2px solid #ccc',
             borderRadius: '4px',
@@ -283,7 +283,7 @@ const ColorPicker = React.memo(function ColorPicker({ color, onChange, onPreview
         <div style={{
           fontSize: '12px',
           color: '#666',
-          fontFamily: 'monospace'
+          fontFamily: 'human-nanum',
         }}>
           {previewColor.toUpperCase()}
         </div>
@@ -407,7 +407,7 @@ const ColorPicker = React.memo(function ColorPicker({ color, onChange, onPreview
                   border: '1px solid #ccc',
                   borderRadius: '3px',
                   fontSize: '11px',
-                  fontFamily: 'monospace',
+                  fontFamily: 'human-nanum',
                   width: '70px'
                 }}
               />
@@ -501,7 +501,7 @@ const ColorPicker = React.memo(function ColorPicker({ color, onChange, onPreview
             <div style={{
               fontSize: '10px',
               color: '#666',
-              fontFamily: 'monospace',
+              ffontFamily: 'human-nanum',
               display: 'flex',
               gap: '8px'
             }}>
@@ -518,11 +518,3 @@ const ColorPicker = React.memo(function ColorPicker({ color, onChange, onPreview
 });
 
 export default ColorPicker;
-
-
-
-
-
-
-
-
