@@ -92,75 +92,75 @@ const CanvasTools = React.memo(function CanvasTools({
 
   return (
     <div className="canvas-tools-container">
-      <div className="tools-group">
-        <div
-          ref={anchorRefs.drawTool}
-          className="tool-anchor"
-          onMouseEnter={() => setHovered("drawTool")}
-          onMouseLeave={() => setHovered(null)}
+      <div
+        ref={anchorRefs.drawTool}
+        className="tool-anchor"
+        onMouseEnter={() => setHovered("drawTool")}
+        onMouseLeave={() => setHovered(null)}
+      >
+        <button
+          onClick={handleDrawToolClick}
+          className={getButtonClasses("drawTool")}
+          aria-label={isSceneTransformed ? "브러시" : "그리기"}
         >
-          <button
-            onClick={handleDrawToolClick}
-            className={getButtonClasses("drawTool")}
-            aria-label={isSceneTransformed ? "브러시" : "그리기"}
-          >
-            {isSceneTransformed ? <FaPaintBrush /> : <FaPen />}
-          </button>
-        </div>
+          {isSceneTransformed ? <FaPaintBrush /> : <FaPen />}
+        </button>
+      </div>
 
-        <div className="color-picker-group">
-            <div className="color-picker-wrapper">
-            <input
-                ref={anchorRefs.color}
-                type="color"
-                value={drawingColor}
-                onChange={handleNativeColorChange}
-                className="square-color-picker"
-                aria-label="색상 선택"
-                title={drawingColor}
-            />
-            </div>
-        </div>
-
-        <div
-          ref={anchorRefs.erase}
-          className="tool-anchor"
-          onMouseEnter={() => setHovered("erase")}
-          onMouseLeave={() => setHovered(null)}
-        >
-          <button
-            onClick={() => onModeChange("erase")}
-            className={getButtonClasses("erase")}
-            aria-label="지우개"
-          >
-            <FaEraser />
-          </button>
-        </div>
-
-        <div
-          ref={anchorRefs.pixelErase}
-          className="tool-anchor"
-          onMouseEnter={() => setHovered("pixelErase")}
-          onMouseLeave={() => setHovered(null)}
-        >
-          <button
-            onClick={() => onModeChange("pixelErase")}
-            className={getButtonClasses("pixelErase")}
-            aria-label="픽셀 지우개"
-          >
-            <FaEraser />
-          </button>
+      <div className="tool-anchor color-picker-group">
+        <div className="color-picker-wrapper">
+          <input
+            ref={anchorRefs.color}
+            type="color"
+            value={drawingColor}
+            onChange={handleNativeColorChange}
+            className="square-color-picker"
+            aria-label="색상 선택"
+            title={drawingColor}
+          />
         </div>
       </div>
 
-      <div className="clear-tool-group">
+      <div
+        ref={anchorRefs.erase}
+        className="tool-anchor"
+        onMouseEnter={() => setHovered("erase")}
+        onMouseLeave={() => setHovered(null)}
+      >
         <button
-          ref={anchorRefs.clear}
+          onClick={() => onModeChange("erase")}
+          className={getButtonClasses("erase")}
+          aria-label="지우개"
+        >
+          <FaEraser />
+        </button>
+      </div>
+
+      <div
+        ref={anchorRefs.pixelErase}
+        className="tool-anchor"
+        onMouseEnter={() => setHovered("pixelErase")}
+        onMouseLeave={() => setHovered(null)}
+      >
+        <button
+          onClick={() => onModeChange("pixelErase")}
+          className={getButtonClasses("pixelErase")}
+          aria-label="픽셀 지우개"
+        >
+          <FaEraser />
+        </button>
+      </div>
+
+      <div
+        ref={anchorRefs.clear}
+        className="tool-anchor"
+        onMouseEnter={() => setHovered("clear")}
+        onMouseLeave={() => setHovered(null)}
+      >
+        <button
           onClick={onClearAll}
           className="tool-button clear-button"
           aria-label="전체 지우기"
-          onMouseEnter={() => setHovered("clear")}
-          onMouseLeave={() => setHovered(null)}
           title="캔버스의 모든 내용 지우기"
         >
           <FaRegTrashAlt />

@@ -21,7 +21,8 @@ function normalizeColorToHex(color) {
   }
   return "#000000";
 }
-
+{/* 구분선 */}
+<div className="separator"/>
 // Brightness Control Component
 const BrightnessControl = ({ 
   value = 1.0, 
@@ -99,6 +100,11 @@ const BrightnessControl = ({
             step={step}
             value={inputValue}
             onChange={handleInputChange}
+            onKeyDown={(e) => {
+              if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab', 'Backspace', 'Delete', 'Enter'].includes(e.key) && !e.ctrlKey && !e.metaKey) {
+                e.preventDefault();
+              }
+            }}
             className={`brightness-number-input ${error ? 'error' : ''}`}
             aria-label={`${label} 값 입력`}
             placeholder="1.0"
@@ -145,6 +151,26 @@ export default function ObjectPropertiesPanel({
   const [localColor, setLocalColor] = useState("");
   const [localBrightness, setLocalBrightness] = useState(1.0);
   const [hasChanges, setHasChanges] = useState(false);
+
+  // 원본값 메모이제이션 (필드별 적용 여부 판단)
+  const originalColor = useMemo(
+    () => normalizeColorToHex(selection?.fill || selection?.stroke),
+    [selection]
+  );
+  const originalBrightness = useMemo(
+    () => selection?.brightness || 1.0,
+    [selection]
+  );
+
+  // 필드별 변경 여부
+  const colorChanged = useMemo(
+    () => !!localColor && originalColor && localColor.toUpperCase() !== originalColor.toUpperCase(),
+    [localColor, originalColor]
+  );
+  const brightnessChanged = useMemo(
+    () => Math.abs(localBrightness - originalBrightness) > 1e-6,
+    [localBrightness, originalBrightness]
+  );
 
   // 색깔과 brightness 둘 다에서 사용할 공통 조건
   const supportsColorAndBrightness =
@@ -205,6 +231,24 @@ export default function ObjectPropertiesPanel({
     }
   }, [selection]);
 
+  // 색상/밝기 개별 적용 및 취소
+  const applyColor = useCallback(() => {
+    if (onChangeFill && localColor) onChangeFill(localColor);
+    setHasChanges(false);
+  }, [onChangeFill, localColor]);
+  const resetColor = useCallback(() => {
+    setLocalColor(originalColor);
+    setHasChanges(false);
+  }, [originalColor]);
+  const applyBrightness = useCallback(() => {
+    if (onChangeBrightness) onChangeBrightness(localBrightness);
+    setHasChanges(false);
+  }, [onChangeBrightness, localBrightness]);
+  const resetBrightness = useCallback(() => {
+    setLocalBrightness(originalBrightness);
+    setHasChanges(false);
+  }, [originalBrightness]);
+
   return (
     <div className="properties-panel">
         {selection && (
@@ -233,11 +277,20 @@ export default function ObjectPropertiesPanel({
                   onChange={handleColorChange}
                   onPreview={() => {}}
                 />
+                {colorChanged && (
+                  <div className="field-actions">
+                    <button type="button" className="btn-apply btn-sm" onClick={applyColor}>색상 적용</button>
+                    <button type="button" className="btn-reset btn-sm" onClick={resetColor}>취소</button>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="properties-note">이 객체는 채우기 색상을 지원하지 않습니다.</div>
             )}
             
+            {/* 색상과 밝기 사이 구분선 */}
+            <div className="separator" />
+
             {/* Brightness Section */}
             {supportsColorAndBrightness && (
               <div className="properties-field">
@@ -255,11 +308,17 @@ export default function ObjectPropertiesPanel({
                   step={0.1}
                   label="Brightness"
                 />
+                {brightnessChanged && (
+                  <div className="field-actions">
+                    <button type="button" className="btn-apply btn-sm" onClick={applyBrightness}>밝기 적용</button>
+                    <button type="button" className="btn-reset btn-sm" onClick={resetBrightness}>취소</button>
+                  </div>
+                )}
               </div>
             )}
 
             {/* Action Buttons - 변경사항이 있을 때만 표시 */}
-            {supportsColorAndBrightness && hasChanges && (
+            {false && (
               <div className="properties-actions">
                 <button
                   type="button"

@@ -3,6 +3,8 @@ import { Link, useLocation, useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { useUnity } from "../contexts/UnityContext.jsx";
 import client from "../api/client";
+import { ImExit } from "react-icons/im";
+import { CiInboxOut } from "react-icons/ci";
 
 export default function Navbar({ transparent: propTransparent = false }) {
   const location = useLocation();
@@ -93,10 +95,10 @@ export default function Navbar({ transparent: propTransparent = false }) {
             <div className="flex items-center gap-2">
               <Link
                 to="/dashboard"
-                className="px-3 py-1.5 rounded border border-gray-300 text-gray-800 hover:bg-gray-100"
+                className="px-3 py-1.5 rounded border border-gray-300 text-gray-800 hover:bg-gray-100 flex items-center"
                 title="대시보드로 이동"
               >
-                Dashboard
+                <ImExit />
               </Link>
               <button
                 onClick={async () => {
@@ -117,16 +119,34 @@ export default function Navbar({ transparent: propTransparent = false }) {
               </button>
 
               <button
-                onClick={() => {
-                  if (!jsonBuilt || !lastJsonUrl) {
+                onClick={async () => {
+                  let url = lastJsonUrl;
+                  // If no JSON generated yet, try to generate via editor API
+                  if (!jsonBuilt || !url) {
+                    if (api?.handleJsonGeneration) {
+                      try {
+                        const generated = await api.handleJsonGeneration();
+                        if (generated) {
+                          url = generated;
+                          setLastJsonUrl(generated);
+                          setJsonBuilt(true);
+                        }
+                      } catch (err) {
+                        console.error("JSON generation failed:", err);
+                      }
+                    }
+                  }
+
+                  if (!url) {
                     alert(
-                      "먼저 변환을 완료하거나 'JSON 파일로만들기' 버튼을 실행해 주세요."
+                      "JSON 생성에 실패했습니다. 에디터에서 변환을 완료해주세요."
                     );
                     return;
                   }
+
                   try {
                     const a = document.createElement("a");
-                    a.href = lastJsonUrl;
+                    a.href = url;
                     a.download = `${(
                       editorState.projectName || "project"
                     ).replace(/[^\\w.-]+/g, "_")}.json`;
@@ -134,13 +154,13 @@ export default function Navbar({ transparent: propTransparent = false }) {
                     a.click();
                     document.body.removeChild(a);
                   } catch (_) {
-                    window.open(lastJsonUrl, "_blank", "noopener");
+                    window.open(url, "_blank", "noopener");
                   }
                 }}
-                className="px-3 py-1.5 rounded !bg-emerald-600 hover:!bg-emerald-700 text-white"
+                className="px-3 py-1.5 rounded border border-gray-300 text-gray-800 hover:bg-gray-100 flex items-center gap-2"
                 title="Export"
               >
-                Export
+                <CiInboxOut size={20} />
               </button>
 
               {!isUnityVisible ? (

@@ -7,9 +7,9 @@
   border-radius: 8px;
   padding: 0;
   overflow: hidden;
-  /* From inline styles */
-  width: 37px;
-  height: 37px;
+  /* Fill the wrapper so the picker matches tool button size */
+  width: 100%;
+  height: 100%;
   cursor: pointer;
 
   transition: all 0.2s ease;
@@ -41,25 +41,19 @@
 .canvas-tools-container {
   display: flex;
   flex-direction: column;
-  align-items: center; /* center all tool rows */
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 32px 0;
+  height: 100%;
 }
 
-.tools-group {
-  display: flex;
-  flex-direction: column;
-  align-items: center; /* horizontal center of each item */
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.tool-anchor {
-  position: relative;
+.tool-anchor,
+.color-picker-group {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 40px;
-  min-height: 40px; /* unify row height */
-  z-index: 1000;
+  width: 100%;
 }
 
 .tool-button {
@@ -73,10 +67,13 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background-color: #ffffff;
+  background-color: transparent;
   color: #111827;
+  border: 1px solid transparent;
+  box-sizing: border-box;
 
-  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s,
+    box-shadow 0.2s;
 }
 
 .tool-button:hover {
@@ -84,8 +81,9 @@
 }
 
 .tool-button.active {
-  background-color: #ffffff; /* keep background */
-  color: #007bff; /* change icon color only */
+  background-color: var(--primary-soft);
+  color: var(--primary-strong);
+  box-shadow: 0 0 0 2px var(--primary-border);
 }
 
 /* Select tool main button (pointer/hand) */
@@ -101,16 +99,20 @@
   justify-content: center;
   background: #ffffff;
   color: #111827;
+  border: 1px solid transparent;
+  box-sizing: border-box;
 
-  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s,
+    box-shadow 0.2s;
 }
 .tool-select-button:hover {
   background-color: #f3f4f6;
 }
 .tool-select-button.active {
-  background: #ffffff; /* keep background */
-  color: #007bff; /* icon color changes */
-  border-color: #007bff;
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+  border-color: var(--primary-border);
+  box-shadow: 0 0 0 2px var(--primary-border);
 }
 
 /* Popover items for select/pan */
@@ -131,8 +133,8 @@
   background-color: #f3f4f6;
 }
 .popover-button.active {
-  background: transparent; /* keep background */
-  color: #007bff; /* text/icon color only */
+  background: var(--primary-soft);
+  color: var(--primary-strong);
 }
 
 /* Ensure the select toggle container centers like other buttons */
@@ -144,28 +146,24 @@
 }
 
 .tool-button.clear-button {
-  background-color: #dc3545;
+  background-color: var(--danger);
   color: white;
-  border-color: #dc3545;
+  border-color: var(--danger);
   font-weight: bold;
 }
 
 .tool-button.clear-button:hover {
-  background-color: #c82333;
-  border-color: #bd2130;
-}
-
-.clear-tool-group {
-  margin-bottom: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  background-color: var(--danger-dark);
+  border-color: var(--danger-dark);
 }
 
 .color-picker-wrapper {
   display: flex;
   flex-direction: column;
-  align-items: center; /* center the picker */
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
   gap: 6px;
 }
 
@@ -218,5 +216,5 @@
 .editor-sidebar {
   display: flex;
   flex-direction: column;
-  gap: 6px; /* 좁은 세로 간격 */
+  gap: 16px; /* gallery toggle spacing */
 }

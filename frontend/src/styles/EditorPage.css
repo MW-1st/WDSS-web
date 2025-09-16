@@ -9,6 +9,20 @@
   gap: 16px;
   box-sizing: border-box;
   overflow-x: hidden;
+  /* Editor theme variables (scoped to editor only) */
+  --primary: #1E3A8A;        /* deep navy highlight */
+  --primary-dark: #162766;   /* pressed state */
+  --accent: #38BDF8;         /* bright cyan accent */
+  --primary-strong: #0F2F5F; /* text/icons on soft surfaces */
+  --primary-soft: #E3EBFF;   /* subtle highlight fills */
+  --primary-border: #C1D1FF; /* light borders */
+  --primary-glow: rgba(30, 58, 138, 0.32); /* focus halo */
+  --danger: #DC3545;
+  --danger-dark: #C82333;
+  --muted: #6C757D;
+  --muted-weak: #ADB5BD;     /* lighter gray for secondary buttons */
+  --muted-dark: #5A6268;
+  --on-primary: #FFFFFF;
 }
 
 .left-rail {
@@ -215,9 +229,9 @@
 .accordion-badge {
   padding: 2px 8px;
   font-size: 12px;
-  background: #eef4ff;
-  color: #2952cc;
-  border: 1px solid #cfe0ff;
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+  border: 1px solid var(--primary-border);
   border-radius: 999px;
   line-height: 1.4;
   white-space: nowrap;
