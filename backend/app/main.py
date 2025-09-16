@@ -23,6 +23,7 @@ app.add_middleware(
         "http://54.157.7.189:8000",
         "http://54.235.221.25:5173",
         "http://54.235.221.25:8000",
+        "http://wdss.store",
     ],
     allow_credentials=True,
     allow_methods=["*"],
