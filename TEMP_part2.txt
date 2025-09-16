@@ -1,0 +1,77 @@
+              cursor: "pointer",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+              transition: "all 0.2s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.transform = "scale(1.1)";
+              e.target.style.boxShadow = "0 2px 6px rgba(0,0,0,0.15)";
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.transform = "scale(1)";
+              e.target.style.boxShadow = "0 1px 3px rgba(0,0,0,0.1)";
+            }}
+          />
+          <span style={{ 
+            fontFamily: "monospace", 
+            fontSize: 13,
+            color: "#666",
+            marginLeft: 2
+          }}>
+            {drawingColor}
+          </span>
+        </div>
+      </div>
+        <div
+          ref={anchorRefs.erase}
+          style={{ position: "relative", display: "inline-flex", zIndex: 1000 }}
+          onMouseEnter={() => setHovered("erase")}
+          onMouseLeave={() => setHovered(null)}
+        >
+          <button
+            onClick={() => handleToolClick("erase")}
+            style={getButtonStyle("erase")}
+            aria-label="ì§€?°ê°œ"
+          >
+            <FaEraser />
+          </button>
+        </div>
+
+        <div
+          ref={anchorRefs.pixelErase}
+          style={{ position: "relative", display: "inline-flex", zIndex: 1000 }}
+          onMouseEnter={() => setHovered("pixelErase")}
+          onMouseLeave={() => setHovered(null)}
+        >
+          <button
+            onClick={() => handleToolClick("pixelErase")}
+            style={getButtonStyle("pixelErase")}
+            aria-label="?½ì? ì§€?°ê°œ"
+          >
+            <FaEraser />
+          </button>
+        </div>
+      </div>
+
+     
+
+      {/* ?„ì²´ ì§€?°ê¸° ë²„íŠ¼ */}
+      <div style={{ marginBottom: "12px" }}>
+        <button
+          ref={anchorRefs.clear}
+          onClick={onClearAll}
+          style={clearButtonStyle}
+          aria-label="?„ì²´ ì§€?°ê¸°"
+          onMouseEnter={() => setHovered("clear")}
+          onMouseLeave={() => setHovered(null)}
+          title="ìº”ë²„?¤ì˜ ëª¨ë“  ?´ìš© ì§€?°ê¸°"
+        >
+          <FaRegTrashAlt />
+        </button>
+      </div>
+
+      <TooltipPortal />
+    </div>
+  );
+});
+
+export default CanvasTools;

@@ -11,7 +11,10 @@ const LayerPanel = ({
   onToggleVisibility,
   onToggleLock,
   onRenameLayer,
-  onLayerReorder
+  onLayerReorder,
+  open,            // optional controlled open state
+  onToggleOpen,    // optional toggler
+  title = '레이어', // header title
 }) => {
   const [editingLayerId, setEditingLayerId] = useState(null);
   const [editingName, setEditingName] = useState('');
@@ -79,20 +82,37 @@ const LayerPanel = ({
     setDragOverLayerId(null);
   };
 
+  const isOpen = typeof open === 'boolean' ? open : true;
+  const containerClass = `layer-panel${isOpen ? '' : ' collapsed'}`;
+
   return (
-    <div className="layer-panel">
-      <div className="layer-panel-header">
-        <h3>레이어</h3>
-        <button 
+    <div className={containerClass}>
+      <div
+        className="layer-panel-header"
+        role="button"
+        aria-expanded={isOpen}
+        onClick={onToggleOpen}
+        title={title}
+        style={{cursor: 'pointer'}}
+      >
+        <h3>{title}</h3>
+        <button
           type="button"
           className="create-layer-btn"
-          onClick={onCreateLayer}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!isOpen && onToggleOpen) {
+              onToggleOpen();
+            }
+            onCreateLayer?.();
+          }}
           title="새 레이어 생성"
         >
           +
         </button>
       </div>
       
+      {isOpen && (
       <div className="layer-list">
         {[...layers].sort((a, b) => b.zIndex - a.zIndex).map((layer) => {
           const handleLayerItemClick = () => {
@@ -198,12 +218,15 @@ const LayerPanel = ({
           );
         })}
       </div>
+      )}
       
+      {isOpen && (
       <div className="layer-panel-footer">
         <small>
           활성 레이어: {layers.find(l => l.id === activeLayerId)?.name || '없음'}
         </small>
       </div>
+      )}
     </div>
   );
 };

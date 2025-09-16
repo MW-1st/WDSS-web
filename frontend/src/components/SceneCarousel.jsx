@@ -385,28 +385,9 @@ export default React.memo(function SceneCarousel({
         <button
           onClick={() => setStart((s) => Math.max(0, s - 1))}
           disabled={startClamped === 0}
+          className="scene-carousel-nav-button prev"
           style={{
-            position: "absolute",
             left: `${dims.leftBtnX}px`,
-            top: "50%",
-            transform: "translateY(-50%)",
-            width: BTN_SIZE,
-            height: BTN_SIZE,
-            borderRadius: "50%",
-            border: "1px solid #cfcfe6",
-            background: "#fff",
-            backgroundImage: leftArrowBg,
-            backgroundRepeat: "no-repeat",
-            backgroundPosition: "center",
-            boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 26,
-            lineHeight: "1",
-            color: "transparent",
-            cursor: startClamped === 0 ? "not-allowed" : "pointer",
-            zIndex: 1,
           }}
           aria-label="이전"
           title="이전"
@@ -450,28 +431,9 @@ export default React.memo(function SceneCarousel({
         <button
           onClick={() => setStart((s) => Math.min(total - VISIBLE, s + 1))}
           disabled={startClamped >= total - VISIBLE}
+          className="scene-carousel-nav-button next"
           style={{
-            position: "absolute",
             right: `${dims.rightBtnX}px`,
-            top: "50%",
-            transform: "translateY(-50%)",
-            width: BTN_SIZE,
-            height: BTN_SIZE,
-            borderRadius: "50%",
-            border: "1px solid #cfcfe6",
-            background: "#fff",
-            backgroundImage: rightArrowBg,
-            backgroundRepeat: "no-repeat",
-            backgroundPosition: "center",
-            boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 26,
-            lineHeight: "1",
-            color: "transparent",
-            cursor: startClamped >= total - VISIBLE ? "not-allowed" : "pointer",
-            zIndex: 1,
           }}
           aria-label="다음"
           title="다음"

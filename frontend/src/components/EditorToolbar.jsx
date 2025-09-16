@@ -1,12 +1,11 @@
-import React from "react";
-import { createPortal } from "react-dom"; // 툴팁만 사용
+﻿import React from "react";
+import { createPortal } from "react-dom"; // 툴팁 렌더링
 import ImageTransformControls from "../components/ImageTransformControls.jsx";
 import UnitySimulatorControls from "../components/UnitySimulatorControls.jsx";
-import CanvasTools from "../components/CanvasTools.jsx";
-import { FaImage } from "react-icons/fa";
-import { LuMousePointer } from "react-icons/lu";
-import { IoHandRightOutline } from "react-icons/io5";
-import PortalPopover from "./PortalPopover.jsx";
+import { FaImage, FaPen, FaPaintBrush, FaEraser, FaRegTrashAlt } from "react-icons/fa";
+import "../styles/CanvasTools.css";
+import { ImExit } from "react-icons/im";
+import { CiInboxOut } from "react-icons/ci";
 const Inner = ({
   onImageDragStart,
   drawingMode,
@@ -27,27 +26,35 @@ const Inner = ({
   isUnityVisible,
   showUnity,
   hideUnity,
-  onGalleryStateChange, // 부모에서 상태 관리
-  isSceneTransformed, // 씬 변환 상태
-  isToolAllowed, // 도구 허용 여부 확인 함수
+  onGalleryStateChange,
+  galleryOpen = false,
+  isSceneTransformed,
+  isToolAllowed,
 }) => {
-  // 🔸 로컬에서 열림여부를 갖지 않고, 부모에게 토글만 알림
   const [galleryHovered, setGalleryHovered] = React.useState(false);
-  const [tooltipPos, setTooltipPos] = React.useState({ top: 0, left: 0 });
-  const btnRef = React.useRef(null);
+  const [galleryTooltipPos, setGalleryTooltipPos] = React.useState({ top: 0, left: 0 });
+  const galleryBtnRef = React.useRef(null);
+
+  const [toolHovered, setToolHovered] = React.useState(null);
+  const drawToolRef = React.useRef(null);
+  const eraseRef = React.useRef(null);
+  const pixelEraseRef = React.useRef(null);
+  const clearRef = React.useRef(null);
+  const dashboardBtnRef = React.useRef(null); // ✅ 대시보드 버튼 ref 추가
+  const [toolTooltipPos, setToolTooltipPos] = React.useState({ top: 0, left: 0 })
 
   const toggleGallery = () => {
-    // 부모가 상태를 소유하므로 이전값을 받아 토글
     onGalleryStateChange?.((prev) => !prev);
   };
 
+  // 갤러리 버튼 툴팁 위치 계산
   React.useEffect(() => {
     if (!galleryHovered) return;
-    const el = btnRef.current;
+    const el = galleryBtnRef.current;
     if (!el) return;
     const update = () => {
       const r = el.getBoundingClientRect();
-      setTooltipPos({
+      setGalleryTooltipPos({
         top: Math.round(r.top + r.height / 2),
         left: Math.round(r.right + 8),
       });
@@ -60,10 +67,49 @@ const Inner = ({
       window.removeEventListener("resize", update);
     };
   }, [galleryHovered]);
-  // Keyboard shortcuts for tool switching: P(draw), E(erase), B(brush), V(select)
+
+  const getAnchorRef = (key) => {
+    switch (key) {
+      case "drawTool":
+        return drawToolRef;
+      case "erase":
+        return eraseRef;
+      case "pixelErase":
+        return pixelEraseRef;
+      case "clear":
+        return clearRef;
+      case "dashboard":
+        return dashboardBtnRef;
+      default:
+        return null;
+    }
+  };
+
+  // 도구 툴팁 위치 계산
+  React.useEffect(() => {
+    if (!toolHovered) return;
+    const ref = getAnchorRef(toolHovered);
+    const el = ref?.current;
+    if (!el) return;
+    const update = () => {
+      const r = el.getBoundingClientRect();
+      setToolTooltipPos({
+        top: Math.round(r.top + r.height / 2),
+        left: Math.round(r.right + 8),
+      });
+    };
+    update();
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
+  }, [toolHovered]);
+
+  // 단축키: P(draw/brush), E(erase), V(select)
   React.useEffect(() => {
     const handler = (e) => {
-      // Ignore when typing into inputs/textareas/contenteditables
       const target = e.target;
       const isTyping =
         target &&
@@ -75,8 +121,7 @@ const Inner = ({
       const key = e.key?.toLowerCase();
       if (key === "p") {
         e.preventDefault();
-        // 씬의 변환 상태에 따라 자동으로 펜 또는 브러쉬 모드로 전환
-        const targetMode = isSceneTransformed ? 'brush' : 'draw';
+        const targetMode = isSceneTransformed ? "brush" : "draw";
         onModeChange && onModeChange(targetMode);
       } else if (key === "e") {
         e.preventDefault();
@@ -90,14 +135,76 @@ const Inner = ({
     return () => window.removeEventListener("keydown", handler);
   }, [onModeChange, isSceneTransformed]);
 
-  const Tooltip = () =>
+  // 툴팁 텍스트
+  const getToolTooltipText = (mode) => {
+    switch (mode) {
+      case "drawTool":
+        return isSceneTransformed
+          ? "브러쉬 도구 (P): 변환된 씬에서 자유롭게 그리기"
+          : "펜 도구 (P): 변환 전 씬에서 선 그리기";
+      case "erase":
+        return "지우개 (E): 객체 또는 선을 지우기";
+      case "pixelErase":
+        return "픽셀 지우개: 세밀하게 픽셀 단위로 지우기";
+      case "clear":
+        return "전체 삭제: 현재 캔버스 내용을 모두 지우기";
+      case "dashboard":
+        return "대시보드로 이동";
+      default:
+        return "";
+    }
+  };
+
+  const resolveModeForPermission = (mode) => {
+    if (mode === "drawTool") {
+      return isSceneTransformed ? "brush" : "draw";
+    }
+    return mode;
+  };
+
+  const isModeAllowed = (mode) => {
+    const resolved = resolveModeForPermission(mode);
+    return typeof isToolAllowed === "function" ? isToolAllowed(resolved) : true;
+  };
+
+  const getButtonClasses = (mode) => {
+    const isActive =
+      mode === "drawTool"
+        ? drawingMode === "draw" || drawingMode === "brush"
+        : drawingMode === mode;
+    return `tool-button${isActive ? " active" : ""}`;
+  };
+
+  const handleDrawToolClick = () => {
+    const targetMode = isSceneTransformed ? "brush" : "draw";
+    if (!isModeAllowed(targetMode)) return;
+    onModeChange?.(targetMode);
+  };
+
+  const handleModeButtonClick = (mode) => {
+    if (!isModeAllowed(mode)) return;
+    onModeChange?.(mode);
+  };
+
+  const handleClearClick = () => {
+    if (!isModeAllowed("clear")) return;
+    onClearAll?.();
+  };
+
+  const handleNativeColorChange = (e) => {
+    const newColor = e.target.value;
+    onColorChange?.(newColor);
+  };
+
+  // 갤러리 툴팁
+  const GalleryTooltip = () =>
     galleryHovered
       ? createPortal(
           <div
             style={{
               position: "fixed",
-              top: tooltipPos.top,
-              left: tooltipPos.left,
+              top: galleryTooltipPos.top,
+              left: galleryTooltipPos.left,
               transform: "translateY(-50%)",
               background: "#000",
               color: "#fff",
@@ -116,46 +223,125 @@ const Inner = ({
         )
       : null;
 
+  // 도구 툴팁
+  const ToolTooltipPortal = () =>
+    toolHovered
+      ? createPortal(
+          <div
+            className="tool-tooltip"
+            style={{
+              top: toolTooltipPos.top,
+              left: toolTooltipPos.left,
+            }}
+          >
+            {getToolTooltipText(toolHovered)}
+          </div>,
+          document.body
+        )
+      : null;
+
+
+
   return (
     <>
       {layout === "sidebar" && (
-        <div style={{ marginBottom: 8 }}>
+        <div className="tool-anchor">
           <button
-            ref={btnRef}
+            ref={galleryBtnRef}
             onClick={toggleGallery}
-            aria-label="Image gallery"
+            aria-label="이미지 갤러리 열기"
             onMouseEnter={() => setGalleryHovered(true)}
             onMouseLeave={() => setGalleryHovered(false)}
-            style={{
-              border: "1px solid #ccc",
-              padding: "8px 16px",
-              borderRadius: 4,
-              cursor: "pointer",
-              fontSize: 16,
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              background: "#f8f9fa",
-            }}
+            className={`tool-button${galleryOpen ? " active" : ""}`}
+            data-open={galleryOpen ? "true" : "false"}
+            title="Image gallery"
           >
-            <FaImage />
+            <FaImage size={20} />
           </button>
-          <Tooltip />
+          <GalleryTooltip />
         </div>
       )}
 
-      <div style={{ marginBottom: 16 }}>
-        <CanvasTools
-          drawingMode={drawingMode}
-          eraserSize={eraserSize}
-          drawingColor={drawingColor}
-          onModeChange={onModeChange}
-          onColorChange={onColorChange}
-          onColorPreview={onColorPreview}
-          onClearAll={onClearAll}
-          isSceneTransformed={isSceneTransformed}
-          isToolAllowed={isToolAllowed}
-        />
+      <div className="canvas-tools-container">
+        <div
+          ref={drawToolRef}
+          className="tool-anchor"
+          onMouseEnter={() => setToolHovered("drawTool")}
+          onMouseLeave={() => setToolHovered(null)}
+        >
+          <button
+            onClick={handleDrawToolClick}
+            className={getButtonClasses("drawTool")}
+            aria-label={isSceneTransformed ? "브러쉬 도구" : "펜 도구"}
+            disabled={!isModeAllowed("drawTool")}
+          >
+            {isSceneTransformed ? <FaPaintBrush /> : <FaPen />}
+          </button>
+        </div>
+
+        <div className="tool-anchor color-picker-group">
+          <div className="color-picker-wrapper">
+            <input
+              type="color"
+              value={drawingColor}
+              onChange={handleNativeColorChange}
+              className="square-color-picker"
+              aria-label="색상 선택"
+              title={drawingColor}
+            />
+          </div>
+        </div>
+
+        <div
+          ref={eraseRef}
+          className="tool-anchor"
+          onMouseEnter={() => setToolHovered("erase")}
+          onMouseLeave={() => setToolHovered(null)}
+        >
+          <button
+            onClick={() => handleModeButtonClick("erase")}
+            className={getButtonClasses("erase")}
+            aria-label="지우개 도구"
+            disabled={!isModeAllowed("erase")}
+          >
+            <FaEraser />
+          </button>
+        </div>
+
+        <div
+          ref={pixelEraseRef}
+          className="tool-anchor"
+          onMouseEnter={() => setToolHovered("pixelErase")}
+          onMouseLeave={() => setToolHovered(null)}
+        >
+          <button
+            onClick={() => handleModeButtonClick("pixelErase")}
+            className={getButtonClasses("pixelErase")}
+            aria-label="픽셀 지우개"
+            disabled={!isModeAllowed("pixelErase")}
+          >
+            <FaEraser />
+          </button>
+        </div>
+
+        <div
+          ref={clearRef}
+          className="tool-anchor"
+          onMouseEnter={() => setToolHovered("clear")}
+          onMouseLeave={() => setToolHovered(null)}
+        >
+          <button
+            onClick={handleClearClick}
+            className="tool-button clear-button"
+            aria-label="전체 삭제"
+            title="현재 캔버스의 모든 내용을 삭제합니다"
+            disabled={!isModeAllowed("clear")}
+          >
+            <FaRegTrashAlt />
+          </button>
+        </div>
+
+        <ToolTooltipPortal />
       </div>
 
       {layout !== "sidebar" && (
@@ -190,7 +376,7 @@ const EditorToolbar = React.memo(function EditorToolbar(props) {
     return (
       <div
         className="editor-sidebar"
-        style={{ display: "flex", flexDirection: "column", gap: 12 }}
+        style={{ display: "flex", flexDirection: "column", gap: 16 }}
       >
         <Inner {...props} />
       </div>

@@ -83,7 +83,7 @@
   width: 32px;
   height: 32px;
   border: 3px solid #e9ecef;
-  border-top: 3px solid #007bff;
+  border-top: 3px solid var(--primary);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -112,9 +112,9 @@
 
 .retry-btn {
   padding: 6px 12px;
-  background: #007bff;
+  background: var(--primary);
   color: white;
-  border: 1px solid #007bff;
+  border: 1px solid var(--primary);
   border-radius: 4px;
   cursor: pointer;
   font-size: 13px;
@@ -122,8 +122,8 @@
 }
 
 .retry-btn:hover:not(:disabled) {
-  background: #0056b3;
-  border-color: #0056b3;
+  background: var(--primary-dark);
+  border-color: var(--primary-dark);
 }
 
 .retry-btn:disabled {
@@ -206,9 +206,9 @@
 .confirm-btn {
   width: 100%;
   padding: 10px 16px;
-  background: #007bff;
+  background: var(--primary);
   color: white;
-  border: 1px solid #007bff;
+  border: 1px solid var(--primary);
   border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
@@ -221,10 +221,10 @@
 }
 
 .confirm-btn:hover:not(:disabled) {
-  background: #0056b3;
-  border-color: #0056b3;
+  background: var(--primary-dark);
+  border-color: var(--primary-dark);
   transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0, 123, 255, 0.3);
+  box-shadow: 0 4px 8px var(--primary-glow);
 }
 
 .confirm-btn:disabled {
