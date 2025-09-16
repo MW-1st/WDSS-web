@@ -165,6 +165,14 @@ class ProjectDetailDataResponse(SuccessResponse):
     project: ProjectDetailResponse
 
 
+class ProjectListDataResponse(BaseModel):
+    """프로젝트 목록 + 전체 개수 반환 모델"""
+
+    success: bool = True
+    projects: List[ProjectResponse]
+    total: int = 0
+
+
 # schemas.py에서 Scene 관련 스키마 수정
 class SceneCreate(BaseModel):
     scene_num: int

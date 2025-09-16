@@ -48,10 +48,14 @@ export default function DashboardPage() {
 
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [pageLoading, setPageLoading] = useState(false);
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
   const [editingProject, setEditingProject] = useState(null);
   const [creating, setCreating] = useState(false);
   const [bannerUrl, setBannerUrl] = useState("/img/banner_01.png");
   const [thumbs, setThumbs] = useState({});
+  const PAGE_SIZE = 12;
 
   // Pick a random banner when the dashboard mounts
   useEffect(() => {
@@ -67,22 +71,48 @@ export default function DashboardPage() {
   }, []);
 
 
+  // initial load
   useEffect(() => {
     if (!isAuthenticated) {
       setLoading(false);
       return;
     }
-    (async () => {
+
+    const loadFirst = async () => {
+      setLoading(true);
+      setOffset(0);
       try {
-        const res = await client.get("/projects");
-        setProjects(res.data.projects);
+  const res = await client.get("/projects", { params: { limit: PAGE_SIZE, offset: 0 } });
+        setProjects(res.data.projects || []);
+        setHasMore((res.data.total || 0) > (res.data.projects || []).length);
+        setOffset((res.data.projects || []).length);
       } catch (err) {
         console.error("Failed to fetch projects:", err);
       } finally {
         setLoading(false);
       }
-    })();
+    };
+
+    loadFirst();
   }, [isAuthenticated]);
+
+  // load more when offset changes or on explicit request
+  const loadMore = async () => {
+    if (pageLoading || !hasMore) return;
+    setPageLoading(true);
+    try {
+  const res = await client.get("/projects", { params: { limit: PAGE_SIZE, offset } });
+      const newItems = res.data.projects || [];
+      setProjects((prev) => [...prev, ...newItems]);
+      const newOffset = offset + newItems.length;
+      setOffset(newOffset);
+      setHasMore(newOffset < (res.data.total || 0));
+    } catch (err) {
+      console.error("Failed to load more projects:", err);
+    } finally {
+      setPageLoading(false);
+    }
+  };
 
   // Fetch thumbnail (scene 1) for each project
   useEffect(() => {
@@ -127,6 +157,26 @@ export default function DashboardPage() {
       cancelled = true;
     };
   }, [projects]);
+
+  // IntersectionObserver for infinite scroll
+  useEffect(() => {
+    const sentinel = document.getElementById("projects-sentinel");
+    if (!sentinel) return;
+
+    const obs = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && hasMore && !pageLoading) {
+            loadMore();
+          }
+        });
+      },
+      { root: null, rootMargin: "200px", threshold: 0.1 }
+    );
+
+    obs.observe(sentinel);
+    return () => obs.disconnect();
+  }, [offset, hasMore, pageLoading]);
 
   const handleCreateProject = () => {
     setCreating(true);
@@ -197,9 +247,9 @@ export default function DashboardPage() {
 
             {loading ? (
               <p>프로젝트를 불러오는 중입니다...</p>
-            ) : projects.length > 0 ? (
+              ) : projects.length > 0 ? (
               <div className="project-grid">
-                {projects.map((project) => (
+                  {projects.map((project) => (
                   <div
                     key={project.id}
                     className="project-card"
@@ -247,6 +297,9 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 ))}
+
+                {/* sentinel for infinite scroll */}
+                <div id="projects-sentinel" style={{ height: 1 }} />
               </div>
             ) : (
               <div className="empty-state">
@@ -254,6 +307,9 @@ export default function DashboardPage() {
                 <p>'새 프로젝트 생성' 버튼을 눌러 프로젝트를 시작해보세요!</p>
               </div>
             )}
+            {/* page loading and end message */}
+            {pageLoading && <p style={{ textAlign: "center", marginTop: 12 }}>더 불러오는 중...</p>}
+            {!hasMore && projects.length > 0 && <p style={{ textAlign: "center", marginTop: 12 }}>모든 프로젝트를 불러왔습니다.</p>}
           </section>
         </main>
       </div>
