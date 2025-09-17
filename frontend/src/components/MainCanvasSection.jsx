@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef, useState, useEffect } from "react";
 import Canvas from "../components/Canvas.jsx";
 
 function MainCanvasSection({
@@ -21,6 +21,28 @@ function MainCanvasSection({
   saveToHistory,
   isSceneTransformed = false // 씬 변환 상태
 }) {
+  const containerRef = useRef(null);
+  const [canvasSize, setCanvasSize] = useState({ width: 1200, height: 675 });
+
+  useEffect(() => {
+    const observer = new ResizeObserver(entries => {
+      for (let entry of entries) {
+        const { width, height } = entry.contentRect;
+        setCanvasSize({ width, height });
+      }
+    });
+
+    if (containerRef.current) {
+      observer.observe(containerRef.current);
+    }
+
+    return () => {
+      if (containerRef.current) {
+        observer.unobserve(containerRef.current);
+      }
+    };
+  }, []);
+
   return (
     <section
       style={{
@@ -31,6 +53,7 @@ function MainCanvasSection({
     >
       <div style={{ width: "70%", maxWidth: 980 }}>
         <div
+          ref={containerRef}
           style={{
             width: "100%",
             aspectRatio: "16 / 9",
@@ -48,8 +71,8 @@ function MainCanvasSection({
               key={selectedScene.id}
               projectId={projectId}
               scene={selectedScene}
-              width={1200}
-              height={675}
+              width={canvasSize.width}
+              height={canvasSize.height}
               onChange={(patch) => onChange(selectedScene.id, patch)}
               onPreviewChange={onPreviewChange}
               onCanvasChange={onCanvasChange}

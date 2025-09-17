@@ -120,7 +120,7 @@
 .canvas-area {
   flex: 1 1 auto; /* 남는 높이 전부 */
   min-height: 0;
-  overflow: auto; /* ✅ 캔버스가 커질 때만 이 안에서 스크롤 */
+  /* overflow: auto;  ✅ 캔버스가 커질 때만 이 안에서 스크롤 */
 }
 
 /* 캐러셀은 항상 보이도록 고정 높이 */
