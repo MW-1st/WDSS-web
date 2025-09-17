@@ -1,13 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import client from "../api/client";
 
-export default function ProjectSettingsModal({ project, onClose, onSaved, mode: modeProp }) {
+export default function ProjectSettingsModal({
+  project,
+  onClose,
+  onSaved,
+  mode: modeProp,
+}) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   const [form, setForm] = useState({
     project_name: "",
-    format: "dsj",
     max_scene: 15,
     max_drone: 1000,
     max_speed: 6.0,
@@ -15,13 +19,15 @@ export default function ProjectSettingsModal({ project, onClose, onSaved, mode: 
     min_separation: 2.0,
   });
 
-  const mode = useMemo(() => modeProp ?? (project?.id ? "edit" : "create"), [modeProp, project]);
+  const mode = useMemo(
+    () => modeProp ?? (project?.id ? "edit" : "create"),
+    [modeProp, project]
+  );
 
   useEffect(() => {
     if (project) {
       setForm({
         project_name: project.project_name ?? "",
-        format: project.format ?? "dsj",
         max_scene: project.max_scene ?? 15,
         max_drone: project.max_drone ?? 1000,
         max_speed: project.max_speed ?? 6.0,
@@ -31,7 +37,6 @@ export default function ProjectSettingsModal({ project, onClose, onSaved, mode: 
     } else {
       setForm({
         project_name: "",
-        format: "dsj",
         max_scene: 15,
         max_drone: 1000,
         max_speed: 6.0,
@@ -45,7 +50,7 @@ export default function ProjectSettingsModal({ project, onClose, onSaved, mode: 
     const val = e.target.value;
     setForm((prev) => ({
       ...prev,
-      [key]: key === "project_name" || key === "format" ? val : val === "" ? "" : Number(val),
+      [key]: key === "project_name" ? val : val === "" ? "" : Number(val),
     }));
   };
 
@@ -58,7 +63,13 @@ export default function ProjectSettingsModal({ project, onClose, onSaved, mode: 
       return;
     }
 
-    const numericKeys = ["max_scene", "max_drone", "max_speed", "max_accel", "min_separation"];
+    const numericKeys = [
+      "max_scene",
+      "max_drone",
+      "max_speed",
+      "max_accel",
+      "min_separation",
+    ];
     for (const k of numericKeys) {
       if (form[k] === "" || Number.isNaN(Number(form[k]))) {
         setError("숫자 필드를 올바르게 입력하세요");
@@ -68,7 +79,6 @@ export default function ProjectSettingsModal({ project, onClose, onSaved, mode: 
 
     const payload = {
       project_name: form.project_name,
-      format: form.format || "dsj",
       max_scene: Number(form.max_scene),
       max_drone: Number(form.max_drone),
       max_speed: Number(form.max_speed),
@@ -104,7 +114,8 @@ export default function ProjectSettingsModal({ project, onClose, onSaved, mode: 
         }
       }
     } catch (err) {
-      const msg = err?.response?.data?.detail || "알 수 없는 오류가 발생했습니다.";
+      const msg =
+        err?.response?.data?.detail || "알 수 없는 오류가 발생했습니다.";
       setError(msg);
     } finally {
       setSaving(false);
@@ -118,10 +129,16 @@ export default function ProjectSettingsModal({ project, onClose, onSaved, mode: 
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-[70] grid place-items-center p-4 bg-blurred backdrop-blur-sm bg-black/30">
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-[2000] grid place-items-center p-4 bg-blurred backdrop-blur-sm bg-black/30"
+    >
       <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl ring-1 ring-black/5 overflow-hidden">
         <div className="flex items-center justify-between px-5 pt-5 pb-3 ">
-          <h3 className="text-xl font-bold">{mode === "create" ? "프로젝트 생성" : "프로젝트 설정"}</h3>
+          <h3 className="text-xl font-bold">
+            {mode === "create" ? "프로젝트 생성" : "프로젝트 설정"}
+          </h3>
           <button
             onClick={onClose}
             aria-label="Close"
@@ -133,7 +150,9 @@ export default function ProjectSettingsModal({ project, onClose, onSaved, mode: 
 
         <form onSubmit={handleSave} className="px-5 py-4 space-y-3">
           <div>
-            <label className="block text-sm font-medium mb-1">프로젝트 이름</label>
+            <label className="block text-sm font-medium mb-1">
+              프로젝트 이름
+            </label>
             <input
               type="text"
               value={form.project_name}
@@ -142,18 +161,6 @@ export default function ProjectSettingsModal({ project, onClose, onSaved, mode: 
               placeholder="프로젝트 이름"
               required
             />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">format</label>
-            <input
-              type="text"
-              value={form.format}
-              onChange={updateField("format")}
-              className="w-full rounded border border-gray-300 px-3 py-2"
-              placeholder="dsj"
-            />
-            <p className="mt-1 text-xs text-gray-500">기본 format은 'dsj' 입니다</p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -218,7 +225,9 @@ export default function ProjectSettingsModal({ project, onClose, onSaved, mode: 
           </div>
 
           {error && (
-            <div className="text-red-600 text-sm" role="alert">{error}</div>
+            <div className="text-red-600 text-sm" role="alert">
+              {error}
+            </div>
           )}
 
           <div className="pt-2 flex justify-end gap-2">
@@ -234,7 +243,13 @@ export default function ProjectSettingsModal({ project, onClose, onSaved, mode: 
               disabled={saving}
               className="rounded px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
             >
-              {saving ? (mode === "create" ? "생성중.." : "저장중..") : (mode === "create" ? "생성" : "저장")}
+              {saving
+                ? mode === "create"
+                  ? "생성중.."
+                  : "저장중.."
+                : mode === "create"
+                ? "생성"
+                : "저장"}
             </button>
           </div>
         </form>

@@ -25,7 +25,8 @@ function AppContent() {
   const navigate = useNavigate();
   const { isUnityVisible, showUnity, hideUnity } = useUnity();
   const { isAuthenticated, logout, loading } = useAuth();
-  const showGlobalNav = location.pathname !== "/" && location.pathname !== "/login";
+  const showGlobalNav =
+    location.pathname !== "/" && location.pathname !== "/login";
   const isEditorRoute = location.pathname.startsWith("/projects/");
   useEffect(() => {
     const handleEscape = (event) => {
@@ -49,7 +50,7 @@ function AppContent() {
     left: 0,
     width: "100%",
     height: "100%",
-    zIndex: 1000,
+    zIndex: 2000,
     backgroundColor: "rgba(0, 0, 0, 0.8)",
     display: isUnityVisible ? "flex" : "none",
     alignItems: "center",
@@ -68,7 +69,7 @@ function AppContent() {
     position: "absolute",
     top: "9px",
     right: "9px",
-    zIndex: 1001,
+    zIndex: 2100,
     padding: "8px 12px",
     backgroundColor: "#dc3545",
     color: "white",
@@ -90,18 +91,48 @@ function AppContent() {
     return <div>Loading...</div>;
   }
 
-return (
-  <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-    {/* 메인에서는 전역 Navbar를 숨기고, 다른 페이지에서만 보이게 */}
-    {showGlobalNav && <Navbar />}  
-      
-  <div style={{ flex: '1 1 auto', position: 'relative', display: 'flex', flexDirection: 'column', overflowX: 'hidden', overflowY: isEditorRoute ? 'hidden' : 'auto' }}>
+  return (
+    <div
+      style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}
+    >
+      {/* 메인에서는 전역 Navbar를 숨기고, 다른 페이지에서만 보이게 */}
+      {showGlobalNav && <Navbar />}
+
+      <div
+        style={{
+          flex: "1 1 auto",
+          position: "relative",
+          display: "flex",
+          flexDirection: "column",
+          overflowX: "hidden",
+          overflowY: isEditorRoute ? "hidden" : "auto",
+        }}
+      >
         <Routes location={background || location}>
           <Route path="/" element={<MainPage />} />
-          <Route path="/dashboard" element={<PrivateRoute> <DashboardPage /> </PrivateRoute> }/>
-          <Route path="/projects" element={<Navigate to="/dashboard" replace />}/>
-          <Route path="/projects/:project_id" element={<ProjectOwnerRoute> <EditorPage /> </ProjectOwnerRoute>}/>
-           {!background && (
+          <Route
+            path="/dashboard"
+            element={
+              <PrivateRoute>
+                {" "}
+                <DashboardPage />{" "}
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/projects"
+            element={<Navigate to="/dashboard" replace />}
+          />
+          <Route
+            path="/projects/:project_id"
+            element={
+              <ProjectOwnerRoute>
+                {" "}
+                <EditorPage />{" "}
+              </ProjectOwnerRoute>
+            }
+          />
+          {!background && (
             <Route
               path="/login"
               element={
@@ -120,7 +151,7 @@ return (
         )}
       </div>
 
-      <div style={unityOverlayStyle}>
+      <div role="dialog" aria-modal="true" style={unityOverlayStyle}>
         <div style={unityContainerStyle}>
           <button
             style={closeButtonStyle}

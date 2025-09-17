@@ -200,7 +200,7 @@
   font-size: 12px;
   white-space: nowrap;
   /* Keep above any app overlays; OS scrollbars may still overlay */
-  z-index: 2147483647; /* max-ish */
+  z-index: 1000; /* max-ish */
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
   pointer-events: none;
 }
@@ -221,7 +221,7 @@
   border-radius: 6px;
   font-size: 12px;
   white-space: nowrap;
-  z-index: 2147483647;
+  z-index: 1000;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
   pointer-events: none;
 }
