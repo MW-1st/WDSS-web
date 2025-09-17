@@ -6,6 +6,7 @@ import client from "../api/client";
 import { ImExit } from "react-icons/im";
 import { FaFileExport } from "react-icons/fa6";
 import { FaRegCirclePlay } from "react-icons/fa6";
+import { getAllCanvasStates } from "../utils/indexedDBUtils";
 
 
 export default function Navbar({ transparent: propTransparent = false }) {
@@ -25,6 +26,7 @@ export default function Navbar({ transparent: propTransparent = false }) {
       imageUrl: api?.imageUrl || "",
       selectedId: api?.selectedId || null,
       projectName: api?.projectName || "",
+      isTransformed: false,
     }));
 
     // IndexedDB에 저장된 objectCount 합계 (현재 프로젝트의 씬만)
@@ -42,7 +44,11 @@ export default function Navbar({ transparent: propTransparent = false }) {
     React.useEffect(() => {
       const handler = (e) => {
         const detail = e.detail || {};
-        setEditorState((prev) => ({ ...prev, ...detail }));
+        setEditorState((prev) => ({
+          ...prev,
+          ...detail,
+          isTransformed: detail.isTransformed !== undefined ? detail.isTransformed : prev.isTransformed
+        }));
       };
       window.addEventListener("editor:updated", handler);
       return () => window.removeEventListener("editor:updated", handler);
@@ -63,8 +69,7 @@ export default function Navbar({ transparent: propTransparent = false }) {
     }, []);
 
     // 현재 프로젝트에 속한 씬 목록을 서버에서 불러옴
-    React.useEffect(() => {
-      const loadProjectScenes = async () => {
+    const loadProjectScenes = React.useCallback(async () => {
         try {
           if (!projectId) {
             setProjectScenes([]);
@@ -82,14 +87,16 @@ export default function Navbar({ transparent: propTransparent = false }) {
           console.warn("Failed to load project scenes for Navbar:", e);
           setProjectScenes([]);
         }
-      };
-
-      loadProjectScenes();
-    }, [projectId]);
+      }, [projectId]);
 
     // IndexedDB에 저장된 씬들 중 현재 프로젝트의 씬만 objectCount 합산
     const refreshSavedObjectCount = React.useCallback(async () => {
       try {
+        if (!projectScenes || projectScenes.length === 0) {
+          console.log('Project scenes not loaded yet, skipping refresh');
+          return;
+        }
+
         const states = await getAllCanvasStates();
         // build per-scene map only for scenes in current project
         const ids = new Set(projectScenes.map((s) => s.id));
@@ -119,19 +126,20 @@ export default function Navbar({ transparent: propTransparent = false }) {
       refreshSavedObjectCount();
 
       const onIndexedDbSave = (e) => {
-        const d = e.detail || {};
-        // 프로젝트에 속한 씬에 대한 저장이면 갱신
-        if (d && d.sceneId && projectScenes.find((p) => p.id === d.sceneId)) {
-          refreshSavedObjectCount();
-        }
+        refreshSavedObjectCount();
       };
 
       const onIndexedDbDelete = (e) => {
-        const d = e.detail || {};
-        if (d && d.sceneId && projectScenes.find((p) => p.id === d.sceneId)) {
-          // 삭제된 씬의 카운트는 0으로 처리
-          refreshSavedObjectCount();
-        }
+        refreshSavedObjectCount();
+      };
+      const onTransformComplete = (e) => {
+        console.log('Transform complete event received:', e.detail);
+        refreshSavedObjectCount();
+      };
+
+      const onSceneCreated = async (e) => {
+        await loadProjectScenes();
+        setTimeout(() => refreshSavedObjectCount(), 200);
       };
 
       const onEditorUpdated = () => refreshSavedObjectCount();
@@ -139,15 +147,16 @@ export default function Navbar({ transparent: propTransparent = false }) {
 
       window.addEventListener("indexeddb:canvas-saved", onIndexedDbSave);
       window.addEventListener("indexeddb:canvas-deleted", onIndexedDbDelete);
+      window.addEventListener("editor:transform-complete", onTransformComplete); // 추가
+      window.addEventListener("editor:scene-changed", onSceneCreated); // 추가
       window.addEventListener("editor:updated", onEditorUpdated);
       window.addEventListener("editor:json-ready", onJsonReady);
 
       return () => {
         window.removeEventListener("indexeddb:canvas-saved", onIndexedDbSave);
-        window.removeEventListener(
-          "indexeddb:canvas-deleted",
-          onIndexedDbDelete
-        );
+        window.removeEventListener("indexeddb:canvas-deleted", onIndexedDbDelete);
+        window.removeEventListener("editor:transform-complete", onTransformComplete); // 추가
+        window.removeEventListener("editor:scene-changed", onSceneCreated); // 추가
         window.removeEventListener("editor:updated", onEditorUpdated);
         window.removeEventListener("editor:json-ready", onJsonReady);
       };
@@ -160,6 +169,10 @@ export default function Navbar({ transparent: propTransparent = false }) {
     React.useEffect(() => {
       setLocalDots(Number(editorState.targetDots) || 2000);
     }, [editorState.targetDots]);
+    
+    React.useEffect(() => {
+      loadProjectScenes();
+    }, [loadProjectScenes]);
 
     const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
     const handleRangeChange = (e) => {
@@ -211,16 +224,13 @@ export default function Navbar({ transparent: propTransparent = false }) {
               >
                 <span className="text-base font-medium">드론 개수 </span>
                 <span className="text-base">
-                  {(() => { try {
-                    if (sceneId) {
-                      if (api?.imageUrl.startsWith("/processed")) {
-                        return perSceneCounts?.[sceneId] ?? 0;
-                      }
-                      return "-";
-                    }
-                  } catch (_) {}
-                  return savedObjectCount;
-                })()}
+                  {(() => {
+                    try {
+                      if (!editorState.isTransformed) return "-";
+                      if (sceneId) {return perSceneCounts?.[sceneId] ?? 0;}
+                    } catch (_) {}
+                    return savedObjectCount;
+                  })()}
                 </span>
               </span>
             </div>
@@ -297,7 +307,7 @@ export default function Navbar({ transparent: propTransparent = false }) {
                   JSON으로 내보내기
                 </span>
             </div>
-            
+
             <div className="relative group">
               <button
                   onClick={async () => {
@@ -331,7 +341,7 @@ export default function Navbar({ transparent: propTransparent = false }) {
                 </button>
               )}
 
-              
+
           </div>
         </div>
       </nav>

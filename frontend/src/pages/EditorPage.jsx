@@ -633,6 +633,11 @@ export default function EditorPage({projectId = DUMMY}) {
 
       const nextTotal = nextScenes.length + 1;
       if (nextTotal > VISIBLE) setStart(nextTotal - VISIBLE);
+
+      window.dispatchEvent(new CustomEvent('editor:scene-changed', {
+        detail: { sceneId: createdId, projectId }
+      }));
+
     } catch (e) {
       console.error(e);
       alert("씬 생성 실패");
