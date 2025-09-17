@@ -23,7 +23,7 @@ import PortalPopover from "../components/PortalPopover.jsx";
 import { deleteCanvasFromIndexedDB, saveCanvasToIndexedDB } from "../utils/indexedDBUtils.js";
 import { useUndoRedo } from '../hooks/useUndoRedo';
 import "../styles/EditorPage.css";
-
+import { IoMdCheckmarkCircleOutline } from "react-icons/io";
 const VISIBLE = 4;
 const DUMMY = "11111111-1111-1111-1111-111111111111";
 
@@ -1537,12 +1537,16 @@ export default function EditorPage({projectId = DUMMY}) {
           {/* 변환 완료 후 */}
           {isSceneTransformed && (
             <div className="transform-complete-box">
-              <div className="transform-complete-title">✅ 변환 완료</div>
+              <div className="transform-complete-title inline-flex items-center gap-2 font-bold">
+                <IoMdCheckmarkCircleOutline className="text-green-500 w-5 h-5" />
+                변환 완료
+              </div>
               <div className="transform-complete-text">
                 브러쉬 도구로 추가 편집이 가능합니다.
               </div>
             </div>
           )}
+
 
           <div className="separator"/>
 

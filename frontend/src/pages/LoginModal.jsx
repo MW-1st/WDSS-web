@@ -280,7 +280,13 @@ export default function LoginModal() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full mt-1.5 rounded bg-[#646cff] hover:bg-[#5c64ed] text-white py-1.5 font-yuniverse transition font-bold text-lg"
+                  className="w-full mt-1.5 rounded bg-[#646cff] hover:bg-[#5c64ed] text-white py-1.5 font-yuniverse font-bold text-lg
+                            transition duration-200
+                            bg-gradient-to-t from-[#646cff] via-[#5c64ed] to-[#646cff]
+                            animate-gradient
+                            hover:from-[#5c64ed] hover:via-[#4b54d6] hover:to-[#5c64ed]
+                            active:from-[#4b54d6] active:via-[#3a42b8] active:to-[#4b54d6]
+                            disabled:opacity-60"
                 >
                   {loading ? "Logging in..." : "Login"}
                 </button>
@@ -296,14 +302,18 @@ export default function LoginModal() {
                   <div className="mb-1 text-lg font-bold flex items-center justify-between">
                     Email
                     {!emailSent && !tokenValidated && (
-                      <button
-                        type="button"
-                        onClick={handleSendVerification}
-                        disabled={loading || !email}
-                        className="px-2 py-1 text-xs rounded bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white transition"
-                      >
-                        Send Verification
-                      </button>
+                    <button
+                      type="button"
+                      onClick={handleSendVerification}
+                      disabled={loading || !email}
+                      className={`px-2 py-1 text-xs rounded text-white transition
+                        ${loading || !email
+                          ? 'bg-gray-400 cursor-not-allowed'
+                          : 'bg-gradient-to-t from-indigo-600 via-indigo-700 to-indigo-600 animate-gradient hover:from-indigo-700 hover:via-indigo-800 hover:to-indigo-700 active:from-indigo-800 active:via-indigo-900 active:to-indigo-800'
+                        }`}
+                    >
+                      Send Verification
+                    </button>
                     )}
                     {tokenValidated && (
                       <span className="text-xs text-green-600 font-bold">✅ Verified</span>
@@ -394,7 +404,11 @@ export default function LoginModal() {
                 <button
                   type="submit"
                   disabled={loading || !tokenValidated}
-                  className="w-full mt-1.5 rounded bg-[#646cff] hover:bg-[#5c64ed] disabled:bg-gray-400 text-white py-1.5 font-yuniverse transition font-bold text-lg"
+                  className={`w-full mt-1.5 rounded py-1.5 font-yuniverse font-bold text-lg transition text-white
+                    ${loading || !tokenValidated
+                      ? "bg-gray-400 cursor-not-allowed" 
+                      : "bg-gradient-to-t from-[#646cff] via-[#5c64ed] to-[#646cff] animate-gradient hover:from-[#5c64ed] hover:via-[#4b54d6] hover:to-[#5c64ed] active:from-[#4b54d6] active:via-[#3a42b8] active:to-[#4b54d6]"}
+                  `}
                 >
                   {loading ? "Registering..." : "Create Account"}
                 </button>

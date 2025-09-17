@@ -220,15 +220,15 @@ export default function Navbar({ transparent: propTransparent = false }) {
                 })()}
               >
                 <span className="text-sm font-medium">드론 개수 </span>
-                <span className="bg-gray-200 text-gray-900 px-2 py-0.5 rounded-full text-sm font-bold">
-                  {(() => {
-                    try {
-                      if (!editorState.isTransformed) return "-";
-                      if (sceneId) {return perSceneCounts?.[sc.id] ?? 0;}
-                    } catch (_) {}
-                    return savedObjectCount;
-                  })()}
-                </span>
+              <span className="bg-gray-200 text-gray-900 px-2 py-0.5 rounded-full text-sm font-bold">
+                {(() => {
+                  try {
+                    if (sceneId) return perSceneCounts?.[sceneId] ?? 0;  // ✅ 현재 씬만 카운트
+                  } catch (_) {}
+                  return savedObjectCount;  // 씬 없으면 전체 합계
+                })()}
+              </span>
+
             </span>
 
             <div className="flex items-center gap-2">
@@ -338,14 +338,7 @@ export default function Navbar({ transparent: propTransparent = false }) {
                 </span>
             </div>
 
-              {isUnityVisible && (
-                <button
-                  className="px-3 py-1.5 rounded !bg-red-600 hover:!bg-red-700 text-white flex items-center gap-2"
-                  onClick={hideUnity}
-                >
-                  Unity 시뮬레이터 닫기
-                </button>
-              )}
+           
 
 
           </div>
@@ -416,8 +409,8 @@ export default function Navbar({ transparent: propTransparent = false }) {
               onClick={logout}
               className={
                 transparent
-                  ? "px-5 py-2 text-xl font-extrabold rounded bg-white/80 hover:bg-white transition text-transparent bg-clip-text hover:underline underline-offset-4 decoration-2 decoration-white"
-                  : "px-5 py-2 text-lg rounded bg-gray-900 hover:bg-black text-white transition"
+                  ? "px-5 py-2 text-xl font-extrabold rounded bg-white/80 text-transparent bg-clip-text transition duration-200 hover:bg-white hover:underline underline-offset-4 decoration-2 decoration-white active:scale-95"
+                  : "px-4.5 py-2 text-lg rounded bg-gray-900 text-white transition duration-200 hover:bg-black active:scale-95"
               }
             >
               Logout

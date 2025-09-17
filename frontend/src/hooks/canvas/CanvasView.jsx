@@ -33,7 +33,7 @@ export default function CanvasView({
             top: "50%",
             left: "50%",
             transform: "translate(-50%, -50%)",
-            backgroundColor: "rgba(0, 123, 255, 0.9)",
+            backgroundColor: "rgba(30, 58, 138, 0.32)",
             color: "white",
             padding: "12px 24px",
             borderRadius: "8px",
