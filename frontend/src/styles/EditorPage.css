@@ -6,8 +6,9 @@
 
 .editor-shell {
   width: 100%;
-  height: auto;
+  height: calc(100dvh - var(--app-header-h));
   min-height: calc(100dvh - var(--app-header-h));
+  flex: 1 1 auto;
   background: #fff;
   display: flex;
   align-items: stretch;
@@ -41,8 +42,6 @@
   box-sizing: border-box;
   z-index: 1200;
 
-  /* ✅ sticky가 ‘얼마나 길지’ 알아야 하므로 높이 명시 */
-  height: 100dvh; /* 헤더가 있으면 calc(100dvh - var(--app-header-h)) */
   display: flex; /* 내부를 flex column으로 채우기 위해 */
 }
 
@@ -110,6 +109,7 @@
 
 .main-content {
   flex: 1 1 auto;
+  display: flex;
   flex-direction: column;
   min-height: 0;
   max-height: calc(100dvh - var(--app-header-h)); /* ✅ 한 화면에 고정 */
@@ -140,7 +140,6 @@
   z-index: 50;
 
   /* ✅ 전고정 높이 */
-  height: 100dvh; /* 헤더 있으면 calc(100dvh - var(--app-header-h)) */
   display: flex;
 }
 .right-panel-inner {
