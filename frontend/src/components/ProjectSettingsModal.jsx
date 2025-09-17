@@ -114,7 +114,7 @@ export default function ProjectSettingsModal({ project, onClose, onSaved, mode: 
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-[70] grid place-items-center p-4 bg-blurred backdrop-blur-sm bg-black/30">
+    <div role="dialog" aria-modal="true" className="fixed inset-0 z-[2000] grid place-items-center p-4 bg-blurred backdrop-blur-sm bg-black/30">
       <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl ring-1 ring-black/5 overflow-hidden">
         <div className="flex items-center justify-between px-5 pt-5 pb-3 ">
           <h3 className="text-xl font-bold">{mode === "create" ? "프로젝트 생성" : "프로젝트 설정"}</h3>
