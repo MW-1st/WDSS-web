@@ -7,6 +7,7 @@ import { ImExit } from "react-icons/im";
 import { FaFileExport } from "react-icons/fa6";
 import { FaRegCirclePlay } from "react-icons/fa6";
 import { getAllCanvasStates } from "../utils/indexedDBUtils";
+import ResponsiveProjectTitle from "./ResponsiveProjectTitle.jsx";
 
 
 export default function Navbar({ transparent: propTransparent = false }) {
@@ -25,7 +26,7 @@ export default function Navbar({ transparent: propTransparent = false }) {
       processing: api?.processing || false,
       imageUrl: api?.imageUrl || "",
       selectedId: api?.selectedId || null,
-      projectName: api?.projectName || "",
+      projectName: api?.projectName || "Untitled Project",
       isTransformed: false,
     }));
 
@@ -186,10 +187,10 @@ export default function Navbar({ transparent: propTransparent = false }) {
     };
 
     return (
-      <nav className="px-4 py-2 flex justify-center font-nanumhuman border-b border-gray-200">
-        <div className="w-full flex justify-between items-center gap-40">
-          {/* Logo + Project name */}
-          <div className="flex items-center gap-3">
+      <nav className="h-14 px-4 flex items-center font-nanumhuman bg-white shadow-sm relative border-b border-gray-200">
+        <div className="w-full flex justify-between items-center">
+          {/* Left side */}
+          <div className="flex items-center gap-4">
             <Link
               to="/"
               title="메인 페이지"
@@ -197,13 +198,9 @@ export default function Navbar({ transparent: propTransparent = false }) {
             >
               <img src="/img/Logo.png" alt="Logo" className="h-10 w-auto" />
             </Link>
-            <div
-              className="font-extrabold text-2xl max-w-[480px] truncate"
-              title={editorState.projectName || "Untitled Project"}
-            >
-              {editorState.projectName || "Untitled Project"}
-              <span
-                className="ml-3 inline-flex items-center gap-2 text-sm font-medium text-gray-800"
+            
+            <span
+                className="inline-flex items-center gap-2 text-sm font-medium text-gray-800"
                 title={(() => {
                   // 툴팁: 각 씬별 카운트 나열
                   try {
@@ -222,45 +219,54 @@ export default function Navbar({ transparent: propTransparent = false }) {
                   }
                 })()}
               >
-                <span className="text-base font-medium">드론 개수 </span>
-                <span className="text-base">
+                <span className="text-sm font-medium">드론 개수 </span>
+                <span className="bg-gray-200 text-gray-900 px-2 py-0.5 rounded-full text-sm font-bold">
                   {(() => {
                     try {
                       if (!editorState.isTransformed) return "-";
-                      if (sceneId) {return perSceneCounts?.[sceneId] ?? 0;}
+                      if (sceneId) {return perSceneCounts?.[sc.id] ?? 0;}
                     } catch (_) {}
                     return savedObjectCount;
                   })()}
                 </span>
-              </span>
-            </div>
-            <div className="flex items-center gap-2 ml-6">
-              <button
-                onClick={() => api?.undo?.()}
-                disabled={!api?.canUndo || api?.isProcessing}
-                className="p-2 rounded border border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                title="실행 취소 (Ctrl+Z)"
-              >
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/>
-                </svg>
-              </button>
-              <button
-                onClick={() => api?.redo?.()}
-                disabled={!api?.canRedo || api?.isProcessing}
-                className="p-2 rounded border border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                title="다시 실행 (Ctrl+Shift+Z)"
-              >
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M18.4 10.6C16.55 8.99 14.15 8 11.5 8c-4.65 0-8.58 3.03-9.96 7.22L3.9 16c1.05-3.19 4.05-5.5 7.6-5.5 1.95 0 3.73.72 5.12 1.88L13 16h9V7l-3.6 3.6z"/>
-                </svg>
-              </button>
+            </span>
+
+            <div className="flex items-center gap-2">
+                <button
+                    onClick={() => api?.undo?.()}
+                    disabled={!api?.canUndo || api?.isProcessing}
+                    className="w-8 h-8 flex items-center justify-center rounded-3xl hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="실행 취소 (Ctrl+Z)"
+                >
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/>
+                    </svg>
+                </button>
+                <button
+                    onClick={() => api?.redo?.()}
+                    disabled={!api?.canRedo || api?.isProcessing}
+                    className="w-8 h-8 flex items-center justify-center rounded-3xl hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="다시 실행 (Ctrl+Shift+Z)"
+                >
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M18.4 10.6C16.55 8.99 14.15 8 11.5 8c-4.65 0-8.58 3.03-9.96 7.22L3.9 16c1.05-3.19 4.05-5.5 7.6-5.5 1.95 0 3.73.72 5.12 1.88L13 16h9V7l-3.6 3.6z"/>
+                    </svg>
+                </button>
             </div>
           </div>
-          {/* JSON + Unity Controls */}
-          <div className="flex items-center gap-2">
+
+          {/* Center: Project Name */}
+          <div className="absolute left-1/2 -translate-x-1/2 w-2/5 px-4">
+            <ResponsiveProjectTitle
+              title={editorState.projectName}
+              className="font-semibold text-xl text-center w-full"
+            />
+          </div>
+
+          {/* Right side: JSON + Unity Controls */}
+          <div className="flex items-center gap-3">
             <div className="relative group">
- <button
+               <button
                   onClick={async () => {
                     let url = lastJsonUrl;
                     // If no JSON generated yet, try to generate via editor API
@@ -299,9 +305,9 @@ export default function Navbar({ transparent: propTransparent = false }) {
                       window.open(url, "_blank", "noopener");
                     }
                   }}
-                  className="px-3 rounded text-[#111827] font-extrabold text-2xl transition-all duration-200 hover:translate-y-[1px] active:translate-y-[2px]"
+                  className="w-11 h-11 flex items-center justify-center rounded text-[#111827] transition-all duration-200 hover:bg-gray-100 active:bg-gray-200"
                 >
-                  <FaFileExport size={26} />
+                  <FaFileExport size={22} />
                 </button>
                 <span className="absolute -left-12 top-full mt-2 px-2 py-0.5 text-xs bg-gray-800 text-white rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-[100] pointer-events-none">
                   JSON으로 내보내기
@@ -323,9 +329,9 @@ export default function Navbar({ transparent: propTransparent = false }) {
                       alert("JSON 생성 기능을 사용할 수 없습니다.");
                     }
                   }}
-                  className="rounded text-[#111827] font-bold text-2xl transition-all duration-200 hover:translate-y-[1px] active:translate-y-[2px]"
+                  className="w-11 h-11 flex items-center justify-center rounded text-[#111827] transition-all duration-200 hover:bg-gray-100 active:bg-gray-200"
                 >
-                  <FaRegCirclePlay size={26}/>
+                  <FaRegCirclePlay size={22}/>
                 </button>
                 <span className="absolute -left-24 top-full mt-2 px-2 py-0.5 text-xs bg-gray-800 text-white rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-[100] pointer-events-none">
                   Unity 시뮬레이터 실행

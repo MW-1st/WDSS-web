@@ -1,5 +1,5 @@
-:root {
-  --app-header-h: 64px; /* 실제 navbar 높이로 맞춰줘 */
+﻿:root {
+  --app-header-h: 56px; /* ?ㅼ젣 navbar ?믪씠濡?留욎떠以?*/
   --right-panel-w: clamp(240px, 22vw, 320px);
   --carousel-h: clamp(120px, 18vh, 180px);
 }
@@ -31,7 +31,7 @@
   --on-primary: #ffffff;
 }
 
-/* 좌측 레일 */
+/* 醫뚯륫 ?덉씪 */
 .left-rail {
   width: 64px;
   border-right: 1px solid #eee;
@@ -42,12 +42,12 @@
   box-sizing: border-box;
   z-index: 1200;
 
-  display: flex; /* 내부를 flex column으로 채우기 위해 */
+  display: flex; /* ?대?瑜?flex column?쇰줈 梨꾩슦湲??꾪빐 */
 }
 
-/* 내부는 컬럼 + 꽉 채우기 + 내부 스크롤 */
+/* ?대???而щ읆 + 苑?梨꾩슦湲?+ ?대? ?ㅽ겕濡?*/
 .left-rail-inner {
-  flex: 1 1 auto; /* ✅ 부모 높이를 꽉 채움 */
+  flex: 1 1 auto; /* ??遺紐??믪씠瑜?苑?梨꾩? */
   display: flex;
   flex-direction: column;
   overflow-y: auto;
@@ -112,20 +112,20 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  max-height: calc(100dvh - var(--app-header-h)); /* ✅ 한 화면에 고정 */
-  overflow: hidden; /* 페이지 스크롤 제거 */
+  max-height: calc(100dvh - var(--app-header-h)); /* ?????붾㈃??怨좎젙 */
+  overflow: hidden; /* ?섏씠吏 ?ㅽ겕濡??쒓굅 */
   padding-top: 12px;
 }
-/* 캔버스 영역은 남는 높이를 전부 먹고 내부 스크롤 */
+/* 罹붾쾭???곸뿭? ?⑤뒗 ?믪씠瑜??꾨? 癒밴퀬 ?대? ?ㅽ겕濡?*/
 .canvas-area {
-  flex: 1 1 auto; /* 남는 높이 전부 */
+  flex: 1 1 auto; /* ?⑤뒗 ?믪씠 ?꾨? */
   min-height: 0;
-  /* overflow: auto;  ✅ 캔버스가 커질 때만 이 안에서 스크롤 */
+  /* overflow: auto;  ??罹붾쾭?ㅺ? 而ㅼ쭏 ?뚮쭔 ???덉뿉???ㅽ겕濡?*/
 }
 
-/* 캐러셀은 항상 보이도록 고정 높이 */
+/* 罹먮윭?? ??긽 蹂댁씠?꾨줉 怨좎젙 ?믪씠 */
 .scene-carousel-wrapper {
-  flex: 0 0 clamp(110px, 16vh, 160px); /* 항상 보이도록 고정 높이 */
+  flex: 0 0 clamp(110px, 16vh, 160px); /* ??긽 蹂댁씠?꾨줉 怨좎젙 ?믪씠 */
   min-height: clamp(110px, 16vh, 160px);
 }
 
@@ -139,11 +139,11 @@
   box-sizing: border-box;
   z-index: 50;
 
-  /* ✅ 전고정 높이 */
+  /* ???꾧퀬???믪씠 */
   display: flex;
 }
 .right-panel-inner {
-  flex: 1 1 auto; /* ✅ 부모 높이를 꽉 채움 */
+  flex: 1 1 auto; /* ??遺紐??믪씠瑜?苑?梨꾩? */
   overflow-y: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -325,12 +325,12 @@
   transform: translateY(-50%);
 }
 
-/* 갤러리 패널은 화면 폭에 따라 자동 축소 */
+/* 媛ㅻ윭由??⑤꼸? ?붾㈃ ??뿉 ?곕씪 ?먮룞 異뺤냼 */
 .gallery-panel {
   flex: 0 0 clamp(200px, 18vw, 260px);
 }
 
-/* 작은 화면에서는 우측패널/캐러셀을 더 줄여서 1스크린 유지 */
+/* ?묒? ?붾㈃?먯꽌???곗륫?⑤꼸/罹먮윭?????以꾩뿬??1?ㅽ겕由??좎? */
 @media (max-height: 820px) {
   :root {
     --carousel-h: clamp(100px, 15vh, 140px);
@@ -341,3 +341,4 @@
     --right-panel-w: clamp(220px, 24vw, 280px);
   }
 }
+

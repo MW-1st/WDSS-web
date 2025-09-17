@@ -113,9 +113,6 @@
 
 .tool-button.clear-button:hover:not(:disabled) {
   color: var(--danger-dark, #c82333);
-  border-color: var(--danger-dark, #c82333);
-  border: 1px solid;
-  box-shadow: 0 3px 8px rgba(220, 53, 69, 0.35);
 }
 
 .tool-button.clear-button:focus-visible {
