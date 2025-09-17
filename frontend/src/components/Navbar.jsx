@@ -232,12 +232,18 @@ export default function Navbar({ transparent: propTransparent = false }) {
             </span>
 
             <div className="flex items-center gap-2">
-                <button
-                    onClick={() => api?.undo?.()}
-                    disabled={!api?.canUndo || api?.isProcessing}
-                    className="w-8 h-8 flex items-center justify-center rounded-3xl hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="실행 취소 (Ctrl+Z)"
-                >
+               <button
+                onClick={() => api?.undo?.()}
+                disabled={!api?.canUndo || api?.isProcessing}
+                className="
+                  w-8 h-8 flex items-center justify-center rounded-3xl
+                  hover:bg-gray-200
+                  active:bg-gray-300 active:scale-95
+                  disabled:opacity-50 disabled:cursor-not-allowed
+                  transition-colors duration-150
+                "
+                title="실행 취소 (Ctrl+Z)"
+              >
                     <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/>
                     </svg>
@@ -245,7 +251,13 @@ export default function Navbar({ transparent: propTransparent = false }) {
                 <button
                     onClick={() => api?.redo?.()}
                     disabled={!api?.canRedo || api?.isProcessing}
-                    className="w-8 h-8 flex items-center justify-center rounded-3xl hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="
+                  w-8 h-8 flex items-center justify-center rounded-3xl
+                  hover:bg-gray-200
+                  active:bg-gray-300 active:scale-95
+                  disabled:opacity-50 disabled:cursor-not-allowed
+                  transition-colors duration-150
+                "
                     title="다시 실행 (Ctrl+Shift+Z)"
                 >
                     <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
