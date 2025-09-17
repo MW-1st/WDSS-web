@@ -26,34 +26,6 @@ export default function CanvasView({
     >
       <canvas ref={canvasRef} />
 
-      {deleteIconPos && drawingMode === "select" && (
-        <button
-          type="button"
-          onClick={onDeleteSelection}
-          style={{
-            // CanvasView: <canvas> 요소와 UI 오버레이를 렌더링합니다.
-            // - 드래그 오버 시 오버레이를 표시하고, 선택이 있을 때 삭제 버튼을 표시합니다.
-            top: deleteIconPos.top,
-            background: "#dc3545",
-            color: "#fff",
-            border: "none",
-            borderRadius: 16,
-            width: 28,
-            height: 28,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            boxShadow: "0 2px 6px rgba(0,0,0,.25)",
-            cursor: "pointer",
-            zIndex: 5000,
-          }}
-          title="선택 영역 삭제"
-          aria-label="선택 영역 삭제"
-        >
-          <MdDelete size={18} />
-        </button>
-      )}
-
       {isDragOver && (
         <div
           style={{
@@ -61,7 +33,7 @@ export default function CanvasView({
             top: "50%",
             left: "50%",
             transform: "translate(-50%, -50%)",
-            backgroundColor: "rgba(0, 123, 255, 0.9)",
+            backgroundColor: "rgba(30, 58, 138, 0.32)",
             color: "white",
             padding: "12px 24px",
             borderRadius: "8px",

@@ -45,19 +45,33 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 24px;
+  padding: 12px 20px;
   font-size: 1rem;
   font-weight: 600;
-  color: #fff;
-  background-color: #007bff;
+  color: #1e3a8a;
+  background-color: #ffffff;
   border: none;
   border-radius: 8px;
   cursor: pointer;
-  box-shadow: 0 4px 6px rgba(0, 123, 255, 0.1);
-  transition: all 0.2s ease;
+
+  /* 기본 그림자 */
+  box-shadow: 0 2px 4px rgba(30, 58, 138, 0.15);
+
+  /* 모든 변화 부드럽게 */
+  transition: background-color 0.25s ease, box-shadow 0.25s ease,
+    transform 0.15s ease;
 }
+
 .create-button:hover {
-  background-color: #0056b3;
+  background-color: #f1f5f9; /* 은은한 회색 톤 (tailwind slate-100) */
+  box-shadow: 0 4px 8px rgba(30, 58, 138, 0.25); /* 그림자 확대 */
+  transform: translateY(-1px); /* 살짝만 올라감 */
+}
+
+.create-button:active {
+  background-color: #e2e8f0; /* 클릭 시 조금 더 진한 회색 */
+  transform: translateY(0) scale(0.97); /* 눌리는 효과 */
+  box-shadow: 0 2px 4px rgba(30, 58, 138, 0.2); /* 눌릴 때 그림자 줄어듦 */
 }
 
 /* ▼▼ 여기부터가 '분리' 핵심 ▼▼ */
@@ -130,7 +144,7 @@
   border-radius: 9999px;
   background: rgba(255, 255, 255, 0.9);
   color: #dc2626;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.15s ease;

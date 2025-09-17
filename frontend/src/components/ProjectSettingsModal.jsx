@@ -234,14 +234,14 @@ export default function ProjectSettingsModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded px-4 py-2 border border-gray-300 text-gray-700 hover:bg-gray-50"
+              className="rounded px-4 py-2 border border-gray-300 text-gray-700 hover:bg-gray-200"
             >
               취소
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="rounded px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
+              className="rounded px-4 py-2 bg-[#1E3A8A] text-white hover:bg-[#172554] disabled:opacity-60"
             >
               {saving
                 ? mode === "create"

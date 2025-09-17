@@ -211,3 +211,16 @@
 .logo-press:active {
   transform: scale(0.96);
 }
+@keyframes gradient-move {
+  0% {
+    background-position: bottom;
+  }
+  100% {
+    background-position: top;
+  }
+}
+
+.animate-gradient {
+  background-size: 100% 200%; /* 세로로 크게 */
+  animation: gradient-move 4s ease-in-out infinite alternate;
+}
