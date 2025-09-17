@@ -7,7 +7,6 @@ export default function ProjectSettingsModal({ project, onClose, onSaved, mode: 
 
   const [form, setForm] = useState({
     project_name: "",
-    format: "dsj",
     max_scene: 15,
     max_drone: 1000,
     max_speed: 6.0,
@@ -21,7 +20,6 @@ export default function ProjectSettingsModal({ project, onClose, onSaved, mode: 
     if (project) {
       setForm({
         project_name: project.project_name ?? "",
-        format: project.format ?? "dsj",
         max_scene: project.max_scene ?? 15,
         max_drone: project.max_drone ?? 1000,
         max_speed: project.max_speed ?? 6.0,
@@ -31,7 +29,6 @@ export default function ProjectSettingsModal({ project, onClose, onSaved, mode: 
     } else {
       setForm({
         project_name: "",
-        format: "dsj",
         max_scene: 15,
         max_drone: 1000,
         max_speed: 6.0,
@@ -45,7 +42,7 @@ export default function ProjectSettingsModal({ project, onClose, onSaved, mode: 
     const val = e.target.value;
     setForm((prev) => ({
       ...prev,
-      [key]: key === "project_name" || key === "format" ? val : val === "" ? "" : Number(val),
+      [key]: key === "project_name" ? val : val === "" ? "" : Number(val),
     }));
   };
 
@@ -68,7 +65,6 @@ export default function ProjectSettingsModal({ project, onClose, onSaved, mode: 
 
     const payload = {
       project_name: form.project_name,
-      format: form.format || "dsj",
       max_scene: Number(form.max_scene),
       max_drone: Number(form.max_drone),
       max_speed: Number(form.max_speed),
@@ -144,17 +140,6 @@ export default function ProjectSettingsModal({ project, onClose, onSaved, mode: 
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">format</label>
-            <input
-              type="text"
-              value={form.format}
-              onChange={updateField("format")}
-              className="w-full rounded border border-gray-300 px-3 py-2"
-              placeholder="dsj"
-            />
-            <p className="mt-1 text-xs text-gray-500">기본 format은 'dsj' 입니다</p>
-          </div>
 
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
