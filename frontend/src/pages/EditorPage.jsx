@@ -1105,22 +1105,26 @@ export default function EditorPage({projectId = DUMMY}) {
 
   const handleChangeBrightness = useCallback((brightnessValue) => {
     const canvas = stageRef.current;
-    if (!canvas) return;
+    if (!canvas) {
+      return;
+    }
 
     const activeObject = canvas.getActiveObject();
-    if (activeObject) {
-      // Fabric.js 객체에 brightness 속성 직접 설정
-      activeObject.set('brightness', brightnessValue);
-
-      // 여러 객체가 선택된 경우
-      if (activeObject.type === 'activeSelection') {
-        activeObject.getObjects().forEach(obj => {
-          obj.set('brightness', brightnessValue);
-        });
-      }
-
-      canvas.requestRenderAll();
+    if (!activeObject) {
+      return;
     }
+
+    if (activeObject.type === 'activeselection') {
+      const objects = activeObject.getObjects();
+
+      objects.forEach((obj, index) => {
+        obj.set({ opacity: brightnessValue });
+      });
+    } else {
+      activeObject.set({ opacity: brightnessValue });
+    }
+
+    canvas.renderAll();
   }, []);
 
   // 레이어 관련 핸들러들
