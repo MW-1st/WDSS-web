@@ -198,26 +198,6 @@ export default function ObjectPropertiesPanel({
     setHasChanges(true);
   }, []);
 
-  // 적용 버튼 핸들러
-  const handleApplyChanges = useCallback(() => {
-    if (onChangeFill && localColor) {
-      onChangeFill(localColor);
-    }
-    if (onChangeBrightness) {
-      onChangeBrightness(localBrightness);
-    }
-    setHasChanges(false);
-
-    if (triggerAutoSave) {
-      console.log("🙏🏻🙏🏻🙏🏻 triggerAutoSave")
-      triggerAutoSave();
-    }
-    if (saveToHistory) {
-      console.log("🙏🏻🙏🏻🙏🏻 saveToHistory")
-      saveToHistory('property_change');
-    }
-  }, [onChangeFill, onChangeBrightness, localColor, localBrightness, triggerAutoSave, saveToHistory]);
-
   // 초기화 버튼 핸들러
   const handleResetChanges = useCallback(() => {
     if (selection) {
