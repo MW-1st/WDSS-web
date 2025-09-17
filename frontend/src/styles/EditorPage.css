@@ -1,5 +1,5 @@
 ﻿:root {
-  --app-header-h: 56px; /* ?ㅼ젣 navbar ?믪씠濡?留욎떠以?*/
+  --app-header-h: 56px; /* 상단 navbar 높이 */
   --right-panel-w: clamp(240px, 22vw, 320px);
   --carousel-h: clamp(120px, 18vh, 180px);
 }
@@ -16,25 +16,25 @@
   box-sizing: border-box;
   overflow-x: hidden;
   /* Editor theme variables (scoped to editor only) */
-  --primary: #1e3a8a; /* deep navy highlight */
-  --primary-dark: #162766; /* pressed state */
-  --accent: #38bdf8; /* bright cyan accent */
-  --primary-strong: #0f2f5f; /* text/icons on soft surfaces */
-  --primary-soft: #e3ebff; /* subtle highlight fills */
-  --primary-border: #c1d1ff; /* light borders */
-  --primary-glow: rgba(30, 58, 138, 0.32); /* focus halo */
-  --danger: #dc3545;
+  --primary: #1e3a8a; /* 메인 네이비 하이라이트 */
+  --primary-dark: #162766; /* 클릭/눌림 상태 */
+  --accent: #38bdf8; /* 밝은 하늘색 포인트 */
+  --primary-strong: #0f2f5f; /* 텍스트/아이콘 */
+  --primary-soft: #e3ebff; /* 은은한 강조 배경 */
+  --primary-border: #c1d1ff; /* 연한 테두리 */
+  --primary-glow: rgba(30, 58, 138, 0.32); /* 포커스 효과 */
+  --danger: #dc3545; /* 경고/삭제 */
   --danger-dark: #c82333;
   --muted: #6c757d;
-  --muted-weak: #adb5bd; /* lighter gray for secondary buttons */
+  --muted-weak: #adb5bd; /* 보조 버튼용 연한 회색 */
   --muted-dark: #5a6268;
   --on-primary: #ffffff;
 }
 
-/* 醫뚯륫 ?덉씪 */
+/* 왼쪽 도구 패널 */
 .left-rail {
   width: 64px;
-  border-right: 1px solid #cbd5e1; /* darker than #eee */
+  border-right: 1px solid #cbd5e1; /* 기존 #eee보다 조금 진하게 */
   position: sticky;
   top: var(--app-header-h);
   height: calc(100dvh - var(--app-header-h));
@@ -42,12 +42,12 @@
   box-sizing: border-box;
   z-index: 1200;
 
-  display: flex; /* ?대?瑜?flex column?쇰줈 梨꾩슦湲??꾪빐 */
+  display: flex; /* 도구들을 flex column으로 배치 */
 }
 
-/* ?대???而щ읆 + 苑?梨꾩슦湲?+ ?대? ?ㅽ겕濡?*/
+/* 도구 버튼 + 스크롤 가능 영역 */
 .left-rail-inner {
-  flex: 1 1 auto; /* ??遺紐??믪씠瑜?苑?梨꾩? */
+  flex: 1 1 auto; /* 내부 콘텐츠 영역 */
   display: flex;
   flex-direction: column;
   overflow-y: auto;
@@ -67,10 +67,11 @@
   margin-top: auto;
   display: flex;
   align-items: center;
-  justify-content: center; /* center settings button like other tools */
-  z-index: 3000; /* above left-rail-inner but below any app overlays */
+  justify-content: center; /* 다른 도구처럼 중앙 정렬 */
+  z-index: 3000;
 }
 
+/* 설정 버튼 툴팁 */
 .settings-container a.tool-button {
   position: relative;
 }
@@ -91,7 +92,6 @@
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.15s ease, transform 0.15s ease;
-  /* Slightly above the rail to ensure visibility */
   z-index: 1300;
 }
 
@@ -101,24 +101,27 @@
   transform: translateY(-50%);
 }
 
-/* Scene thumbnails */
+/* 씬(장면) 썸네일 */
 .scene-thumb {
   border: 1px solid #d0d0d0;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
-  transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+  transition: transform 120ms ease, box-shadow 120ms ease,
+    border-color 120ms ease;
 }
 .scene-thumb:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12);
-  border-color: #a3b1c6; /* slightly darker on hover */
+  border-color: #a3b1c6;
 }
 .scene-thumb:active {
   transform: translateY(0) scale(0.98);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
 }
 .scene-thumb.is-selected {
-  border-color: #5b5bd6;
-  box-shadow: 0 0 0 2px rgba(91, 91, 214, 0.15), 0 2px 6px rgba(0, 0, 0, 0.08);
+  border-color: #64748b;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.16);
+  outline: 3px solid rgba(99, 102, 241, 0.45);
+  outline-offset: 2px;
 }
 
 .gallery-panel {
@@ -127,31 +130,34 @@
   box-sizing: border-box;
 }
 
+/* 메인 편집 영역 */
 .main-content {
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  max-height: calc(100dvh - var(--app-header-h)); /* ?????붾㈃??怨좎젙 */
-  overflow: hidden; /* ?섏씠吏 ?ㅽ겕濡??쒓굅 */
+  max-height: calc(100dvh - var(--app-header-h)); /* 화면 크기에 맞춤 */
+  overflow: hidden; /* 페이지 스크롤 제거 */
   padding-top: 12px;
 }
-/* 罹붾쾭???곸뿭? ?⑤뒗 ?믪씠瑜??꾨? 癒밴퀬 ?대? ?ㅽ겕濡?*/
+
+/* 캔버스 영역 (남는 높이를 채움) */
 .canvas-area {
-  flex: 1 1 auto; /* ?⑤뒗 ?믪씠 ?꾨? */
+  flex: 1 1 auto;
   min-height: 0;
-  /* overflow: auto;  ??罹붾쾭?ㅺ? 而ㅼ쭏 ?뚮쭔 ???덉뿉???ㅽ겕濡?*/
+  /* overflow: auto;  // 캔버스 내부에서만 스크롤 */
 }
 
-/* 罹먮윭?? ??긽 蹂댁씠?꾨줉 怨좎젙 ?믪씠 */
+/* 씬 캐러셀 영역 고정 높이 */
 .scene-carousel-wrapper {
-  flex: 0 0 clamp(110px, 16vh, 160px); /* ??긽 蹂댁씠?꾨줉 怨좎젙 ?믪씠 */
+  flex: 0 0 clamp(110px, 16vh, 160px);
   min-height: clamp(110px, 16vh, 160px);
 }
 
+/* 오른쪽 속성 패널 */
 .right-panel {
   width: 280px;
-  border-left: 1px solid #cbd5e1; /* darker than #eee */
+  border-left: 1px solid #cbd5e1;
   position: sticky;
   top: var(--app-header-h);
   height: calc(100dvh - var(--app-header-h));
@@ -159,19 +165,14 @@
   box-sizing: border-box;
   z-index: 50;
 
-  /* ???꾧퀬???믪씠 */
   display: flex;
 }
 .right-panel-inner {
-  flex: 1 1 auto; /* ??遺紐??믪씠瑜?苑?梨꾩? */
+  flex: 1 1 auto;
   overflow-y: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
   padding: 16px;
-}
-.right-panel-inner::-webkit-scrollbar {
-  width: 0;
-  height: 0;
 }
 .right-panel-inner::-webkit-scrollbar {
   width: 0;
@@ -233,23 +234,23 @@
   word-break: keep-all;
 }
 
-/* Right panel accordion */
+/* 오른쪽 패널 아코디언 */
 .accordion-section {
   margin-top: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); /* match layer panel shadow */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   border-radius: 8px;
   transition: transform 120ms ease, box-shadow 120ms ease;
 }
 .accordion-header {
   width: 100%;
   text-align: left;
-  padding: 10px 16px; /* match layer-panel-header */
-  border: 1px solid #dee2e6; /* match layer-panel border */
+  padding: 10px 16px;
+  border: 1px solid #dee2e6;
   border-radius: 8px;
-  background: #fff; /* match layer-panel-header */
-  color: #343a40; /* match layer-panel-header text */
+  background: #fff;
+  color: #343a40;
   font-weight: 600;
-  font-size: 16px; /* match layer-panel-header h3 size */
+  font-size: 16px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -261,35 +262,31 @@
 .accordion-header:hover {
   transform: scale(1.01);
 }
-/* When open, visually merge header with body */
 .accordion-header[aria-expanded="true"] {
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;
 }
 
-/* Accordion body as a unified card with the header */
 .accordion-body {
-  border: 1px solid #dee2e6; /* match layer-panel */
-  border-top: none; /* merge with header */
+  border: 1px solid #dee2e6;
+  border-top: none;
   border-bottom-left-radius: 8px;
   border-bottom-right-radius: 8px;
   background: #ffffff;
   padding: 12px;
 }
 
-/* Make inner properties panel seamless when placed inside accordion */
+/* Accordion 내부 속성 패널을 카드와 일체감 있게 */
 .accordion-body .properties-panel {
   border: none;
   box-shadow: none;
   background: transparent;
   padding: 0;
 }
-
 .accordion-body .properties-panel-body {
   padding: 0;
 }
 
-/* Small selection/type badge inside the accordion header */
 .accordion-badge {
   padding: 2px 8px;
   font-size: 12px;
@@ -302,7 +299,7 @@
   text-transform: lowercase;
 }
 
-/* Scene Carousel Navigation */
+/* 씬 캐러셀 네비게이션 버튼 */
 .scene-carousel-nav-button {
   position: absolute;
   top: 50%;
@@ -324,19 +321,16 @@
   transition: all 0.2s ease-out;
   padding-bottom: 2px;
 }
-
 .scene-carousel-nav-button:hover {
   border-color: #5b5bd6;
   transform: translateY(-50%) scale(1.05);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
 }
-
 .scene-carousel-nav-button:active {
   transform: translateY(-50%) scale(0.98);
   background-color: #f0f0f8;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
 }
-
 .scene-carousel-nav-button:disabled {
   cursor: not-allowed;
   opacity: 0.5;
@@ -345,12 +339,12 @@
   transform: translateY(-50%);
 }
 
-/* 媛ㅻ윭由??⑤꼸? ?붾㈃ ??뿉 ?곕씪 ?먮룞 異뺤냼 */
+/* 갤러리 패널이 화면 우측에 자동으로 조정되도록 */
 .gallery-panel {
   flex: 0 0 clamp(200px, 18vw, 260px);
 }
 
-/* ?묒? ?붾㈃?먯꽌???곗륫?⑤꼸/罹먮윭?????以꾩뿬??1?ㅽ겕由??좎? */
+/* 화면이 작은 경우 캐러셀/패널 크기 조정 */
 @media (max-height: 820px) {
   :root {
     --carousel-h: clamp(100px, 15vh, 140px);
@@ -361,4 +355,3 @@
     --right-panel-w: clamp(220px, 24vw, 280px);
   }
 }
-
