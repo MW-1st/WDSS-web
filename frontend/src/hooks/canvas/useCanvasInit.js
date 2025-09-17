@@ -58,7 +58,10 @@ export default function useCanvasInit({
       selection: false,
       skipTargetFind: false,
       perPixelTargetFind: false,
-      enableRetinaScaling: false,
+      // enable retina scaling so fabric keeps backing store in sync with
+      // devicePixelRatio / browser zoom. This helps avoid blurry or
+      // mis-positioned content when the user changes browser zoom.
+      enableRetinaScaling: true,
     });
 
     const clipPath = new fabric.Rect({
@@ -89,6 +92,20 @@ export default function useCanvasInit({
       }
     } catch (_) {}
     fabricCanvasRef.current = canvas;
+
+    // Ensure the canvas DOM element has explicit CSS width/height that
+    // matches the logical size. Fabric will manage the internal backing
+    // store size (retina) when `enableRetinaScaling` is enabled, but
+    // setting these styles avoids mismatch between CSS pixels and
+    // canvas internal pixels when the browser zoom/devicePixelRatio
+    // changes.
+    try {
+      const el = canvas.getElement();
+      if (el) {
+        el.style.width = `${width}px`;
+        el.style.height = `${height}px`;
+      }
+    } catch (_) {}
 
     if (externalStageRef) {
       externalStageRef.current = canvas;
