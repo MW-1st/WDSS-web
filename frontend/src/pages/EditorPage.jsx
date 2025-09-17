@@ -1105,22 +1105,26 @@ export default function EditorPage({projectId = DUMMY}) {
 
   const handleChangeBrightness = useCallback((brightnessValue) => {
     const canvas = stageRef.current;
-    if (!canvas) return;
+    if (!canvas) {
+      return;
+    }
 
     const activeObject = canvas.getActiveObject();
-    if (activeObject) {
-      // Fabric.js 객체에 brightness 속성 직접 설정
-      activeObject.set('brightness', brightnessValue);
-
-      // 여러 객체가 선택된 경우
-      if (activeObject.type === 'activeSelection') {
-        activeObject.getObjects().forEach(obj => {
-          obj.set('brightness', brightnessValue);
-        });
-      }
-
-      canvas.requestRenderAll();
+    if (!activeObject) {
+      return;
     }
+
+    if (activeObject.type === 'activeselection') {
+      const objects = activeObject.getObjects();
+
+      objects.forEach((obj, index) => {
+        obj.set({ opacity: brightnessValue });
+      });
+    } else {
+      activeObject.set({ opacity: brightnessValue });
+    }
+
+    canvas.renderAll();
   }, []);
 
   // 레이어 관련 핸들러들
@@ -1458,7 +1462,36 @@ export default function EditorPage({projectId = DUMMY}) {
           activeLayerId={activeLayerIdState}
           onModeChange={handleModeChange}
           onSelectionChange={(selection) => {
-            setSelectedObject(selection);
+            if (selection && stageRef.current) {
+              const activeObject = stageRef.current.getActiveObject();
+
+              if (activeObject && activeObject.type.toLowerCase() === 'activeselection') {
+                // 다중 선택: 첫 번째 객체의 속성을 대표값으로 사용
+                const objects = activeObject.getObjects();
+                const firstObject = objects[0];
+
+                const enhancedSelection = {
+                  ...selection,
+                  opacity: firstObject?.opacity || 1.0,
+                  fill: firstObject?.fill || selection.fill,
+                  customType: firstObject?.customType || selection.customType,
+                  // 다중 선택임을 명시
+                  isMultiSelection: true,
+                  objectCount: objects.length
+                };
+                setSelectedObject(enhancedSelection);
+              } else {
+                // 단일 선택
+                const enhancedSelection = {
+                  ...selection,
+                  opacity: activeObject?.opacity || 1.0,
+                  isMultiSelection: false
+                };
+                setSelectedObject(enhancedSelection);
+              }
+            } else {
+              setSelectedObject(selection);
+            }
             setSelectedObjectLayerId(selection?.layerId || null);
           }}
           onPanChange={setIsPanMode}

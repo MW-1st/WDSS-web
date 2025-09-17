@@ -11,25 +11,33 @@ function normalizeColorToHex(color) {
       /^rgb\s*\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$/
     );
     if (rgbMatch) {
-      const r = Math.max(0, Math.min(255, parseInt(rgbMatch[21], 10)));
-      const g = Math.max(0, Math.min(255, parseInt(rgbMatch[22], 10)));
-      const b = Math.max(0, Math.min(255, parseInt(rgbMatch[12], 10)));
+      const r = Math.max(0, Math.min(255, parseInt(rgbMatch[1], 10)));
+      const g = Math.max(0, Math.min(255, parseInt(rgbMatch[2], 10)));
+      const b = Math.max(0, Math.min(255, parseInt(rgbMatch[3], 10)));
       const toHex = (v) => v.toString(16).padStart(2, "0");
       return `#${toHex(r)}${toHex(g)}${toHex(b)}`.toUpperCase();
     }
   }
   return "#000000";
 }
+
+function getSelectedObjectOpacity(selection) {
+  if (!selection) return 1.0;
+  console.log("👍🏻",selection)
+  console.log("👍🏻",selection.opacity)
+  return selection.opacity || 1.0;
+}
+
 {/* 구분선 */}
 <div className="separator"/>
 // Brightness Control Component
-const BrightnessControl = ({ 
-  value = 1.0, 
-  onChange, 
-  min = 0.0, 
+const BrightnessControl = ({
+  value = 1.0,
+  onChange,
+  min = 0.0,
   max = 1.0,
   step = 0.1,
-  label = "Brightness" 
+  label = "Brightness"
 }) => {
   const [inputValue, setInputValue] = useState(value.toString());
   const [sliderValue, setSliderValue] = useState(value);
@@ -37,36 +45,37 @@ const BrightnessControl = ({
 
   const validateAndUpdate = useCallback((newValue) => {
     const numValue = parseFloat(newValue);
-    
+
     if (isNaN(numValue)) {
       setError("유효한 숫자를 입력해주세요");
       return false;
     }
-    
+
     if (numValue < min || numValue > max) {
       setError(`값은 ${min}~${max} 범위 내여야 합니다`);
       return false;
 
     }
-    
+
     setError("");
     setSliderValue(numValue);
-    onChange?.(numValue);
     return true;
-  }, [min, max, onChange]);
+  }, [min, max]);
 
   const handleInputChange = useCallback((e) => {
     const newValue = e.target.value;
     setInputValue(newValue);
     validateAndUpdate(newValue);
-  }, [validateAndUpdate]);
+    onChange?.(parseFloat(newValue));
+  }, [validateAndUpdate, onChange]);
 
   const handleSliderChange = useCallback((e) => {
     const newValue = parseFloat(e.target.value);
     setInputValue(newValue.toString());
     setSliderValue(newValue);
     validateAndUpdate(newValue);
-  }, [validateAndUpdate]);
+    onChange?.(newValue);
+  }, [validateAndUpdate, onChange]);
 
   // selection이 변경될 때마다 값 동기화
   useEffect(() => {
@@ -79,7 +88,7 @@ const BrightnessControl = ({
     <div className="brightness-control">
       <div className="brightness-input-group">
         <label className="brightness-label">{label}</label>
-        
+
         <div className="brightness-number-container">
           <input
             type="number"
@@ -99,7 +108,7 @@ const BrightnessControl = ({
           />
           <span className="brightness-unit">배율</span>
         </div>
-        
+
         <div className="brightness-slider-container">
           <input
             type="range"
@@ -117,7 +126,7 @@ const BrightnessControl = ({
             <span className="slider-max">{max}</span>
           </div>
         </div>
-        
+
         {error && (
           <div className="brightness-error" role="alert">
             ⚠️ {error}
@@ -128,18 +137,17 @@ const BrightnessControl = ({
   );
 };
 
-export default function ObjectPropertiesPanel({ 
-  selection, 
-  onChangeFill, 
+export default function ObjectPropertiesPanel({
+  selection,
+  onChangeFill,
   onChangeBrightness,
   triggerAutoSave,
   saveToHistory,
 }) {
   const isMulti = selection?.type === "activeSelection";
-  
+
   // 로컬 상태로 현재 편집 중인 값들을 관리
   const [localColor, setLocalColor] = useState("");
-  const [localBrightness, setLocalBrightness] = useState(1.0);
   const [hasChanges, setHasChanges] = useState(false);
 
   // 원본값 메모이제이션 (필드별 적용 여부 판단)
@@ -147,19 +155,19 @@ export default function ObjectPropertiesPanel({
     () => normalizeColorToHex(selection?.fill || selection?.stroke),
     [selection]
   );
-  const originalBrightness = useMemo(
-    () => selection?.brightness || 1.0,
-    [selection]
-  );
+  const originalOpacity = useMemo(() => {
+    return getSelectedObjectOpacity(selection);
+  }, [selection])
+  const [localOpacity, setLocalOpacity] = useState(originalOpacity);
 
   // 필드별 변경 여부
   const colorChanged = useMemo(
     () => !!localColor && originalColor && localColor.toUpperCase() !== originalColor.toUpperCase(),
     [localColor, originalColor]
   );
-  const brightnessChanged = useMemo(
-    () => Math.abs(localBrightness - originalBrightness) > 1e-6,
-    [localBrightness, originalBrightness]
+  const opacityChanged = useMemo(
+    () => Math.abs(localOpacity - originalOpacity) > 1e-6,
+    [localOpacity, originalOpacity]  // brightness -> opacity
   );
 
   // 색깔과 brightness 둘 다에서 사용할 공통 조건
@@ -178,10 +186,10 @@ export default function ObjectPropertiesPanel({
   useEffect(() => {
     if (selection) {
       const currentColor = normalizeColorToHex(selection?.fill || selection?.stroke);
-      const currentBrightness = selection?.brightness || 1.0;
-      
+      const currentOpacity  = selection?.opacity  || 1.0;
+
       setLocalColor(currentColor);
-      setLocalBrightness(currentBrightness);
+      setLocalOpacity(currentOpacity );
       setHasChanges(false);
     }
   }, [selection]);
@@ -194,38 +202,18 @@ export default function ObjectPropertiesPanel({
 
   // 밝기 변경 핸들러
   const handleBrightnessChange = useCallback((newBrightness) => {
-    setLocalBrightness(newBrightness);
+    setLocalOpacity(newBrightness);
     setHasChanges(true);
   }, []);
-
-  // 적용 버튼 핸들러
-  const handleApplyChanges = useCallback(() => {
-    if (onChangeFill && localColor) {
-      onChangeFill(localColor);
-    }
-    if (onChangeBrightness) {
-      onChangeBrightness(localBrightness);
-    }
-    setHasChanges(false);
-
-    if (triggerAutoSave) {
-      console.log("🙏🏻🙏🏻🙏🏻 triggerAutoSave")
-      triggerAutoSave();
-    }
-    if (saveToHistory) {
-      console.log("🙏🏻🙏🏻🙏🏻 saveToHistory")
-      saveToHistory('property_change');
-    }
-  }, [onChangeFill, onChangeBrightness, localColor, localBrightness, triggerAutoSave, saveToHistory]);
 
   // 초기화 버튼 핸들러
   const handleResetChanges = useCallback(() => {
     if (selection) {
       const originalColor = normalizeColorToHex(selection?.fill || selection?.stroke);
-      const originalBrightness = selection?.brightness || 1.0;
-      
+      const originalBrightness = selection?.opacity || 1.0;
+
       setLocalColor(originalColor);
-      setLocalBrightness(originalBrightness);
+      setLocalOpacity(originalOpacity);
       setHasChanges(false);
     }
   }, [selection]);
@@ -234,19 +222,36 @@ export default function ObjectPropertiesPanel({
   const applyColor = useCallback(() => {
     if (onChangeFill && localColor) onChangeFill(localColor);
     setHasChanges(false);
-  }, [onChangeFill, localColor]);
+
+    if (triggerAutoSave) {
+      triggerAutoSave();
+    }
+    if (saveToHistory) {
+      saveToHistory('color_change');
+    }
+  }, [onChangeFill, localColor, triggerAutoSave, saveToHistory]);
+
   const resetColor = useCallback(() => {
     setLocalColor(originalColor);
     setHasChanges(false);
   }, [originalColor]);
+
   const applyBrightness = useCallback(() => {
-    if (onChangeBrightness) onChangeBrightness(localBrightness);
+    if (onChangeBrightness) onChangeBrightness(localOpacity);
     setHasChanges(false);
-  }, [onChangeBrightness, localBrightness]);
+
+    if (triggerAutoSave) {
+      triggerAutoSave();
+    }
+    if (saveToHistory) {
+      saveToHistory('brightness_change');
+    }
+  }, [onChangeBrightness, localOpacity, triggerAutoSave, saveToHistory]);
+
   const resetBrightness = useCallback(() => {
-    setLocalBrightness(originalBrightness);
+    setLocalOpacity(originalOpacity);
     setHasChanges(false);
-  }, [originalBrightness]);
+  }, [originalOpacity]);
 
   return (
     <div className="properties-panel">
@@ -300,14 +305,14 @@ export default function ObjectPropertiesPanel({
                   </div>
                 </div>
                 <BrightnessControl
-                  value={localBrightness}
+                  value={originalOpacity}
                   onChange={handleBrightnessChange}
                   min={0.0}
                   max={1.0}
                   step={0.1}
                   label="Brightness"
                 />
-                {brightnessChanged && (
+                {opacityChanged && (
                   <div className="field-actions">
                     <button type="button" className="btn-apply btn-sm" onClick={applyBrightness}>밝기 적용</button>
                     <button type="button" className="btn-reset btn-sm" onClick={resetBrightness}>취소</button>
@@ -378,7 +383,7 @@ export default function ObjectPropertiesPanel({
                 <div className="metadata-item pending">
                   <span className="metadata-label">Pending Brightness:</span>
                   <span className="metadata-value pending">
-                    {localBrightness.toFixed(1)}
+                    {localOpacity.toFixed(1)}
                   </span>
                 </div>
               )}

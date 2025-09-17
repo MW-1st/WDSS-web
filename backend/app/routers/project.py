@@ -214,13 +214,13 @@ async def export_project_to_json(
 
                 # 개별 씬 액션 데이터 생성
                 actions = []
-                for x, y, (r, g, b) in coords_with_colors:
+                for x, y, (r, g, b), opacity in coords_with_colors:
                     tx = x * scale_x + offset_x
                     ty = y * scale_y + offset_y
                     tz = z_value * scale_z + offset_z
                     actions.append(
                         {
-                            "led_intensity": float(led_intensity),
+                            "led_intensity": float(opacity),
                             "led_rgb": [int(r), int(g), int(b)],
                             "transform_pos": [float(tx), float(ty), float(tz)],
                         }

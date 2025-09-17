@@ -61,9 +61,9 @@ def fabric_json_to_coords(json_path: str) -> List[Tuple[float, float]]:
 
 def fabric_json_to_coords_with_colors(
     json_path: str,
-) -> List[Tuple[float, float, Tuple[int, int, int]]]:
+) -> List[Tuple[float, float, Tuple[int, int, int], float]]:
     """
-    Parse a Fabric.js JSON file and return a list of (x, y, (r, g, b)) for circle objects.
+    Parse a Fabric.js JSON file and return a list of (x, y, (r, g, b), opacity) for circle objects.
     """
     if not os.path.exists(json_path):
         raise FileNotFoundError(f"Fabric.js JSON not found: {json_path}")
@@ -74,7 +74,7 @@ def fabric_json_to_coords_with_colors(
     except (json.JSONDecodeError, UnicodeDecodeError) as e:
         raise ValueError(f"Failed to parse JSON file: {json_path}, error: {e}")
 
-    coords_with_colors: List[Tuple[float, float, Tuple[int, int, int]]] = []
+    coords_with_colors: List[Tuple[float, float, Tuple[int, int, int], float]] = []
 
     # Extract objects from Fabric.js canvas JSON
     objects = fabric_data.get("objects", [])
@@ -92,7 +92,9 @@ def fabric_json_to_coords_with_colors(
             else:
                 rgb_color = (255, 255, 255)  # default white
 
-            coords_with_colors.append((x, y, rgb_color))
+            # Extract opacity
+            opacity = _parse_float(str(obj.get("opacity", 1.0)))
+            coords_with_colors.append((x, y, rgb_color, opacity))
 
     return coords_with_colors
 
