@@ -186,10 +186,10 @@ export default function ObjectPropertiesPanel({
   useEffect(() => {
     if (selection) {
       const currentColor = normalizeColorToHex(selection?.fill || selection?.stroke);
-      const currentBrightness = selection?.brightness || 1.0;
+      const currentOpacity  = selection?.opacity  || 1.0;
 
       setLocalColor(currentColor);
-      setLocalOpacity(currentBrightness);
+      setLocalOpacity(currentOpacity );
       setHasChanges(false);
     }
   }, [selection]);
@@ -213,7 +213,7 @@ export default function ObjectPropertiesPanel({
       const originalBrightness = selection?.opacity || 1.0;
 
       setLocalColor(originalColor);
-      setLocalOpacity(originalBrightness);
+      setLocalOpacity(originalOpacity);
       setHasChanges(false);
     }
   }, [selection]);
