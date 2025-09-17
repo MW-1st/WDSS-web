@@ -64,6 +64,7 @@ function MainCanvasSection({
             alignItems: "center",
             justifyContent: "center",
             boxShadow: "inset 0 0 0 1px #eee",
+            border: "1px solid #bbb", 
           }}
         >
           {selectedScene ? (
