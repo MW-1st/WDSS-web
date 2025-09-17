@@ -1440,6 +1440,7 @@ export default function EditorPage({projectId = DUMMY}) {
 
       {/* 메인 캔버스 */}
       <div className="main-content">
+        <div className="canvas-area">
         <MainCanvasSection
           selectedScene={selectedScene}
           projectId={project_id}
@@ -1479,8 +1480,8 @@ export default function EditorPage({projectId = DUMMY}) {
           onSelectScene={handleSelect}
           compact={galleryOpen}
         />
+        </div>
       </div>
-
       {/* 오른쪽 패널 */}
       <aside className="right-panel">
         <div className="right-panel-inner">
