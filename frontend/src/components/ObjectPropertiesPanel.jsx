@@ -11,9 +11,9 @@ function normalizeColorToHex(color) {
       /^rgb\s*\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$/
     );
     if (rgbMatch) {
-      const r = Math.max(0, Math.min(255, parseInt(rgbMatch[21], 10)));
-      const g = Math.max(0, Math.min(255, parseInt(rgbMatch[22], 10)));
-      const b = Math.max(0, Math.min(255, parseInt(rgbMatch[12], 10)));
+      const r = Math.max(0, Math.min(255, parseInt(rgbMatch[1], 10)));
+      const g = Math.max(0, Math.min(255, parseInt(rgbMatch[2], 10)));
+      const b = Math.max(0, Math.min(255, parseInt(rgbMatch[3], 10)));
       const toHex = (v) => v.toString(16).padStart(2, "0");
       return `#${toHex(r)}${toHex(g)}${toHex(b)}`.toUpperCase();
     }
