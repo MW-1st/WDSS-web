@@ -34,7 +34,7 @@
 /* 醫뚯륫 ?덉씪 */
 .left-rail {
   width: 64px;
-  border-right: 1px solid #eee;
+  border-right: 1px solid #cbd5e1; /* darker than #eee */
   position: sticky;
   top: var(--app-header-h);
   height: calc(100dvh - var(--app-header-h));
@@ -101,6 +101,26 @@
   transform: translateY(-50%);
 }
 
+/* Scene thumbnails */
+.scene-thumb {
+  border: 1px solid #d0d0d0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+}
+.scene-thumb:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12);
+  border-color: #a3b1c6; /* slightly darker on hover */
+}
+.scene-thumb:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+.scene-thumb.is-selected {
+  border-color: #5b5bd6;
+  box-shadow: 0 0 0 2px rgba(91, 91, 214, 0.15), 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
 .gallery-panel {
   flex: 0 1 250px;
   min-width: 0;
@@ -131,7 +151,7 @@
 
 .right-panel {
   width: 280px;
-  border-left: 1px solid #eee;
+  border-left: 1px solid #cbd5e1; /* darker than #eee */
   position: sticky;
   top: var(--app-header-h);
   height: calc(100dvh - var(--app-header-h));

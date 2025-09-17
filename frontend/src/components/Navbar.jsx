@@ -187,7 +187,7 @@ export default function Navbar({ transparent: propTransparent = false }) {
     };
 
     return (
-      <nav className="h-14 px-4 flex items-center font-nanumhuman bg-white shadow-sm relative border-b border-gray-200">
+      <nav className="h-14 px-4 flex items-center font-nanumhuman bg-white shadow-sm relative border-b border-gray-300">
         <div className="w-full flex justify-between items-center">
           {/* Left side */}
           <div className="flex items-center gap-4">

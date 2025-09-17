@@ -1,0 +1,210 @@
+
+      // 3) ?œë²„?ì„œ ìµœì‹  ëª©ë¡ ?¤ì‹œ ë°›ì•„??ë°˜ì˜
+      const newList = await fetchScenesNormalized();
+      onSelectScene?.(neighbor && newList.some((x) => x.id === neighbor) ? neighbor : newList[0]?.id ?? null);
+
+      // 4) start ë³´ì • (ì´??„ì´??= ??ê°œìˆ˜ + ?œì¶”ê°€??1)
+      const totalNext = newList.length + 1;
+      const maxStart = Math.max(0, totalNext - VISIBLE);
+      if (start > maxStart) setStart(maxStart);
+
+    } catch (err) {
+      const status = err?.response?.status;
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        err.message ||
+        "?????†ëŠ” ?¤ë¥˜";
+      alert(
+        [
+          "?? œ???¤íŒ¨?ˆìŠµ?ˆë‹¤.",
+          `?ì¸: ${status ? status + " " : ""}${msg}`,
+          `?•ì¸: project_id=${projectId}, scene_id=${item.id}`,
+        ].join("\n")
+      );
+    }
+  };
+
+  const Thumb = ({ item }) => {
+    const isSelected = selectedId === item.id;
+    const elRef = React.useRef(null);
+    return (
+      <div
+        ref={elRef}
+        role="button"
+        tabIndex={0}
+        draggable={!item.isAdd}
+        onDragStart={(e) => {
+          if (item.isAdd) return;
+          setDraggingId(item.id);
+          e.dataTransfer.effectAllowed = "move";
+          e.dataTransfer.setData("text/plain", item.id);
+        }}
+        onDragOver={(e) => {
+          if (draggingId && !item.isAdd) {
+            e.preventDefault();
+            const rect = elRef.current?.getBoundingClientRect();
+            if (rect) {
+              const side = (e.clientX - rect.left) > rect.width / 2 ? 'after' : 'before';
+              setOverSide(side);
+            }
+            setOverId(item.id);
+          }
+        }}
+        onDragLeave={() => setOverId(null)}
+        onDrop={(e) => {
+          e.preventDefault();
+          const src = e.dataTransfer.getData("text/plain") || draggingId;
+          setOverId(null);
+          setDraggingId(null);
+          if (src && item.id) handleDropReorder(src, item.id, overSide);
+        }}
+        onClick={() => handleSelect(item.id)}
+        onKeyDown={(ev) => (ev.key === "Enter" || ev.key === " ") && handleSelect(item.id)}
+        title={item.name}
+        style={{
+          width: dims.thumbW,
+          height: dims.thumbH,
+          background: (item.preview || item.imageUrl) ? `url(${item.preview || item.imageUrl})` : "#ddd",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          borderRadius: 8,
+          border: isSelected ? "2px solid #5b5bd6" : "1px solid #d0d0d0",
+          boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
+          cursor: "pointer",
+          position: "relative",
+          overflow: "hidden",
+          outline: "none",
+        }}
+      >
+        {overId === item.id && (
+          <span
+            aria-hidden
+            style={{
+              position: 'absolute',
+              top: 0,
+              bottom: 0,
+              width: 4,
+              background: '#94a3b8',
+              left: overSide === 'before' ? 0 : 'auto',
+              right: overSide === 'after' ? 0 : 'auto',
+            }}
+          />
+        )}
+        <span
+          style={{
+            position: "absolute",
+            left: 8,
+            bottom: 6,
+            fontSize: 12,
+            color: "#333",
+            opacity: 0.6,
+            background: "rgba(255,255,255,0.7)",
+            padding: "2px 6px",
+            borderRadius: 4,
+          }}
+        >
+          {item.name || "Scene"}
+        </span>
+
+        <button
+          type="button"
+          onClick={(e) => handleDeleteClick(e, item)}
+          aria-label="???? œ"
+          title="???? œ"
+          style={{
+            position: "absolute",
+            top: 6,
+            right: 6,
+            width: 28,
+            height: 28,
+            borderRadius: 6,
+            border: "1px solid #e4e4ef",
+            background: "rgba(255,255,255,0.92)",
+            boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 16,
+            lineHeight: "1",
+            cursor: "pointer",
+          }}
+        >
+          <RiDeleteBinLine size={16} color="#6b7280" />
+        </button>
+      </div>
+    );
+  };
+
+  return (
+    <section
+      ref={containerRef}
+      style={{ position: "relative", marginTop: 8, marginBottom: 72, width: "100%" }}
+    >
+      {canSlide && (
+        <button
+          onClick={() => setStart((s) => Math.max(0, s - 1))}
+          disabled={startClamped === 0}
+          className="scene-carousel-nav-button prev"
+          style={{
+            left: `${dims.leftBtnX}px`,
+          }}
+          aria-label="?´ì „"
+          title="?´ì „"
+          onDragEnter={(e) => { e.preventDefault(); startAutoScroll(-1); }}
+          onDragOver={(e) => { e.preventDefault(); }}
+          onDragLeave={stopAutoScroll}
+          onDrop={stopAutoScroll}
+        >
+          ??
+        </button>
+      )}
+
+      <div style={{ display: "flex", justifyContent: "center", gap: dims.gap, paddingLeft: BTN_SIZE + 24, paddingRight: BTN_SIZE + 24 }}>
+        {visibleItems.map((item) =>
+          item.isAdd ? (
+            <button
+              key="__ADD__"
+              onClick={onAddScene}
+              aria-label="??ì¶”ê??˜ê¸°"
+              title="??ì¶”ê??˜ê¸°"
+              style={{
+                width: dims.thumbW,
+                height: dims.thumbH,
+                borderRadius: 8,
+                border: "1px dashed #999",
+                background: "#fff",
+                fontSize: 28,
+                color: "#666",
+                cursor: "pointer",
+              }}
+            >
+              +
+            </button>
+          ) : (
+            <Thumb key={item.id} item={item} />
+          )
+        )}
+      </div>
+
+      {canSlide && (
+        <button
+          onClick={() => setStart((s) => Math.min(total - VISIBLE, s + 1))}
+          disabled={startClamped >= total - VISIBLE}
+          className="scene-carousel-nav-button next"
+          style={{
+            right: `${dims.rightBtnX}px`,
+          }}
+          aria-label="?¤ìŒ"
+          title="?¤ìŒ"
+          onDragEnter={(e) => { e.preventDefault(); startAutoScroll(1); }}
+          onDragOver={(e) => { e.preventDefault(); }}
+          onDragLeave={stopAutoScroll}
+          onDrop={stopAutoScroll}
+        >
+          ??
+        </button>
+      )}
+    </section>
+  );
+});

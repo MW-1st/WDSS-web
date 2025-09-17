@@ -302,6 +302,7 @@ export default React.memo(function SceneCarousel({
         onClick={() => handleSelect(item.id)}
         onKeyDown={(ev) => (ev.key === "Enter" || ev.key === " ") && handleSelect(item.id)}
         title={item.name}
+        className={`scene-thumb${isSelected ? " is-selected" : ""}`}
         style={{
           width: dims.thumbW,
           height: dims.thumbH,
@@ -309,8 +310,6 @@ export default React.memo(function SceneCarousel({
           backgroundSize: "cover",
           backgroundPosition: "center",
           borderRadius: 8,
-          border: isSelected ? "2px solid #5b5bd6" : "1px solid #d0d0d0",
-          boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
           cursor: "pointer",
           position: "relative",
           overflow: "hidden",
