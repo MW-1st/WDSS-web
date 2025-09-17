@@ -50,10 +50,18 @@ export default function DashboardPage() {
   // don't auto-load on mount; wait for user scroll
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(false);
+  // pageIndex is 1-based: 1 == first page (offset 0), 2 == second page (offset PAGE_SIZE), etc.
   const [offset, setOffset] = useState(0);
+  const [pageIndex, setPageIndex] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [userScrolled, setUserScrolled] = useState(false);
   const sentinelRef = useRef(null);
+  // refs to hold latest values for use inside event callbacks/observer to avoid stale closures
+  const offsetRef = useRef(offset);
+  const pageLoadingRef = useRef(pageLoading);
+  const hasMoreRef = useRef(hasMore);
+  const userScrolledRef = useRef(userScrolled);
+  const pageIndexRef = useRef(pageIndex);
   const [editingProject, setEditingProject] = useState(null);
   const [creating, setCreating] = useState(false);
   const [bannerUrl, setBannerUrl] = useState("/img/banner_01.png");
@@ -73,7 +81,6 @@ export default function DashboardPage() {
     setBannerUrl(candidates[idx]);
   }, []);
 
-
   // don't fetch automatically on mount — wait for the user to scroll
   useEffect(() => {
     if (!isAuthenticated) {
@@ -89,19 +96,53 @@ export default function DashboardPage() {
 
   // load more when offset changes or on explicit request
   const loadMore = async () => {
-    if (pageLoading || !hasMore) return;
+    if (pageLoadingRef.current || !hasMoreRef.current) return;
     setPageLoading(true);
+    pageLoadingRef.current = true;
     try {
-  const res = await client.get("/projects", { params: { limit: PAGE_SIZE, offset } });
+      console.debug("loadMore called", {
+        pageIndex: pageIndexRef.current,
+        offset: offsetRef.current,
+        pageLoading: pageLoadingRef.current,
+        hasMore: hasMoreRef.current,
+      });
+      // compute next page offset from pageIndexRef
+      const nextPage = (pageIndexRef.current || 0) + 1; // e.g. 0 -> 1 (first), 1 -> 2 (second)
+      const reqOffset = (nextPage - 1) * PAGE_SIZE;
+      const res = await client.get("/projects", {
+        params: { limit: PAGE_SIZE, offset: reqOffset },
+      });
       const newItems = res.data.projects || [];
+      console.debug("loadMore fetched", {
+        reqOffset,
+        fetched: newItems.length,
+        total: res.data.total,
+      });
       setProjects((prev) => [...prev, ...newItems]);
-      const newOffset = offset + newItems.length;
-      setOffset(newOffset);
-      setHasMore(newOffset < (res.data.total || 0));
+
+      // advance pageIndex
+      setPageIndex((prev) => {
+        const updated = prev + 1;
+        pageIndexRef.current = updated;
+        return updated;
+      });
+
+      // maintain offset for compatibility
+      setOffset((prev) => {
+        const updated = prev + newItems.length;
+        offsetRef.current = updated;
+        return updated;
+      });
+
+      const total = res.data.total || 0;
+      const newHasMore = pageIndexRef.current * PAGE_SIZE < total;
+      setHasMore(newHasMore);
+      hasMoreRef.current = newHasMore;
     } catch (err) {
       console.error("Failed to load more projects:", err);
     } finally {
       setPageLoading(false);
+      pageLoadingRef.current = false;
     }
   };
 
@@ -111,11 +152,16 @@ export default function DashboardPage() {
     if (pageLoading) return;
     setLoading(true);
     try {
-      const res = await client.get("/projects", { params: { limit: PAGE_SIZE, offset: 0 } });
+      const res = await client.get("/projects", {
+        params: { limit: PAGE_SIZE, offset: 0 },
+      });
       const items = res.data.projects || [];
       setProjects(items);
       setHasMore((res.data.total || 0) > items.length);
       setOffset(items.length);
+      // set pageIndex to 1 since we've loaded the first page
+      setPageIndex(1);
+      pageIndexRef.current = 1;
     } catch (err) {
       console.error("Failed to fetch projects:", err);
     } finally {
@@ -133,14 +179,16 @@ export default function DashboardPage() {
         projects.map(async (p) => {
           try {
             const { data } = await client.get(`/projects/${p.id}/scenes`);
-            const list = Array.isArray(data) ? data : (data?.scenes ?? []);
+            const list = Array.isArray(data) ? data : data?.scenes ?? [];
             if (!Array.isArray(list) || list.length === 0) return [p.id, null];
 
             // Prefer scene_num === 1, else min scene_num, else first
             const targetByOne = list.find((s) => s?.scene_num === 1) || null;
             let target = targetByOne;
             if (!target) {
-              const withNum = list.filter((s) => typeof s?.scene_num === "number");
+              const withNum = list.filter(
+                (s) => typeof s?.scene_num === "number"
+              );
               if (withNum.length) {
                 const minNum = Math.min(...withNum.map((s) => s.scene_num));
                 target = withNum.find((s) => s.scene_num === minNum) || null;
@@ -152,13 +200,18 @@ export default function DashboardPage() {
             const url = sceneId ? `/thumbnails/${sceneId}.png` : null;
             return [p.id, url || null];
           } catch (e) {
-            console.warn("Failed to load scenes for project", p.id, e?.response?.data || e?.message);
+            console.warn(
+              "Failed to load scenes for project",
+              p.id,
+              e?.response?.data || e?.message
+            );
             return [p.id, null];
           }
         })
       );
 
-      if (!cancelled) setThumbs((prev) => ({ ...prev, ...Object.fromEntries(entries) }));
+      if (!cancelled)
+        setThumbs((prev) => ({ ...prev, ...Object.fromEntries(entries) }));
     };
 
     run();
@@ -166,6 +219,27 @@ export default function DashboardPage() {
       cancelled = true;
     };
   }, [projects]);
+
+  // keep refs in sync with state to avoid stale closures in observers/handlers
+  useEffect(() => {
+    offsetRef.current = offset;
+  }, [offset]);
+
+  useEffect(() => {
+    pageIndexRef.current = pageIndex;
+  }, [pageIndex]);
+
+  useEffect(() => {
+    pageLoadingRef.current = pageLoading;
+  }, [pageLoading]);
+
+  useEffect(() => {
+    hasMoreRef.current = hasMore;
+  }, [hasMore]);
+
+  useEffect(() => {
+    userScrolledRef.current = userScrolled;
+  }, [userScrolled]);
 
   // IntersectionObserver for infinite scroll
   useEffect(() => {
@@ -176,7 +250,12 @@ export default function DashboardPage() {
       (entries) => {
         entries.forEach((entry) => {
           // only trigger loading after the user has scrolled
-          if (entry.isIntersecting && hasMore && !pageLoading && userScrolled) {
+          if (
+            entry.isIntersecting &&
+            hasMoreRef.current &&
+            !pageLoadingRef.current &&
+            userScrolledRef.current
+          ) {
             loadMore();
           }
         });
@@ -186,25 +265,26 @@ export default function DashboardPage() {
 
     obs.observe(node);
     return () => obs.disconnect();
-  }, [userScrolled, hasMore, pageLoading]);
+  }, []);
 
   // If the page is too short to scroll (e.g. small/minimized window) and we haven't
   // received a user scroll, auto-trigger loading so content fills the viewport.
   useEffect(() => {
     try {
-      if (userScrolled) return;
+      if (userScrolledRef.current) return;
       const doc = document.documentElement;
       const canScroll = doc.scrollHeight > window.innerHeight;
-      if (!canScroll && hasMore && !pageLoading) {
+      if (!canScroll && hasMoreRef.current && !pageLoadingRef.current) {
         // Allow intersection observer and other logic to run as if the user scrolled
         setUserScrolled(true);
+        userScrolledRef.current = true;
         // Load next page to try to fill viewport
         loadMore();
       }
     } catch (e) {
       // ignore if DOM not available
     }
-  }, [projects, userScrolled, hasMore, pageLoading]);
+  }, [projects]);
 
   // ensure first page is loaded when the user is authenticated (so the dashboard is not empty)
   useEffect(() => {
@@ -217,11 +297,12 @@ export default function DashboardPage() {
   useEffect(() => {
     const onFirstScroll = () => {
       setUserScrolled(true);
+      userScrolledRef.current = true;
       window.removeEventListener("scroll", onFirstScroll);
 
       // If the sentinel is already in view when the user scrolls, trigger a load
       const sentinel = sentinelRef.current;
-      if (sentinel && hasMore && !pageLoading) {
+      if (sentinel && hasMoreRef.current && !pageLoadingRef.current) {
         const rect = sentinel.getBoundingClientRect();
         if (rect.top <= window.innerHeight + 200) {
           loadMore();
@@ -231,7 +312,24 @@ export default function DashboardPage() {
 
     window.addEventListener("scroll", onFirstScroll, { passive: true });
     return () => window.removeEventListener("scroll", onFirstScroll);
-  }, [hasMore, pageLoading]);
+  }, []);
+
+  // Fallback: if IntersectionObserver misses, ensure we load more when scrolling near bottom
+  useEffect(() => {
+    const onScrollNearBottom = () => {
+      if (!userScrolledRef.current) return;
+      if (pageLoadingRef.current || !hasMoreRef.current) return;
+      const threshold = 300; // px from bottom
+      const position = window.innerHeight + window.scrollY;
+      const height = document.documentElement.scrollHeight;
+      if (height - position < threshold) {
+        loadMore();
+      }
+    };
+
+    window.addEventListener("scroll", onScrollNearBottom, { passive: true });
+    return () => window.removeEventListener("scroll", onScrollNearBottom);
+  }, []);
 
   const handleCreateProject = () => {
     setCreating(true);
@@ -249,12 +347,16 @@ export default function DashboardPage() {
   const closeSettings = () => setEditingProject(null);
 
   const handleSaved = (updated) => {
-    setProjects((prev) => prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)));
+    setProjects((prev) =>
+      prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p))
+    );
   };
 
   const handleDeleteProject = async (e, projectId, projectName) => {
     e.stopPropagation();
-    const ok = window.confirm(`프로젝트 "${projectName}"를 삭제할까요? 이 작업은 되돌릴 수 없습니다.`);
+    const ok = window.confirm(
+      `프로젝트 "${projectName}"를 삭제할까요? 이 작업은 되돌릴 수 없습니다.`
+    );
     if (!ok) return;
     try {
       await client.delete(`/projects/${projectId}`);
@@ -284,15 +386,17 @@ export default function DashboardPage() {
         <div className="hero" style={{ height: 240 }}>
           <img src={bannerUrl} alt="banner" className="hero-bg" />
           <header className="dashboard-header">
-          <h2 className="welcome-message">{user.username}님 안녕하세요</h2>
-          <p className="welcome-sub-message">새 작업을 시작하거나 기존 프로젝트를 확인하세요.</p>
+            <h2 className="welcome-message">{user.username}님 안녕하세요</h2>
+            <p className="welcome-sub-message">
+              새 작업을 시작하거나 기존 프로젝트를 확인하세요.
+            </p>
 
-          <div className="dashboard-actions">
-            <button onClick={handleCreateProject} className="create-button">
-              <PlusIcon />
-              <span>새 프로젝트 생성</span>
-            </button>
-          </div>
+            <div className="dashboard-actions">
+              <button onClick={handleCreateProject} className="create-button">
+                <PlusIcon />
+                <span>새 프로젝트 생성</span>
+              </button>
+            </div>
           </header>
         </div>
 
@@ -302,9 +406,9 @@ export default function DashboardPage() {
 
             {loading ? (
               <p>프로젝트를 불러오는 중입니다...</p>
-              ) : projects.length > 0 ? (
+            ) : projects.length > 0 ? (
               <div className="project-grid">
-                  {projects.map((project) => (
+                {projects.map((project) => (
                   <div
                     key={project.id}
                     className="project-card"
@@ -312,7 +416,8 @@ export default function DashboardPage() {
                     role="button"
                     tabIndex={0}
                     onKeyDown={(e) =>
-                      (e.key === "Enter" || e.key === " ") && handleProjectClick(project.id)
+                      (e.key === "Enter" || e.key === " ") &&
+                      handleProjectClick(project.id)
                     }
                   >
                     {/* Hover delete button */}
@@ -320,7 +425,9 @@ export default function DashboardPage() {
                       className="project-delete-btn"
                       title="프로젝트 삭제"
                       aria-label={`삭제: ${project.project_name}`}
-                      onClick={(e) => handleDeleteProject(e, project.id, project.project_name)}
+                      onClick={(e) =>
+                        handleDeleteProject(e, project.id, project.project_name)
+                      }
                     >
                       <TiDelete size={22} />
                     </button>
@@ -329,7 +436,11 @@ export default function DashboardPage() {
                         <img
                           src={thumbs[project.id]}
                           alt={`${project.project_name} 썸네일`}
-                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "cover",
+                          }}
                           loading="lazy"
                         />
                       ) : (
@@ -348,13 +459,19 @@ export default function DashboardPage() {
                           <CiMenuBurger size={18} />
                         </button>
                       </div>
-                      <p className="card-date">생성일 {formatDate(project.created_at)}</p>
+                      <p className="card-date">
+                        생성일 {formatDate(project.created_at)}
+                      </p>
                     </div>
                   </div>
                 ))}
 
                 {/* sentinel for infinite scroll */}
-                <div id="projects-sentinel" ref={sentinelRef} style={{ height: 1 }} />
+                <div
+                  id="projects-sentinel"
+                  ref={sentinelRef}
+                  style={{ height: 1 }}
+                />
               </div>
             ) : (
               <div className="empty-state">
@@ -363,8 +480,16 @@ export default function DashboardPage() {
               </div>
             )}
             {/* page loading and end message */}
-            {pageLoading && <p style={{ textAlign: "center", marginTop: 12 }}>더 불러오는 중...</p>}
-            {!hasMore && projects.length > 0 && <p style={{ textAlign: "center", marginTop: 12 }}>모든 프로젝트를 불러왔습니다.</p>}
+            {pageLoading && (
+              <p style={{ textAlign: "center", marginTop: 12 }}>
+                더 불러오는 중...
+              </p>
+            )}
+            {!hasMore && projects.length > 0 && (
+              <p style={{ textAlign: "center", marginTop: 12 }}>
+                모든 프로젝트를 불러왔습니다.
+              </p>
+            )}
           </section>
         </main>
       </div>
