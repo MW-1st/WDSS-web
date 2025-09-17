@@ -39,19 +39,35 @@ const ResponsiveProjectTitle = ({ title, className }) => {
 
   }, [title]); // Re-run when the title text changes
 
-  return (
-    // This container defines the maximum boundary for the title
-    <div ref={containerRef} className="w-full">
-      <div
-        ref={textRef}
-        className={className}
-        style={{ fontSize: fontSize, whiteSpace: 'nowrap', transition: 'font-size 0.1s ease-out' }}
-        title={title}
+return (
+  <div ref={containerRef} className="w-full" style={{ textAlign: "center" }}>
+    <div
+      ref={textRef}
+      className={className}
+      style={{
+        fontSize: fontSize || "28px", // 제목 기본 크기
+        whiteSpace: "nowrap",
+        transition: "font-size 0.1s ease-out",
+        display: "inline-block",
+      }}
+      title={title}
+    >
+      <span 
+        style={{ 
+          color: "#9ca3af",       // 연회색
+          fontSize: "0.7em",      // 제목보다 작게
+          fontWeight: "400",      // 얇게
+          marginRight: "6px"
+        }}
       >
-        {title}
-      </div>
+        title :
+      </span>
+      <span>{title}</span>
     </div>
-  );
+  </div>
+);
+
+
 };
 
 export default ResponsiveProjectTitle;
