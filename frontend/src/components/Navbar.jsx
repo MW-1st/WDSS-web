@@ -275,86 +275,90 @@ export default function Navbar({ transparent: propTransparent = false }) {
             />
           </div>
 
-          {/* Right side: JSON + Unity Controls */}
-          <div className="flex items-center gap-3">
-            <div className="relative group">
-               <button
-                  onClick={async () => {
-                    let url = lastJsonUrl;
-                    // If no JSON generated yet, try to generate via editor API
-                    if (!jsonBuilt || !url) {
-                      if (api?.handleJsonGeneration) {
-                        try {
-                          const generated = await api.handleJsonGeneration();
-                          if (generated) {
-                            url = generated;
-                            setLastJsonUrl(generated);
-                            setJsonBuilt(true);
-                          }
-                        } catch (err) {
-                          console.error("JSON generation failed:", err);
-                        }
-                      }
+         <div className="flex items-center gap-3">
+        {/* JSON 내보내기 */}
+        <div className="relative group">
+          <button
+            onClick={async () => {
+              let url = lastJsonUrl;
+              if (!jsonBuilt || !url) {
+                if (api?.handleJsonGeneration) {
+                  try {
+                    const generated = await api.handleJsonGeneration();
+                    if (generated) {
+                      url = generated;
+                      setLastJsonUrl(generated);
+                      setJsonBuilt(true);
                     }
-
-                    if (!url) {
-                      alert(
-                        "JSON 생성에 실패했습니다. 에디터에서 변환을 완료해주세요."
-                      );
-                      return;
-                    }
-
-                    try {
-                      const a = document.createElement("a");
-                      a.href = url;
-                      a.download = `${(
-                        editorState.projectName || "project"
-                      ).replace(/[^\\w.-]+/g, "_")}.json`;
-                      document.body.appendChild(a);
-                      a.click();
-                      document.body.removeChild(a);
-                    } catch (_) {
-                      window.open(url, "_blank", "noopener");
-                    }
-                  }}
-                  className="w-11 h-11 flex items-center justify-center rounded text-[#111827] transition-all duration-200 hover:bg-gray-100 active:bg-gray-200"
-                >
-                  <FaFileExport size={22} />
-                </button>
-                <span className="absolute -left-12 top-full mt-2 px-2 py-0.5 text-xs bg-gray-800 text-white rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-[100] pointer-events-none">
-                  JSON으로 내보내기
-                </span>
-            </div>
-
-            <div className="relative group">
-              <button
-                  onClick={async () => {
-                    // JSON 생성 및 Unity 시뮬레이터 실행
-                    if (api?.handleJsonGeneration) {
-                      const jsonUrl = await api.handleJsonGeneration();
-                      if (jsonUrl) {
-                        setLastJsonUrl(jsonUrl);
-                        setJsonBuilt(true);
-                        showUnity(); // JSON 생성 후 Unity 시뮬레이터 실행
-                      }
-                    } else {
-                      alert("JSON 생성 기능을 사용할 수 없습니다.");
-                    }
-                  }}
-                  className="w-11 h-11 flex items-center justify-center rounded text-[#111827] transition-all duration-200 hover:bg-gray-100 active:bg-gray-200"
-                >
-                  <FaRegCirclePlay size={22}/>
-                </button>
-                <span className="absolute -left-24 top-full mt-2 px-2 py-0.5 text-xs bg-gray-800 text-white rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-[100] pointer-events-none">
-                  Unity 시뮬레이터 실행
-                </span>
-            </div>
-
-           
-
-
-          </div>
+                  } catch (err) {
+                    console.error("JSON generation failed:", err);
+                  }
+                }
+              }
+              if (!url) {
+                alert("JSON 생성에 실패했습니다. 에디터에서 변환을 완료해주세요.");
+                return;
+              }
+              try {
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `${(editorState.projectName || "project").replace(
+                  /[^\w.-]+/g,
+                  "_"
+                )}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+              } catch (_) {
+                window.open(url, "_blank", "noopener");
+              }
+            }}
+            className="
+              w-11 h-11 flex items-center justify-center rounded 
+              text-[#111827] 
+              transition-all duration-200
+              hover:bg-gray-200 hover:-translate-y-0.5
+              active:bg-gray-300 active:translate-y-0
+            "
+          >
+            <FaFileExport size={22} />
+          </button>
+          <span className="absolute -left-12 top-full mt-2 px-2 py-0.5 text-xs bg-gray-800 text-white rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-[100] pointer-events-none">
+            JSON으로 내보내기
+          </span>
         </div>
+
+        {/* Unity 실행 */}
+        <div className="relative group">
+          <button
+            onClick={async () => {
+              if (api?.handleJsonGeneration) {
+                const jsonUrl = await api.handleJsonGeneration();
+                if (jsonUrl) {
+                  setLastJsonUrl(jsonUrl);
+                  setJsonBuilt(true);
+                  showUnity();
+                }
+              } else {
+                alert("JSON 생성 기능을 사용할 수 없습니다.");
+              }
+            }}
+            className="
+              w-11 h-11 flex items-center justify-center rounded 
+              text-[#111827] 
+              transition-all duration-200
+              hover:bg-gray-200 hover:-translate-y-0.5
+              active:bg-gray-300 active:translate-y-0
+            "
+          >
+            <FaRegCirclePlay size={22} />
+          </button>
+          <span className="absolute -left-24 top-full mt-2 px-2 py-0.5 text-xs bg-gray-800 text-white rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-[100] pointer-events-none">
+            Unity 시뮬레이터 실행
+          </span>
+        </div>
+      </div>
+    </div>
       </nav>
     );
   }
