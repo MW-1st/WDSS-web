@@ -59,22 +59,23 @@ const BrightnessControl = ({
 
     setError("");
     setSliderValue(numValue);
-    onChange?.(numValue);
     return true;
-  }, [min, max, onChange]);
+  }, [min, max]);
 
   const handleInputChange = useCallback((e) => {
     const newValue = e.target.value;
     setInputValue(newValue);
     validateAndUpdate(newValue);
-  }, [validateAndUpdate]);
+    onChange?.(parseFloat(newValue));
+  }, [validateAndUpdate, onChange]);
 
   const handleSliderChange = useCallback((e) => {
     const newValue = parseFloat(e.target.value);
     setInputValue(newValue.toString());
     setSliderValue(newValue);
     validateAndUpdate(newValue);
-  }, [validateAndUpdate]);
+    onChange?.(newValue);
+  }, [validateAndUpdate, onChange]);
 
   // selection이 변경될 때마다 값 동기화
   useEffect(() => {
@@ -221,15 +222,32 @@ export default function ObjectPropertiesPanel({
   const applyColor = useCallback(() => {
     if (onChangeFill && localColor) onChangeFill(localColor);
     setHasChanges(false);
-  }, [onChangeFill, localColor]);
+
+    if (triggerAutoSave) {
+      triggerAutoSave();
+    }
+    if (saveToHistory) {
+      saveToHistory('color_change');
+    }
+  }, [onChangeFill, localColor, triggerAutoSave, saveToHistory]);
+
   const resetColor = useCallback(() => {
     setLocalColor(originalColor);
     setHasChanges(false);
   }, [originalColor]);
+
   const applyBrightness = useCallback(() => {
     if (onChangeBrightness) onChangeBrightness(localOpacity);
     setHasChanges(false);
-  }, [onChangeBrightness, localOpacity]);
+
+    if (triggerAutoSave) {
+      triggerAutoSave();
+    }
+    if (saveToHistory) {
+      saveToHistory('brightness_change');
+    }
+  }, [onChangeBrightness, localOpacity, triggerAutoSave, saveToHistory]);
+
   const resetBrightness = useCallback(() => {
     setLocalOpacity(originalOpacity);
     setHasChanges(false);
