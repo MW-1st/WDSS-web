@@ -28,8 +28,6 @@ import * as fabricLayerUtils from "../utils/fabricLayerUtils";
 export default function Canvas({
   width = 800,
   height = 500,
-  baseWidth,
-  baseHeight,
   imageUrl = "",
   stageRef: externalStageRef,
   drawingMode: externalDrawingMode = "select",
@@ -161,8 +159,7 @@ export default function Canvas({
   }, [layers, activeLayerId, getLayer, getSortedLayers, canvasRevision]);
 
   /* 리사이즈 및 뷰포트 처리 */
-  // Include canvasRevision so viewport recenters after scene/content changes
-  useCanvasViewport(fabricCanvas, width, height, baseWidth, baseHeight, canvasRevision);
+  useCanvasViewport(fabricCanvas, width, height);
 
   /* 키보드 삭제(Del 키) 처리 */
   useCanvasKeyboardDelete(
@@ -372,7 +369,6 @@ export default function Canvas({
   useCanvasExternalStageApi({
     externalStageRef,
     fabricCanvas,
-    setCanvasRevision,
     getCurrentCanvasAsSvg,
     exportCanvasAsImage,
     exportDrawnLinesOnly,
