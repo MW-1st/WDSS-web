@@ -33,6 +33,9 @@ export default function EditorPage({projectId = DUMMY}) {
   const [scenes, setScenes] = useState([]);
   const [projectName, setProjectName] = useState("");
   const [projectMeta, setProjectMeta] = useState(null);
+  useEffect(() => {
+    setProjectMeta(prev => (prev ? { ...prev, max_scene: scenes.length } : prev));
+  }, [scenes.length]);
   const [selectedId, setSelectedId] = useState(null);
   const [start, setStart] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -588,37 +591,26 @@ export default function EditorPage({projectId = DUMMY}) {
   // 씬 추가
   const handleAddScene = async () => {
     try {
-      // 최대 씬 개수 제한 (프로젝트 설정)
-      const maxScenes = projectMeta?.max_scene ?? projectMeta?.maxScenes ?? null;
-      if (Number.isFinite(maxScenes) && maxScenes !== null && scenes.length >= maxScenes) {
-        alert(`씬은 최대 ${maxScenes}개까지만 생성할 수 있어요.`);
-        return;
-      }
       const projectIdReady = await ensureProjectId();
-      const numericSceneNums = (scenes || [])
-          .map((s) => s?.scene_num)
-          .filter((n) => typeof n === "number" && !Number.isNaN(n));
-      const maxSceneNum = numericSceneNums.length ? Math.max(...numericSceneNums) : 0;
-      const scene_num = Math.max(maxSceneNum, scenes.length) + 1;
 
       const {data} = await client.post(
           `/projects/${projectIdReady}/scenes`,
-          {
-            scene_num,
-          }
+          {}
       );
       const createdRaw = data.scene || data || {};
       const createdId = createdRaw.id ?? createdRaw.scene_id ?? createdRaw.sceneId;
+      const fallbackSceneNum = createdRaw.scene_num ?? (scenes.length + 1);
       const createdNorm = {
         ...createdRaw,
         id: createdId,
         project_id: createdRaw.project_id ?? projectIdReady,
-        scene_num: createdRaw.scene_num ?? scene_num,
-        name: createdRaw.name || `Scene ${createdRaw.scene_num ?? scene_num}`,
+        scene_num: fallbackSceneNum,
+        name: createdRaw.name || `Scene ${fallbackSceneNum}`,
         imageUrl: getImageUrl(createdRaw.s3_key),
       };
       const nextScenes = [...scenes, createdNorm];
       setScenes(nextScenes);
+      setProjectMeta(prev => (prev ? { ...prev, max_scene: nextScenes.length } : prev));
 
       // 선택 상태 초기화
       setSelectedObject(null);
