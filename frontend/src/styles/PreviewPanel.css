@@ -5,7 +5,7 @@
   border-radius: 8px;
   display: flex;
   flex-direction: column;
-  font-family: 'Arial', sans-serif;
+  font-family: "Arial", sans-serif;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
@@ -89,8 +89,12 @@
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .preview-loading p {
@@ -242,30 +246,7 @@
   margin: 0;
 }
 
-/* 반응형 */
-@media (max-width: 768px) {
-  .preview-panel {
-    margin-top: 12px;
-  }
-  
-  .preview-panel-body {
-    padding: 8px 12px;
-    height: 140px; /* 모바일에서도 고정 높이 */
-  }
-  
-  .preview-image-container {
-    max-height: 140px;
-  }
-  
-  .preview-empty {
-    padding: 30px 15px;
-  }
-  
-  .confirm-btn {
-    padding: 8px 12px;
-    font-size: 13px;
-  }
-}
+/* Responsive rules removed to keep preview panel layout consistent across viewports */
 
 /* 미리보기 모달 */
 .preview-modal-overlay {
@@ -334,13 +315,12 @@
   .loading-spinner {
     animation: none;
   }
-  
+
   .confirm-btn:hover:not(:disabled) {
     transform: none;
   }
-  
+
   .preview-image.clickable:hover {
     transform: none;
   }
 }
-

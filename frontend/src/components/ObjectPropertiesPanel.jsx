@@ -301,7 +301,8 @@ export default function ObjectPropertiesPanel({
                 <div className="field-header">
                   <div className="label">Brightness</div>
                   <div className="field-description">
-                    객체의 밝기를 조정합니다 (0.0 = 완전 어두움, 1.0 = 기본 밝기)
+                    객체의 밝기를 조정합니다 <br />
+                    (0.0 = 완전 어두움, 1.0 = 기본 밝기)
                   </div>
                 </div>
                 <BrightnessControl
