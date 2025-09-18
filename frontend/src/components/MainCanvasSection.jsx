@@ -22,26 +22,25 @@ function MainCanvasSection({
   isSceneTransformed = false // 씬 변환 상태
 }) {
   const containerRef = useRef(null);
-  const [canvasSize, setCanvasSize] = useState({ width: 1200, height: 675 });
 
-  useEffect(() => {
-    const observer = new ResizeObserver(entries => {
-      for (let entry of entries) {
-        const { width, height } = entry.contentRect;
-        setCanvasSize({ width, height });
-      }
-    });
+  // useEffect(() => {
+  //   const observer = new ResizeObserver(entries => {
+  //     for (let entry of entries) {
+  //       const { width, height } = entry.contentRect;
+  //       setCanvasSize({ width, height });
+  //     }
+  //   });
 
-    if (containerRef.current) {
-      observer.observe(containerRef.current);
-    }
+  //   if (containerRef.current) {
+  //     observer.observe(containerRef.current);
+  //   }
 
-    return () => {
-      if (containerRef.current) {
-        observer.unobserve(containerRef.current);
-      }
-    };
-  }, []);
+  //   return () => {
+  //     if (containerRef.current) {
+  //       observer.unobserve(containerRef.current);
+  //     }
+  //   };
+  // }, []);
 
   return (
     <section
@@ -51,12 +50,11 @@ function MainCanvasSection({
         padding: "24px 0 32px",
       }}
     >
-      <div style={{ width: "70%", maxWidth: 980 }}>
+      <div>
         <div
           ref={containerRef}
           style={{
             width: "100%",
-            aspectRatio: "16 / 9",
             background: "#f7f7f7",
             borderRadius: 8,
             overflow: "hidden",
@@ -72,8 +70,6 @@ function MainCanvasSection({
               key={selectedScene.id}
               projectId={projectId}
               scene={selectedScene}
-              width={canvasSize.width}
-              height={canvasSize.height}
               onChange={(patch) => onChange(selectedScene.id, patch)}
               onPreviewChange={onPreviewChange}
               onCanvasChange={onCanvasChange}

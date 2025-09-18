@@ -7,8 +7,8 @@ import * as fabricLayerUtils from "../../utils/fabricLayerUtils";
 fabric.Object.prototype.toObject = (function (toObject) {
   return function (propertiesToInclude) {
     propertiesToInclude = (propertiesToInclude || []).concat([
-      'layerId',
-      'layerName',
+      "layerId",
+      "layerName",
     ]);
     return toObject.call(this, propertiesToInclude);
   };
@@ -51,9 +51,6 @@ export default function useCanvasInit({
     }
 
     const canvas = new fabric.Canvas(canvasRef.current, {
-      width: width,
-      height: height,
-      backgroundColor: "#fafafa",
       renderOnAddRemove: false,
       selection: false,
       skipTargetFind: false,
@@ -64,14 +61,14 @@ export default function useCanvasInit({
       enableRetinaScaling: true,
     });
 
-    const clipPath = new fabric.Rect({
-      left: 0,
-      top: 0,
-      width: width,
-      height: height,
-      absolutePositioned: true,
-    });
-    canvas.clipPath = clipPath;
+    // const clipPath = new fabric.Rect({
+    //   left: 0,
+    //   top: 0,
+    //   width: width,
+    //   height: height,
+    //   absolutePositioned: true,
+    // });
+    // canvas.clipPath = clipPath;
 
     const brush = new fabric.PencilBrush(canvas);
     brush.width = 2;
@@ -81,7 +78,11 @@ export default function useCanvasInit({
     canvas.freeDrawingBrush = brush;
 
     try {
-      if (!(externalDrawingMode === "draw" || externalDrawingMode === "pixelErase")) {
+      if (
+        !(
+          externalDrawingMode === "draw" || externalDrawingMode === "pixelErase"
+        )
+      ) {
         canvas.isDrawingMode = false;
         canvas.selection = externalDrawingMode === "select";
         canvas.skipTargetFind =
@@ -99,19 +100,24 @@ export default function useCanvasInit({
     // setting these styles avoids mismatch between CSS pixels and
     // canvas internal pixels when the browser zoom/devicePixelRatio
     // changes.
-    try {
-      const el = canvas.getElement();
-      if (el) {
-        el.style.width = `${width}px`;
-        el.style.height = `${height}px`;
-      }
-    } catch (_) {}
+    // try {
+    //   const el = canvas.getElement();
+    //   if (el) {
+    //     el.style.width = `${width}px`;
+    //     el.style.height = `${height}px`;
+    //   }
+    // } catch (_) {}
 
     if (externalStageRef) {
       externalStageRef.current = canvas;
     }
 
-    const previewEvents = ["object:added", "object:modified", "object:removed", "path:created"];
+    const previewEvents = [
+      "object:added",
+      "object:modified",
+      "object:removed",
+      "path:created",
+    ];
     previewEvents.forEach((evt) => canvas.on(evt, schedulePreview));
 
     canvas.renderOnAddRemove = true;
@@ -137,8 +143,6 @@ export default function useCanvasInit({
       const boundary = new fabric.Rect({
         left: 0,
         top: 0,
-        width: width,
-        height: height,
         fill: "transparent",
         stroke: "#999",
         strokeWidth: 1,
@@ -277,14 +281,20 @@ export default function useCanvasInit({
       if (path) {
         const currentActiveLayerId = activeLayerIdRef.current;
         const currentLayers = layersRef.current;
-        const activeLayer = currentLayers.find((layer) => layer.id === currentActiveLayerId);
+        const activeLayer = currentLayers.find(
+          (layer) => layer.id === currentActiveLayerId
+        );
 
         if (activeLayer) {
-          fabricLayerUtils.assignObjectToLayer(path, activeLayer.id, activeLayer.name);
+          fabricLayerUtils.assignObjectToLayer(
+            path,
+            activeLayer.id,
+            activeLayer.name
+          );
           setCanvasRevision((c) => c + 1);
 
           triggerAutoSave({ drawingMode: "draw" });
-          saveToHistory("draw")
+          saveToHistory("draw");
           if (onCanvasChangeRef.current) onCanvasChangeRef.current();
         }
       }
@@ -295,10 +305,16 @@ export default function useCanvasInit({
       if (obj && !obj.layerId) {
         const currentActiveLayerId = activeLayerIdRef.current;
         const currentLayers = layersRef.current;
-        const activeLayer = currentLayers.find((layer) => layer.id === currentActiveLayerId);
+        const activeLayer = currentLayers.find(
+          (layer) => layer.id === currentActiveLayerId
+        );
 
         if (activeLayer) {
-          fabricLayerUtils.assignObjectToLayer(obj, activeLayer.id, activeLayer.name);
+          fabricLayerUtils.assignObjectToLayer(
+            obj,
+            activeLayer.id,
+            activeLayer.name
+          );
         }
       }
     };
@@ -442,11 +458,20 @@ export default function useCanvasInit({
       canvas.off("path:created", handlePathCreated);
       canvas.off("object:added", handleObjectAdded);
       if (selectionHandlers.current.handleCreated)
-        canvas.off("selection:created", selectionHandlers.current.handleCreated);
+        canvas.off(
+          "selection:created",
+          selectionHandlers.current.handleCreated
+        );
       if (selectionHandlers.current.handleUpdated)
-        canvas.off("selection:updated", selectionHandlers.current.handleUpdated);
+        canvas.off(
+          "selection:updated",
+          selectionHandlers.current.handleUpdated
+        );
       if (selectionHandlers.current.handleCleared)
-        canvas.off("selection:cleared", selectionHandlers.current.handleCleared);
+        canvas.off(
+          "selection:cleared",
+          selectionHandlers.current.handleCleared
+        );
       canvas.off("object:moving", handleTransforming);
       canvas.off("object:scaling", handleTransforming);
       canvas.off("object:rotating", handleTransforming);

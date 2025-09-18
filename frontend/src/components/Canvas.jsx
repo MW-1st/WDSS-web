@@ -159,7 +159,7 @@ export default function Canvas({
   }, [layers, activeLayerId, getLayer, getSortedLayers, canvasRevision]);
 
   /* 리사이즈 및 뷰포트 처리 */
-  useCanvasViewport(fabricCanvas, width, height);
+  // useCanvasViewport(fabricCanvas, width, height);
 
   /* 키보드 삭제(Del 키) 처리 */
   useCanvasKeyboardDelete(
@@ -254,8 +254,8 @@ export default function Canvas({
 
   const canvasImageActions = createCanvasImageActions({
     fabricCanvasRef: fabricCanvas,
-    width,
-    height,
+    // width,
+    // height,
     externalActiveLayerId: externalActiveLayerId,
     layers,
     setCanvasRevision,
@@ -302,8 +302,8 @@ export default function Canvas({
     saveToHistory,
     onCanvasChangeRef,
     setCanvasRevision,
-    width,
-    height,
+    // width,
+    // height,
   });
 
   const {
