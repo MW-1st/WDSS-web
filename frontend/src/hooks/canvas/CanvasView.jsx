@@ -3,6 +3,8 @@ import { MdDelete } from "react-icons/md";
 
 export default function CanvasView({
   canvasRef,
+  width,
+  height,
   isDragOver,
   deleteIconPos,
   drawingMode,
@@ -14,6 +16,8 @@ export default function CanvasView({
   return (
     <div
       style={{
+        width: '100%',
+        height: 'auto',
         position: "relative",
         display: "inline-block",
         border: isDragOver ? "3px dashed #007bff" : "none",
@@ -24,7 +28,7 @@ export default function CanvasView({
       onDragLeave={onDragLeave}
       onDrop={onDrop}
     >
-      <canvas ref={canvasRef} />
+      <canvas width={800} height={500} ref={canvasRef}  style={{ width: '100%', height: 'auto' }}  />
 
       {isDragOver && (
         <div

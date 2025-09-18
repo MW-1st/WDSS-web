@@ -1,6 +1,7 @@
 ﻿:root {
   --app-header-h: 56px; /* 상단 navbar 높이 */
-  --right-panel-w: clamp(240px, 22vw, 320px);
+  /* 오른쪽 패널을 고정 너비로 설정 (반응형 제거) */
+  --right-panel-w: 255px;
   --carousel-h: clamp(120px, 18vh, 180px);
 }
 
@@ -137,8 +138,15 @@
   flex-direction: column;
   min-height: 0;
   max-height: calc(100dvh - var(--app-header-h)); /* 화면 크기에 맞춤 */
-  overflow: hidden; /* 페이지 스크롤 제거 */
+  /* 내부 스크롤 허용하지만 스크롤바는 숨김 */
+  overflow: auto;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
   padding-top: 12px;
+}
+.main-content::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 /* 캔버스 영역 (남는 높이를 채움) */
@@ -156,7 +164,10 @@
 
 /* 오른쪽 속성 패널 */
 .right-panel {
-  width: 280px;
+  /* 고정 너비: 350px */
+  width: var(--right-panel-w);
+  flex: 0 0 var(--right-panel-w);
+  min-width: var(--right-panel-w);
   border-left: 1px solid #cbd5e1;
   position: sticky;
   top: var(--app-header-h);
@@ -348,10 +359,5 @@
 @media (max-height: 820px) {
   :root {
     --carousel-h: clamp(100px, 15vh, 140px);
-  }
-}
-@media (max-width: 1200px) {
-  :root {
-    --right-panel-w: clamp(220px, 24vw, 280px);
   }
 }

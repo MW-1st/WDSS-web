@@ -1435,7 +1435,7 @@ export default function EditorPage({projectId = DUMMY}) {
       )}
 
       {/* 메인 캔버스 */}
-      <div className="main-content">
+      <div className="main-content" style={{ width: '100%' }}>
         <div className="canvas-area">
         <MainCanvasSection
           selectedScene={selectedScene}
