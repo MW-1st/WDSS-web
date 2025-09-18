@@ -22,7 +22,8 @@ function MainCanvasSection({
   isSceneTransformed = false // 씬 변환 상태
 }) {
   const containerRef = useRef(null);
-  const [canvasSize, setCanvasSize] = useState({ width: 1200, height: 675 });
+  const DESIGN = { width: 1200, height: 675 }; // logical base resolution
+  const [canvasSize, setCanvasSize] = useState({ width: DESIGN.width, height: DESIGN.height });
 
   useEffect(() => {
     const observer = new ResizeObserver(entries => {
@@ -74,6 +75,8 @@ function MainCanvasSection({
               scene={selectedScene}
               width={canvasSize.width}
               height={canvasSize.height}
+              baseWidth={DESIGN.width}
+              baseHeight={DESIGN.height}
               onChange={(patch) => onChange(selectedScene.id, patch)}
               onPreviewChange={onPreviewChange}
               onCanvasChange={onCanvasChange}
