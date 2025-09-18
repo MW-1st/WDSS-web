@@ -28,6 +28,7 @@ from fastapi import APIRouter, Depends, status, HTTPException
 import json
 import os
 import uuid
+import websockets
 
 router = APIRouter()
 
@@ -143,6 +144,18 @@ async def delete_existing_project(
             status_code=status.HTTP_404_NOT_FOUND, detail="Project not found"
         )
     return {"success": True}
+
+## GCS서버로 json보내버리기
+async def send_json_to_external_server(json_data: str):
+    """외부 WebSocket 서버로 JSON 데이터를 전송합니다."""
+    uri = "ws://gsc.wdss.store:8000/"
+    try:
+        async with websockets.connect(uri) as websocket:
+            await websocket.send(json_data)
+            print(f"Successfully sent JSON data to {uri}")
+    except Exception as e:
+        # 주 프로세스를 중단시키지 않고 오류를 로깅합니다.
+        print(f"Error sending JSON to external server {uri}: {e}")
 
 
 @router.post("/{project_id}/json")
@@ -270,7 +283,7 @@ async def export_project_to_json(
         json.dump(project_json, f, ensure_ascii=False, indent=2)
 
     # Unity로 전송
-    await manager.broadcast(json.dumps(project_json))
+    await send_json_to_external_server(json.dumps(project_json))
 
     return {
         "json_url": f"/svg-json/{out_name}",
