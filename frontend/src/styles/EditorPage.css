@@ -138,8 +138,15 @@
   flex-direction: column;
   min-height: 0;
   max-height: calc(100dvh - var(--app-header-h)); /* 화면 크기에 맞춤 */
-  overflow: hidden; /* 페이지 스크롤 제거 */
+  /* 내부 스크롤 허용하지만 스크롤바는 숨김 */
+  overflow: auto;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
   padding-top: 12px;
+}
+.main-content::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 /* 캔버스 영역 (남는 높이를 채움) */
