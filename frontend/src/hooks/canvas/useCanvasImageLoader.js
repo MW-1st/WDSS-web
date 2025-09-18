@@ -121,6 +121,16 @@ export default function useCanvasImageLoader({
       canvas.renderOnAddRemove = false;
       canvas.add(...successfullyCreated);
       canvas.renderOnAddRemove = true;
+      // Restore saved viewport if present in data
+      try {
+        const vp = fabricJsonData.viewport || fabricJsonData.layerMetadata?.viewport;
+        if (vp && Array.isArray(vp.vpt)) {
+          canvas.setViewportTransform(vp.vpt);
+          if (typeof vp.zoom === 'number') canvas.setZoom(vp.zoom);
+          canvas.__wdss_preserveViewport = true;
+        }
+      } catch (_) {}
+      try { if (typeof setCanvasRevision === 'function') setCanvasRevision(c => c + 1); } catch (_) {}
 
       if (fabricJsonData.layerMetadata && loadSceneLayerState && scene?.id) {
         loadSceneLayerState(scene.id, fabricJsonData.layerMetadata);
@@ -157,6 +167,7 @@ export default function useCanvasImageLoader({
       setTimeout(() => {
         if (isCancelled) return;
         canvas.renderAll();
+        try { if (typeof setCanvasRevision === 'function') setCanvasRevision(c => c + 1); } catch (_) {}
       }, 16);
 
       postLoadActions();
