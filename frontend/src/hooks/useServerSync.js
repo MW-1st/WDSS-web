@@ -221,19 +221,15 @@ export const useServerSync = (projectId, sceneId, fabricCanvas, options = {}) =>
       layerMetadata = canvas.saveCurrentSceneLayerState();
     }
 
-    const vpt = Array.isArray(canvas.viewportTransform) ? [...canvas.viewportTransform] : null;
-    const zoom = typeof canvas.getZoom === 'function' ? canvas.getZoom() : null;
-
     const saveMetadata = {
       objectCount: actualObjectCount,
       canvasSize: {
         width: canvas.getWidth(),
         height: canvas.getHeight()
-      },
-      viewport: vpt && zoom ? { vpt, zoom } : null,
+      }
     }
 
-    return { ...canvasData, layerMetadata, ...saveMetadata }
+    return {...canvasData, layerMetadata, ...saveMetadata}
   }, [fabricCanvas]);
 
   // 주기적 동기화 시작
@@ -306,14 +302,6 @@ export const useServerSync = (projectId, sceneId, fabricCanvas, options = {}) =>
 
         return new Promise((resolve) => {
           canvas.loadFromJSON(canvasData, () => {
-            try {
-              const vp = canvasData.viewport || canvasData.layerMetadata?.viewport;
-              if (vp && Array.isArray(vp.vpt)) {
-                canvas.setViewportTransform(vp.vpt);
-                if (typeof vp.zoom === 'number') canvas.setZoom(vp.zoom);
-                canvas.__wdss_preserveViewport = true;
-              }
-            } catch (_) {}
             canvas.renderAll();
             console.log(`Canvas loaded from server: ${syncType} for scene ${sceneId}`);
             resolve(true);
