@@ -40,15 +40,23 @@ async def create_project(
 ) -> dict:
     """DB에 새 프로젝트를 생성합니다."""
     query = """
-        INSERT INTO project (project_name, format, max_scene, max_drone, max_speed, max_accel, min_separation, user_id)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        INSERT INTO project (
+            project_name,
+            format,
+            max_scene,
+            max_drone,
+            max_speed,
+            max_accel,
+            min_separation,
+            user_id
+        )
+        VALUES ($1, $2, 0, $3, $4, $5, $6, $7)
         RETURNING *
     """
     new_project = await conn.fetchrow(
         query,
         project_data.project_name,
         project_data.format,
-        project_data.max_scene,
         project_data.max_drone,
         project_data.max_speed,
         project_data.max_accel,
@@ -83,6 +91,14 @@ async def get_project_by_id(
         project_id,
     )
     project["scenes"] = [dict(row) for row in scene_rows]
+    scene_count = len(project["scenes"])
+    if project.get("max_scene") != scene_count:
+        await conn.execute(
+            "UPDATE project SET max_scene = $1 WHERE id = $2",
+            scene_count,
+            project_id,
+        )
+    project["max_scene"] = scene_count
     return project
 
 
@@ -94,6 +110,7 @@ async def update_project_by_id(
 ) -> Optional[dict]:
     """프로젝트 ID로 특정 프로젝트 정보를 수정합니다."""
     update_data = project_data.model_dump(exclude_unset=True)
+    update_data.pop("max_scene", None)
     if not update_data:
         # 수정할 내용이 없으면 기존 프로젝트 정보 반환
         return await get_project_by_id(conn, project_id, user_id)

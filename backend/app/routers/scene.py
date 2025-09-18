@@ -26,6 +26,39 @@ from app.services.image_service import process_image
 router = APIRouter()
 
 
+async def recalc_project_max_scene(conn, project_id: uuid.UUID) -> int:
+    count = await conn.fetchval(
+        "SELECT COUNT(*) FROM project_scenes WHERE project_id = $1",
+        project_id,
+    )
+    await conn.execute(
+        "UPDATE project SET max_scene = $2 WHERE id = $1",
+        project_id,
+        count,
+    )
+    return int(count)
+
+
+async def normalize_scene_numbers(conn, project_id: uuid.UUID) -> None:
+    rows = await conn.fetch(
+        """
+        SELECT s.id, s.scene_num
+        FROM project_scenes ps
+        JOIN scene s ON ps.scene_id = s.id
+        WHERE ps.project_id = $1
+        ORDER BY s.scene_num ASC
+        """,
+        project_id,
+    )
+    for idx, row in enumerate(rows, start=1):
+        if row["scene_num"] != idx:
+            await conn.execute(
+                "UPDATE scene SET scene_num = $1 WHERE id = $2",
+                idx,
+                row["id"],
+            )
+
+
 @router.get("", response_model=ScenesResponse)
 async def get_scenes(project_id: str, user: UserResponse = Depends(get_current_user)):
     """씬 목록 조회"""
@@ -92,35 +125,44 @@ async def create_scene(
             if not project_check:
                 raise HTTPException(status_code=404, detail="Project not found")
 
-            # 중복 scene_num 확인 (같은 프로젝트 내에서)
-            existing_scene = await conn.fetchrow(
+            existing_numbers = await conn.fetch(
                 """
-                SELECT s.id
+                SELECT s.scene_num
                 FROM project_scenes ps
                 JOIN scene s ON ps.scene_id = s.id
-                WHERE ps.project_id = $1 AND s.scene_num = $2
+                WHERE ps.project_id = $1
+                ORDER BY s.scene_num ASC
                 """,
                 project_id,
-                scene_data.scene_num,
             )
 
-            if existing_scene:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Scene number {scene_data.scene_num} already exists",
-                )
+            requested_num = (
+                scene_data.scene_num if scene_data.scene_num and scene_data.scene_num > 0 else None
+            )
+            used_numbers = {
+                row["scene_num"] for row in existing_numbers if isinstance(row["scene_num"], int)
+            }
+            scene_num = requested_num
+            if scene_num is None or scene_num in used_numbers:
+                scene_num = 1
+                for row in existing_numbers:
+                    current = row["scene_num"]
+                    if not isinstance(current, int) or current < 1:
+                        continue
+                    if current == scene_num:
+                        scene_num += 1
+                    elif current > scene_num:
+                        break
 
-            # 씬 생성
             scene = await conn.fetchrow(
                 """
                 INSERT INTO scene (scene_num)
-                VALUES ($1) 
+                VALUES ($1)
                 RETURNING id, s3_key, scene_num
                 """,
-                scene_data.scene_num,
+                scene_num,
             )
 
-            # project_scenes 관계 생성
             await conn.execute(
                 """
                 INSERT INTO project_scenes (project_id, scene_id)
@@ -130,16 +172,30 @@ async def create_scene(
                 scene["id"],
             )
 
-            return SceneResponse(
-                success=True,
-                scene=Scene(
-                    id=str(scene["id"]),
-                    project_id=project_id,
-                    scene_num=scene["scene_num"],
-                    s3_key=scene["s3_key"],
-                    # display_url=get_display_url(scene["s3_key"]),
-                ),
+            await normalize_scene_numbers(conn, project_id)
+            await recalc_project_max_scene(conn, project_id)
+
+            created_scene = await conn.fetchrow(
+                """
+                SELECT s.id, s.scene_num, s.s3_key
+                FROM scene s
+                JOIN project_scenes ps ON ps.scene_id = s.id
+                WHERE ps.project_id = $1 AND s.id = $2
+                """,
+                project_id,
+                scene["id"],
             )
+
+        return SceneResponse(
+            success=True,
+            scene=Scene(
+                id=str(created_scene["id"]),
+                project_id=project_id,
+                scene_num=created_scene["scene_num"],
+                s3_key=created_scene["s3_key"],
+                # display_url=get_display_url(scene["s3_key"]),
+            ),
+        )
 
 
 @router.get("/{scene_id}", response_model=SceneResponse)
@@ -385,7 +441,10 @@ async def delete_scene(
                     scene_id,
                 )
 
-        return {"success": True, "message": "Scene deleted successfully"}
+            await normalize_scene_numbers(conn, project_id)
+            new_count = await recalc_project_max_scene(conn, project_id)
+
+    return {"success": True, "message": "Scene deleted successfully", "max_scene": new_count}
 
 
 @router.put("/{scene_id}/originals")

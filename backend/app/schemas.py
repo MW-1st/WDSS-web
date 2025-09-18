@@ -76,7 +76,6 @@ class ProjectBase(BaseModel):
         ..., description="프로젝트 이름", example="새 드론쇼 프로젝트"
     )
     format: str = Field("dsj", description="프로젝트 포맷", example="dsj")
-    max_scene: int = Field(..., description="최대 씬 개수", example=15)
     max_drone: int = Field(..., description="최대 드론 개수", example=10)
     max_speed: float = Field(..., description="최대 속도", example=6.0)
     max_accel: float = Field(..., description="최대 가속도", example=3.0)
@@ -94,9 +93,6 @@ class ProjectUpdate(BaseModel):
 
     project_name: Optional[str] = Field(
         None, description="수정할 프로젝트 이름", example="수정된 프로젝트 이름"
-    )
-    max_scene: Optional[int] = Field(
-        None, description="수정할 최대 씬 개수", example=20
     )
     max_drone: Optional[int] = Field(
         None, description="수정할 최대 드론 개수", example=15
@@ -175,7 +171,7 @@ class ProjectListDataResponse(BaseModel):
 
 # schemas.py에서 Scene 관련 스키마 수정
 class SceneCreate(BaseModel):
-    scene_num: int
+    scene_num: Optional[int] = None
 
 
 class SceneUpdate(BaseModel):

@@ -12,7 +12,6 @@ export default function ProjectSettingsModal({
 
   const [form, setForm] = useState({
     project_name: "",
-    max_scene: 15,
     max_drone: 1000,
     max_speed: 6.0,
     max_accel: 3.0,
@@ -28,7 +27,6 @@ export default function ProjectSettingsModal({
     if (project) {
       setForm({
         project_name: project.project_name ?? "",
-        max_scene: project.max_scene ?? 15,
         max_drone: project.max_drone ?? 1000,
         max_speed: project.max_speed ?? 6.0,
         max_accel: project.max_accel ?? 3.0,
@@ -37,7 +35,6 @@ export default function ProjectSettingsModal({
     } else {
       setForm({
         project_name: "",
-        max_scene: 15,
         max_drone: 1000,
         max_speed: 6.0,
         max_accel: 3.0,
@@ -64,7 +61,6 @@ export default function ProjectSettingsModal({
     }
 
     const numericKeys = [
-      "max_scene",
       "max_drone",
       "max_speed",
       "max_accel",
@@ -79,7 +75,6 @@ export default function ProjectSettingsModal({
 
     const payload = {
       project_name: form.project_name,
-      max_scene: Number(form.max_scene),
       max_drone: Number(form.max_drone),
       max_speed: Number(form.max_speed),
       max_accel: Number(form.max_accel),
@@ -152,29 +147,25 @@ export default function ProjectSettingsModal({
           <div>
             <label className="block text-sm font-medium mb-1">
               프로젝트 이름
-            </label>
-            <input
-              type="text"
-              value={form.project_name}
-              onChange={updateField("project_name")}
-              className="w-full rounded border border-gray-300 px-3 py-2"
-              placeholder="프로젝트 이름"
-              required
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block">
-              <div className="text-sm font-medium mb-1">max_scene</div>
               <input
-                type="number"
-                inputMode="numeric"
-                value={form.max_scene}
-                onChange={updateField("max_scene")}
+                type="text"
+                value={form.project_name}
+                onChange={updateField("project_name")}
                 className="w-full rounded border border-gray-300 px-3 py-2"
-                min={0}
+                placeholder="프로젝트 이름"
+                required
               />
             </label>
+          </div>
+
+          {Number.isFinite(project?.max_scene) && (
+            <div className="rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+              현재 씬 수는 에디터에서 자동으로 {project.max_scene}개로
+              관리됩니다.
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
             <label className="block">
               <div className="text-sm font-medium mb-1">max_drone</div>
               <input
