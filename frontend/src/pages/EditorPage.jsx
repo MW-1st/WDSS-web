@@ -937,7 +937,14 @@ export default function EditorPage({projectId = DUMMY}) {
       if (stageRef.current.clear) {
         stageRef.current.clear();
       }
+      // Preserve current viewport so confirmation does not jump/resize
+      const prevVpt = stageRef.current.viewportTransform
+        ? [...stageRef.current.viewportTransform]
+        : null;
       stageRef.current.loadFromJSON(transformedJsonData, () => {
+        try {
+          if (prevVpt) stageRef.current.setViewportTransform(prevVpt);
+        } catch (_) {}
         stageRef.current.renderAll();
       });
     } else {

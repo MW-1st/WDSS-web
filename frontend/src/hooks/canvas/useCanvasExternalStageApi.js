@@ -6,6 +6,7 @@ import { useEffect } from "react";
 export default function useCanvasExternalStageApi({
   externalStageRef,
   fabricCanvas,
+  setCanvasRevision,
   getCurrentCanvasAsSvg,
   exportCanvasAsImage,
   exportDrawnLinesOnly,
@@ -126,9 +127,15 @@ export default function useCanvasExternalStageApi({
       externalStageRef.current.restoreSceneLayerState = restoreSceneLayerState;
       externalStageRef.current.loadSceneLayerState = loadSceneLayerState;
       externalStageRef.current.getSceneLayerState = getSceneLayerState;
+
+      // Force viewport recalculation from parent (e.g., after loadFromJSON)
+      externalStageRef.current.recalcViewport = () => {
+        try { if (typeof setCanvasRevision === 'function') setCanvasRevision(c => c + 1); } catch (_) {}
+      };
     }
   }, [
     externalStageRef,
+    setCanvasRevision,
     getSortedLayers,
     activeLayerId,
     setActiveLayerId,

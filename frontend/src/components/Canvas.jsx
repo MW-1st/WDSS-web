@@ -371,6 +371,7 @@ export default function Canvas({
   useCanvasExternalStageApi({
     externalStageRef,
     fabricCanvas,
+    setCanvasRevision,
     getCurrentCanvasAsSvg,
     exportCanvasAsImage,
     exportDrawnLinesOnly,
