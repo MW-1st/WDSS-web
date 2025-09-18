@@ -83,25 +83,18 @@ export function createCanvasActions({ fabricCanvasRef, drawingColorRef, layersRe
 
     const canvas = fabricCanvasRef.current;
 
-    const currentViewportTransform = canvas.viewportTransform
-      ? [...canvas.viewportTransform]
-      : null;
+    // Export using the current viewport transform so the preview matches
+    // what the user sees (scaled/centered content). Disabling transforms
+    // here caused cropping in the preview modal when content exceeded the
+    // raw logical canvas size.
+    canvas.requestRenderAll();
+    const dataURL = canvas.toDataURL({
+      format: "png",
+      quality: 1.0,
+      multiplier: 1,
+    });
 
-    try {
-      canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
-
-      const dataURL = canvas.toDataURL({
-        format: "png",
-        quality: 1.0,
-        multiplier: 1,
-      });
-
-      return dataURL;
-    } finally {
-      if (currentViewportTransform) {
-        canvas.setViewportTransform(currentViewportTransform);
-      }
-    }
+    return dataURL;
   };
 
   const exportDrawnLinesOnly = () => {

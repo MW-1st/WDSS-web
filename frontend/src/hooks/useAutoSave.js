@@ -209,6 +209,14 @@ export const useAutoSave = (projectId, sceneId, fabricCanvas, options = {}, scen
 
         return new Promise((resolve) => {
           canvas.loadFromJSON(savedState, () => {
+            try {
+              const vp = savedState.viewport || savedState.layerMetadata?.viewport;
+              if (vp && Array.isArray(vp.vpt)) {
+                canvas.setViewportTransform(vp.vpt);
+                if (typeof vp.zoom === 'number') canvas.setZoom(vp.zoom);
+                canvas.__wdss_preserveViewport = true;
+              }
+            } catch (_) {}
             canvas.renderAll();
             console.log(`Canvas state loaded for scene: ${targetSceneId}`);
             resolve(true);
