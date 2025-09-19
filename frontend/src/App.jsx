@@ -61,7 +61,7 @@ function AppContent() {
     position: "relative",
     width: "90%",
     height: "90%",
-    backgroundColor: "white",
+    backgroundColor: "black",
     borderRadius: "8px",
   };
 
