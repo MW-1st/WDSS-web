@@ -89,7 +89,7 @@ function MainCanvasSection({
             />
 
           ) : (
-            <div style={{ color: "#666", fontSize: 14 }}>
+            <div style={{ color: "#666", fontSize: 14, width:800, height:500, textAlign:"center", display:"flex", alignItems:"center", justifyContent:"center" }}>
               아래 + 카드로 새 씬을 추가하세요
             </div>
           )}
