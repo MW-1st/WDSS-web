@@ -19,6 +19,9 @@ python -m venv venv
 venv\Scripts\activate   # 윈도우
 # source venv/bin/activate   # 리눅스/맥
 
+#백엔드 서버 실행
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
 # 패키지 설치
 pip install -r requirements.txt
 ```

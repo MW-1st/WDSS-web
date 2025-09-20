@@ -10,6 +10,7 @@ export default defineConfig({
     port: 5173,        // 개발 서버 포트 (변경 가능)
     allowedHosts: [
       'wdss.store',    // 도메인 허용
+      'ec2-54-234-136-155.compute-1.amazonaws.com',
     ],
     proxy: {
       '/api': {
