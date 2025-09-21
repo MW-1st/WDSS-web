@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import '../styles/PreviewPanel.css';
 import client from '../api/client';
 import { getImageUrl } from '../utils/imageUtils';
@@ -497,8 +498,8 @@ const PreviewPanel = React.forwardRef(({
         </button>
       </div>
 
-      {/* 미리보기 모달 */}
-      {isModalOpen && previewImage && (
+      {/* 미리보기 모달: 포탈로 body에 렌더하여 stacking context 문제 방지 */}
+      {isModalOpen && previewImage && typeof document !== 'undefined' && createPortal(
         <div className="preview-modal-overlay" onClick={() => setIsModalOpen(false)}>
           <div className="preview-modal-content" onClick={(e) => e.stopPropagation()}>
             <button 
@@ -513,7 +514,8 @@ const PreviewPanel = React.forwardRef(({
               className="preview-modal-image"
             />
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

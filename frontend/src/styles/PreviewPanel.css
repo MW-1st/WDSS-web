@@ -259,6 +259,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  /* Ensure modal always sits above left rail/tooltips (which may use z-index up to ~3000) */
   z-index: 10000;
   padding: 20px;
   box-sizing: border-box;
@@ -288,6 +289,7 @@
   color: #999;
   cursor: pointer;
   line-height: 1;
+  /* Make sure the close button is clickable above other overlay children */
   z-index: 10001;
   width: 40px;
   height: 40px;
