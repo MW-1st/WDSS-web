@@ -206,6 +206,7 @@ async def export_project_to_json(
         raise HTTPException(status_code=404, detail="No scenes found")
 
     all_scenes_data = []
+    max_drone = int(project["max_drone"]);
 
     for i, scene in enumerate(scenes):
         scene_id = scene["id"]
@@ -226,6 +227,10 @@ async def export_project_to_json(
                 # SVG 파일을 좌표+색상으로 변환
                 coords_with_colors = fabric_json_to_coords_with_colors(processed_path)
                 scene_w, scene_h, scene_z = get_fabric_json_size(processed_path)
+
+                # 드론 수 갱신
+                max_drone = min(len(coords_with_colors), max_drone)
+                print(len(coords_with_colors))
 
                 # 개별 씬 액션 데이터 생성
                 actions = []
@@ -263,7 +268,7 @@ async def export_project_to_json(
         "format": (project["format"] or "dsj").strip(),
         "show": {
             "show_name": project["project_name"] or "Untitled Show",
-            "max_drone": int(project["max_drone"] or 1),
+            "max_drone": max_drone,
             "max_scene": len(scenes),
         },
         "constraints": {
