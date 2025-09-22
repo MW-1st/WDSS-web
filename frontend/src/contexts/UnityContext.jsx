@@ -16,6 +16,11 @@ export const UnityProvider = ({ children }) => {
 
   const showUnity = () => {
     try {
+    const iframe = document.querySelector('iframe[title="Unity WebGL Simulator"]');
+    const unityWindow = iframe?.contentWindow;
+    if (unityWindow && unityWindow.unityApp) {
+        unityWindow.unityApp.SendMessage('Panel', 'StartWebView');
+    }
       const canvas = window?.editorAPI?.stageRef?.current;
       if (canvas && typeof canvas.discardActiveObject === 'function') {
         const actives = typeof canvas.getActiveObjects === 'function' ? canvas.getActiveObjects() : [];
