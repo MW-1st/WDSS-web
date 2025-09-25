@@ -149,7 +149,7 @@ async def delete_existing_project(
 async def send_json_to_external_server(json_data: str):
     """외부 WebSocket 서버로 JSON 데이터를 전송합니다."""
     # uri = "ws://gsc.wdss.store:8000/"
-    uri = "ws://3.36.114.187:5089/json"
+    uri = "ws://43.202.17.174:5089/json"
     try:
         print(f"Attempting to send JSON data to {uri}")
         async with websockets.connect(uri) as websocket:

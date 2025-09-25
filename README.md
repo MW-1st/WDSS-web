@@ -7,6 +7,14 @@
 
 ---
 
+cd backend
+source venv/bin/activate
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+cd frontend
+npm run dev
+
+
 ## 세팅
 
 1. 백엔드 (Python / 가상환경)
