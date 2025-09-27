@@ -206,7 +206,9 @@ async def export_project_to_json(
         raise HTTPException(status_code=404, detail="No scenes found")
 
     all_scenes_data = []
-    max_drone = int(project["max_drone"]);
+    project_max_drone_raw = project["max_drone"]
+    project_max_drone = int(project_max_drone_raw) if project_max_drone_raw is not None else None
+    max_drones_in_scenes = 0
 
     for i, scene in enumerate(scenes):
         scene_id = scene["id"]
@@ -229,8 +231,8 @@ async def export_project_to_json(
                 scene_w, scene_h, scene_z = get_fabric_json_size(processed_path)
 
                 # 드론 수 갱신
-                max_drone = min(len(coords_with_colors), max_drone)
-                print(len(coords_with_colors))
+                drone_count = len(coords_with_colors)
+                max_drones_in_scenes = max(max_drones_in_scenes, drone_count)
 
                 # 개별 씬 액션 데이터 생성
                 actions = []
@@ -268,7 +270,7 @@ async def export_project_to_json(
         "format": (project["format"] or "dsj").strip(),
         "show": {
             "show_name": project["project_name"] or "Untitled Show",
-            "max_drone": max_drone,
+            "max_drone": project_max_drone if project_max_drone is not None else max_drones_in_scenes,
             "max_scene": len(scenes),
         },
         "constraints": {
